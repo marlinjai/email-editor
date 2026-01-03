@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Implementation plan to fix the Next.js example build failure by adding missing workspace dependencies and fixing a broken CSS export.",
+  "updatedAt":  "2026-01-03T20:13:25.227624Z"
+}

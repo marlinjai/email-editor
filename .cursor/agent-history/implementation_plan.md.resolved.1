@@ -1,0 +1,34 @@
+# Fix Next.js Example Build Failure
+
+The Next.js example is failing to build because it's missing direct dependencies on workspace packages it uses (`core`, `ui`, `blocks`) and the `editor` package has a broken CSS export.
+
+## Proposed Changes
+
+### Next.js Example
+#### [MODIFY] [package.json](file:///Users/marlin.pohl/software%20development/email-editor/examples/nextjs/package.json)
+- Add `@returnhypnosis/email-editor-core`, `@returnhypnosis/email-editor-ui`, and `@returnhypnosis/email-editor-blocks` to `dependencies`.
+
+### Editor Package
+#### [MODIFY] [package.json](file:///Users/marlin.pohl/software%20development/email-editor/packages/editor/package.json)
+- Re-added the [./styles.css](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/dist/styles.css) export.
+- Updated `build` script to copy [styles.css](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/dist/styles.css) from the UI package.
+
+### Core Package (Fix for 'fs' error)
+#### [MODIFY] [package.json](file:///Users/marlin.pohl/software%20development/email-editor/packages/core/package.json)
+- Add `./compiler` to `exports`.
+- Update `build` script to include [src/compiler/index.ts](file:///Users/marlin.pohl/software%20development/email-editor/packages/core/src/compiler/index.ts) as an entry point.
+#### [MODIFY] [index.ts](file:///Users/marlin.pohl/software%20development/email-editor/packages/core/src/index.ts)
+- Remove `export * from './compiler';`.
+
+### Next.js Example (Fix for 'fs' error)
+#### [MODIFY] [route.ts](file:///Users/marlin.pohl/software%20development/email-editor/examples/nextjs/app/api/compile/route.ts)
+- Update import to use `@returnhypnosis/email-editor-core/compiler`.
+
+## Verification Plan
+
+### Automated Tests
+1. Run `npx pnpm build` in the root to ensure all packages and the example build successfully.
+2. Run `npx pnpm --filter email-editor-nextjs-example dev` to verify the dev server starts without errors.
+
+### Manual Verification
+1. Open the Next.js example in the browser (if possible) or verify that the console output shows no CSS resolution errors.

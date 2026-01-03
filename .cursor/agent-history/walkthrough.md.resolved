@@ -1,0 +1,353 @@
+# Build and CSS Fixes for Next.js Example
+
+I've successfully resolved the build and CSS resolution issues in the Next.js example. The application now builds correctly and the dev server starts without errors.
+
+## Changes Made
+
+### 1. Workspace Dependency Resolution
+The Next.js example was missing direct dependencies on the workspace packages it uses. I added them to [examples/nextjs/package.json](file:///Users/marlin.pohl/software%20development/email-editor/examples/nextjs/package.json):
+- `@returnhypnosis/email-editor-core`
+- `@returnhypnosis/email-editor-ui`
+- `@returnhypnosis/email-editor-blocks`
+
+### 2. CSS Export Fix
+The `@returnhypnosis/email-editor` package had a broken [./styles.css](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/dist/styles.css) export. I fixed this by:
+- Adding a post-build step to [packages/editor/package.json](file:///Users/marlin.pohl/software%20development/email-editor/packages/editor/package.json) to copy the CSS from the UI package to the editor's `dist` folder.
+- Re-enabling the [./styles.css](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/dist/styles.css) export in the `exports` map.
+
+### 3. MJML Bundling and 'fs' Error Fix
+The MJML library (which uses Node.js `fs`) was being bundled into the client-side code because it was exported from the core package's main entry point. I fixed this by:
+- Separating the MJML compiler into a subpath export: `@returnhypnosis/email-editor-core/compiler`.
+- Updating the Next.js API route to use this new subpath.
+- Updating [EmailEditor](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/src/EmailEditor.tsx#27-261) and [EmailEditorReact](file:///Users/marlin.pohl/software%20development/email-editor/packages/editor/dist/react.mjs#7-46) to take the compiler as an optional prop, removing its direct usage from client-side paths.
+
+### 4. Next.js 'EBADF' Build Error Fix
+Next.js was hitting a "Bad File Descriptor" error during the build's page data collection phase when analyzing the MJML compiler. I resolved this by:
+- Marking `mjml` and its sub-packages as external in [next.config.js](file:///Users/marlin.pohl/software%20development/email-editor/examples/nextjs/next.config.js).
+- Adding `export const dynamic = 'force-dynamic'` to the API route.
+
+## Verification Results
+
+### Build Status
+All packages and the Next.js example now build successfully:
+```bash
+npx pnpm build
+```
+Result: `Tasks: 5 successful, 5 total`
+
+### Dev Server
+The Next.js dev server starts and compiles the home page successfully:
+```bash
+npx pnpm --filter email-editor-nextjs-example dev
+```
+Result: `✓ Compiled / in 1444ms (568 modules)`
+
+## Next Steps
+- You can now run the dev server and start using the email editor in the Next.js example.
+- The editor will now correctly render the template (if the compiler is provided via an API route or server-side).
+
+```diff:package.json
+{
+  "name": "email-editor-nextjs-example",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Next.js integration example for email editor",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@returnhypnosis/email-editor": "workspace:*",
+    "next": "^14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.0"
+  }
+}
+
+===
+{
+  "name": "email-editor-nextjs-example",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Next.js integration example for email editor",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@returnhypnosis/email-editor": "workspace:*",
+    "@returnhypnosis/email-editor-core": "workspace:*",
+    "@returnhypnosis/email-editor-ui": "workspace:*",
+    "@returnhypnosis/email-editor-blocks": "workspace:*",
+    "next": "^14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.0"
+  }
+}
+
+```
+```diff:package.json
+{
+  "name": "@returnhypnosis/email-editor",
+  "version": "0.0.1",
+  "description": "Email editor with MJML compilation",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js",
+      "types": "./dist/react.d.ts"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/react.tsx --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts src/react.tsx --format cjs,esm --dts --watch",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@returnhypnosis/email-editor-core": "workspace:*",
+    "@returnhypnosis/email-editor-ui": "workspace:*",
+    "@returnhypnosis/email-editor-blocks": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  }
+}
+
+===
+{
+  "name": "@returnhypnosis/email-editor",
+  "version": "0.0.1",
+  "description": "Email editor with MJML compilation",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js",
+      "types": "./dist/react.d.ts"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/react.tsx --format cjs,esm --dts --clean && cp ../ui/dist/styles.css ./dist/styles.css",
+    "dev": "tsup src/index.ts src/react.tsx --format cjs,esm --dts --watch",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@returnhypnosis/email-editor-core": "workspace:*",
+    "@returnhypnosis/email-editor-ui": "workspace:*",
+    "@returnhypnosis/email-editor-blocks": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  }
+}
+
+```
+```diff:package.json
+{
+  "name": "@returnhypnosis/email-editor-core",
+  "version": "0.0.1",
+  "description": "Framework-agnostic core engine for email editor",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "immer": "^10.0.3",
+    "mjml": "^4.14.1",
+    "nanoid": "^5.0.4",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/mjml": "^4.7.4",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.4"
+  }
+}
+
+===
+{
+  "name": "@returnhypnosis/email-editor-core",
+  "version": "0.0.1",
+  "description": "Framework-agnostic core engine for email editor",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./compiler": {
+      "types": "./dist/compiler/index.d.ts",
+      "import": "./dist/compiler/index.mjs",
+      "require": "./dist/compiler/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/compiler/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "immer": "^10.0.3",
+    "mjml": "^4.14.1",
+    "nanoid": "^5.0.4",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/mjml": "^4.7.4",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.4"
+  }
+}
+
+```
+```diff:next.config.js
+// examples/nextjs/next.config.js
+// Next.js configuration
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  transpilePackages: [
+    '@returnhypnosis/email-editor',
+    '@returnhypnosis/email-editor-core',
+    '@returnhypnosis/email-editor-ui',
+    '@returnhypnosis/email-editor-blocks',
+  ],
+  webpack: (config) => {
+    // Handle workspace packages
+    config.resolve.extensionAlias = {
+      '.js': ['.ts', '.tsx', '.js', '.jsx'],
+      '.mjs': ['.mts', '.mjs'],
+    };
+    return config;
+  },
+};
+
+module.exports = nextConfig;
+
+===
+// examples/nextjs/next.config.js
+// Next.js configuration
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  transpilePackages: [
+    '@returnhypnosis/email-editor',
+    '@returnhypnosis/email-editor-core',
+    '@returnhypnosis/email-editor-ui',
+    '@returnhypnosis/email-editor-blocks',
+  ],
+  experimental: {
+    serverComponentsExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
+  },
+  webpack: (config, { isServer }) => {
+    // Handle workspace packages
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'];
+    }
+
+    config.resolve.extensionAlias = {
+      '.js': ['.ts', '.tsx', '.js', '.jsx'],
+      '.mjs': ['.mts', '.mjs'],
+    };
+    return config;
+  },
+};
+
+module.exports = nextConfig;
+
+```

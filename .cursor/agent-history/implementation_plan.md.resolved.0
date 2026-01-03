@@ -1,0 +1,29 @@
+# Fix Next.js Example Build Failure
+
+The Next.js example is failing to build because it's missing direct dependencies on workspace packages it uses (`core`, `ui`, `blocks`) and the `editor` package has a broken CSS export.
+
+## Proposed Changes
+
+### Next.js Example
+#### [MODIFY] [package.json](file:///Users/marlin.pohl/software%20development/email-editor/examples/nextjs/package.json)
+- Add `@returnhypnosis/email-editor-core`, `@returnhypnosis/email-editor-ui`, and `@returnhypnosis/email-editor-blocks` to `dependencies`.
+
+### Editor Package
+#### [MODIFY] [package.json](file:///Users/marlin.pohl/software%20development/email-editor/packages/editor/package.json)
+- Remove the broken [./styles.css](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/dist/styles.css) export or point it to a valid file. Since [EmailEditorReact](file:///Users/marlin.pohl/software%20development/email-editor/packages/editor/src/react.tsx#21-66) already imports styles from the UI package, and the UI package exports them correctly, we should either:
+    1. Remove [./styles.css](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/dist/styles.css) from the editor package's `exports`.
+    2. Or, add a post-build step to copy [packages/ui/dist/styles.css](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/dist/styles.css) to `packages/editor/dist/styles.css`.
+    
+    I will choose option 1 for now to see if it's sufficient, as standard practice is to import styles from the package that defines them. However, to keep the API consistent, I'll update the `build` script to copy the CSS file.
+
+#### [MODIFY] [package.json](file:///Users/marlin.pohl/software%20development/email-editor/packages/editor/package.json)
+- Update `build` script to copy [styles.css](file:///Users/marlin.pohl/software%20development/email-editor/packages/ui/dist/styles.css) from the UI package.
+
+## Verification Plan
+
+### Automated Tests
+1. Run `npx pnpm build` in the root to ensure all packages and the example build successfully.
+2. Run `npx pnpm --filter email-editor-nextjs-example dev` to verify the dev server starts without errors.
+
+### Manual Verification
+1. Open the Next.js example in the browser (if possible) or verify that the console output shows no CSS resolution errors.

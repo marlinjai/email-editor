@@ -1,0 +1,12 @@
+# Task: Fix CSS issue in Next.js example
+
+- [/] Research CSS issue <!-- id: 0 -->
+    - [x] List files and examine project structure <!-- id: 1 -->
+    - [/] Check UI package exports for CSS <!-- id: 2 -->
+    - [ ] Check Next.js example configuration <!-- id: 3 -->
+- [ ] Fix CSS resolution <!-- id: 4 -->
+    - [ ] Run `pnpm install` and build packages <!-- id: 5 -->
+    - [ ] Adjust UI package exports if necessary <!-- id: 6 -->
+    - [ ] Verify fix by running Next.js dev server <!-- id: 7 -->
+- [ ] Final verification <!-- id: 8 -->
+    - [ ] Confirm app loads without CSS errors <!-- id: 9 -->

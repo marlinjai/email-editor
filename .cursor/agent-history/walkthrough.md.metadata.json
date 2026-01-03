@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_WALKTHROUGH",
+  "summary":  "Walkthrough of the fixes for the Next.js example build failure, including dependency resolution, CSS export fixes, and MJML bundling separation.",
+  "updatedAt":  "2026-01-03T20:18:09.754132Z"
+}
