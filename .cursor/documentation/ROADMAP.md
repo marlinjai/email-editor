@@ -2,7 +2,7 @@
 
 **Project:** `@returnhypnosis/email-editor`  
 **Type:** Embeddable email template authoring tool  
-**Current Phase:** Phase 1 (Core Foundation) - In Progress
+**Current Phase:** Phase 7 (Production Hardening) - In Progress
 
 ---
 
@@ -62,215 +62,63 @@ Build a standalone, pluggable email editor that:
 - [x] Define JSON schema for templates
 - [x] Document integration patterns
 
-### 🔄 Phase 1: Core Foundation (In Progress)
-**Timeline:** Week 1-2  
-**Status:** 70% complete
-
-#### Completed
+### ✅ Phase 1: Core Foundation (Completed)
 - [x] Turborepo monorepo setup
 - [x] TypeScript strict mode configuration
 - [x] Core JSON schema with Zod validation
 - [x] Block registry system
 - [x] MJML compiler (JSON → MJML → HTML)
 - [x] History manager (undo/redo with Immer)
+- [x] Selection manager (track selected block/section)
 
-#### In Progress
-- [ ] UI package setup (React + Tailwind + Radix UI + dnd-kit)
-  - **Blockers:** None
-  - **Next steps:** Install dependencies, configure Tailwind
+### ✅ Phase 2: React UI Components (Completed)
+- [x] Canvas component (iframe-based preview)
+- [x] Block toolbar (draggable blocks)
+- [x] Property inspector (Auto-generated forms)
+- [x] Main editor layout (3-panel)
 
-#### Remaining
-- [ ] Selection manager (track selected block/section)
-- [ ] Core unit tests (schema, compiler, history)
+### ✅ Phase 3: Standard Blocks Library (Completed)
+- [x] Text block (TipTap integration)
+- [x] Image block
+- [x] Button block
+- [x] Divider block
+- [x] Spacer block
 
-**Success Criteria:**
-- Can define `EmailTemplate` JSON
-- Can compile JSON → MJML → HTML
-- Can undo/redo changes
-- Core is framework-agnostic (no React dependencies)
+### ✅ Phase 4: Public API & React Wrapper (Completed)
+- [x] `createEditor()` factory function
+- [x] `EmailEditorReact` component wrapper
+- [x] Package configuration (NPM exports, tsup)
 
----
+### ✅ Phase 5: Custom ReTurn Blocks (Completed)
+- [x] Branded header block
+- [x] Branded footer block
+- [x] ReTurn theme configuration
 
-### 📋 Phase 2: React UI Components
-**Timeline:** Week 2-3  
-**Status:** Not started
+### ✅ Phase 6: Documentation & Examples (Completed)
+- [x] README.md (installation, quick start)
+- [x] API documentation
+- [x] Integration guide (Next.js example)
 
-#### Tasks
-- [ ] Canvas component (iframe-based preview)
-  - [ ] Click-to-select blocks
-  - [ ] Selection outline overlay
-  - [ ] Device toggle (desktop/mobile)
-- [ ] Block toolbar (draggable blocks)
-  - [ ] Category grouping
-  - [ ] Search/filter
-  - [ ] Drag source (dnd-kit)
-- [ ] Property inspector
-  - [ ] Auto-generated forms from Zod schemas
-  - [ ] Field components (text, color, alignment, spacing)
-  - [ ] Real-time updates with debouncing
-- [ ] Main editor layout
-  - [ ] 3-panel layout (Toolbar | Canvas | Inspector)
-  - [ ] Top toolbar (undo/redo, save, preview)
-  - [ ] Keyboard shortcuts (Cmd+Z, Delete)
-
-**Success Criteria:**
-- Can drag blocks from toolbar to canvas
-- Can click to select blocks
-- Can edit properties in inspector
-- Changes reflect in live preview
-
----
-
-### 📦 Phase 3: Standard Blocks Library
-**Timeline:** Week 3-4  
-**Status:** Not started
-
-#### Tasks
-- [ ] Text block
-  - [ ] TipTap integration for rich text
-  - [ ] Support: bold, italic, underline, links, headings
-  - [ ] Alignment, color, font size controls
-  - [ ] Convert TipTap JSON → MJML `<mj-text>`
-- [ ] Image block
-  - [ ] URL input with preview
-  - [ ] Alt text, width, alignment
-  - [ ] Convert to `<mj-image>`
-- [ ] Button block
-  - [ ] Label, link, alignment
-  - [ ] Colors, border radius
-  - [ ] Convert to `<mj-button>`
-- [ ] Divider block
-  - [ ] Color, width options
-  - [ ] Convert to `<mj-divider>`
-- [ ] Spacer block
-  - [ ] Height control
-  - [ ] Convert to `<mj-spacer>`
-
-**Success Criteria:**
-- All 5 standard blocks compile to valid MJML
-- Each block has working property inspector
-- Preview matches final email output
-
----
-
-### 🔌 Phase 4: Public API & React Wrapper
-**Timeline:** Week 4  
-**Status:** Not started
-
-#### Tasks
-- [ ] `createEditor()` factory function
-  - [ ] Framework-agnostic API
-  - [ ] Accept: `container`, `initialValue`, `theme`, `blocks`, callbacks
-  - [ ] Return: instance with `getValue()`, `setValue()`, `export()`, etc.
-- [ ] `EmailEditorReact` component wrapper
-  - [ ] Props: `value`, `onChange`, `theme`, `blocks`
-  - [ ] Handle React lifecycle & cleanup
-- [ ] Host adapter interface
-  - [ ] `uploadAsset()` hook
-  - [ ] `sendTestEmail()` hook (optional)
-  - [ ] `getMergeTags()` hook (optional)
-  - [ ] `listAudiences()` hook (optional)
-- [ ] Package configuration
-  - [ ] NPM exports: `@returnhypnosis/email-editor`, `/react`
-  - [ ] Peer dependencies (React, ReactDOM)
-  - [ ] Production build with tsup
-
-**Success Criteria:**
-- Can import and use in vanilla JS
-- Can import and use in React app
-- Can provide custom adapters (upload, send)
-- Package installs without errors
-
----
-
-### 🎨 Phase 5: Custom ReTurn Blocks (Optional)
-**Timeline:** Week 5  
-**Status:** Not started
-
-#### Tasks
-- [ ] Branded header block
-  - [ ] ReTurn logo
-  - [ ] "Welcome to the ReTurn Newsletter" text
-  - [ ] Locked (non-editable)
-- [ ] Branded footer block
-  - [ ] Social links
-  - [ ] Unsubscribe link placeholder
-  - [ ] Locked (non-editable)
-- [ ] ReTurn theme configuration
-  - [ ] Primary color: `#944923`
-  - [ ] Font: Georgia, serif
-  - [ ] Export as `returnTheme`
-
-**Success Criteria:**
-- Can add branded blocks to toolbar
-- Blocks are locked (cannot be edited, only added/removed)
-- Theme applies consistently across editor
-
----
-
-### 📚 Phase 6: Documentation & Examples
-**Timeline:** Week 5-6  
-**Status:** Not started
-
-#### Tasks
-- [ ] README.md (installation, quick start)
-- [ ] API documentation (TypeScript types + examples)
-- [ ] Integration guide
-  - [ ] Next.js example
-  - [ ] React example
-  - [ ] Vanilla JS example
-- [ ] Resend adapter example
-- [ ] Migration guide (from GrapesJS/Unlayer)
-- [ ] Storybook for component development
-
-**Success Criteria:**
-- Anyone can install and integrate in <15 minutes
-- Examples run without modification
-- Types are fully documented
-
----
-
-### 🚀 Phase 7: Production Hardening
-**Timeline:** Week 6-7  
-**Status:** Not started
-
-#### Tasks
+### 🔄 Phase 7: Production Hardening (In Progress)
 - [ ] Error handling & validation
 - [ ] Performance optimization
-  - [ ] Lazy load blocks
-  - [ ] Debounce heavy operations
-  - [ ] Virtual scrolling for large templates
 - [ ] Accessibility (WCAG 2.1 AA)
 - [ ] Unit tests (80%+ coverage)
 - [ ] E2E tests (Playwright)
 - [ ] CI/CD pipeline (GitHub Actions)
 - [ ] NPM publishing workflow
-- [ ] Versioning & changelog
-
-**Success Criteria:**
-- Passes all tests
-- Loads in <2 seconds
-- Works with screen readers
-- Published to NPM
 
 ---
 
-## Current Sprint (Week 1)
+## Current Sprint
 
 ### This Week's Goals
-1. ✅ Complete boundary specification
-2. ✅ Set up documentation structure
-3. 🔄 Complete UI package setup
-4. 🔄 Build Canvas component (basic)
-5. 🔄 Build Block toolbar (basic)
+1. [ ] Implement comprehensive unit tests for core & UI
+2. [ ] Performance: Debounce MJML compilation
+3. [ ] Accessibility review of Radix UI components
 
-### Blockers
-- None currently
-
-### Next Week Preview
-- Complete Canvas + Toolbar
-- Start Property Inspector
-- Build first block (Text)
+### Next steps
+- Start unit testing with Vitest
 
 ---
 
@@ -388,5 +236,4 @@ create-editor-api
 ---
 
 **Last updated:** 2026-01-03  
-**Next review:** 2026-01-10 (end of Week 1)
-
+**Next review:** 2026-01-10
