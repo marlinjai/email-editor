@@ -29,6 +29,7 @@ These are the **editor's responsibilities**:
    - Click-to-select blocks
    - Property inspector for editing
    - Canvas preview (iframe-based)
+   - 3-way drop intent (before/after/inside)
 
 2. **Template JSON schema**
    - `EmailTemplate` type with sections, columns, blocks
@@ -48,23 +49,87 @@ These are the **editor's responsibilities**:
    - `uploadAsset(file)` callback provided by host
    - Editor doesn't store files, just calls the hook
 
+6. **Centralized state management**
+   - Zustand store with document/interaction/api slices
+   - History middleware for undo/redo
+   - Validation middleware for MJML constraints
+
 ### Nice-to-Haves (Still Editor-ish)
 
-6. **Variables/merge tags**
+7. **Variables/merge tags**
    - Support `{{first_name}}`, `{{company}}`
    - Host provides available tags via `getMergeTags()` hook
 
-7. **Template validation**
+8. **Template validation**
    - Missing alt text
    - Empty links
    - Broken images
 
-8. **Versioning hooks**
+9. **Versioning hooks**
    - `onSave(template)` callback
    - Host decides where to store (DB/Git/S3)
 
-9. **Undo/Redo**
-   - In-memory history (Immer-based)
+10. **Undo/Redo**
+    - Zustand middleware with Immer patches
+    - Efficient patch-based history
+
+---
+
+## Centralized State Management (Zustand Store)
+
+The editor uses a centralized Zustand store with three slices:
+
+### Document Slice (Authoritative State)
+- Template structure (sections, columns, blocks)
+- CRUD operations for all nodes
+- mj-group abstraction via `setMobileHorizontal()`
+- Integrated with history middleware
+
+### Interaction Slice (Ephemeral UI State)
+- Current selection (block/section/column)
+- Drag state (isDragging, dropIntent)
+- Resize state (for canvas handles)
+- High-frequency updates that don't affect document
+
+### API Slice (Monetization Configuration)
+- API key for compile endpoint
+- Compile endpoint URL
+- Preview mode flag
+- Usage tracking
+
+### Middleware
+
+**History Middleware:**
+- Tracks document changes automatically
+- Uses Immer patches for efficient undo/redo
+- Skips interaction state changes
+
+**Validation Middleware:**
+- Enforces MJML nesting rules
+- Provides smart fallbacks for invalid operations
+- Ensures document is always MJML-valid
+
+---
+
+## mj-group Abstraction
+
+The editor uses `mj-group` for mobile-horizontal layouts but hides this from users:
+
+### User-Facing Model
+- Sections contain columns
+- Columns contain blocks
+- "Keep columns side-by-side on mobile" toggle in section inspector
+
+### Internal Implementation
+- `Section.noStack` flag controls mj-group output
+- When enabled: compiler wraps columns in `<mj-group>`
+- Column widths forced to percentages
+- Layers panel never shows "group" nodes
+
+### Why This Matters
+- Users think in terms of "Section → Columns"
+- They don't need to understand mj-group semantics
+- The abstraction handles MJML complexity automatically
 
 ---
 
@@ -120,29 +185,106 @@ These are the **host application's responsibilities**:
 
 ---
 
+## Monetization Boundary
+
+The editor follows a hybrid monetization model:
+
+### What Ships via npm (Public, Free)
+
+- React UI components (Canvas, Toolbar, Inspector, Layers)
+- JSON schema and TypeScript types
+- Block definitions and registry
+- Zustand store infrastructure
+- Client-side preview (for development)
+
+### What Runs on API (Protected, Monetized)
+
+- MJML compiler (production compiles require API key)
+- Usage tracking and billing
+- Future: Template library, AI content generation
+
+### Pricing Tiers (Planned)
+
+| Tier | Price | Limits | Features |
+|------|-------|--------|----------|
+| Free | $0 | 100 compiles/month | Watermark in HTML output |
+| Pro | $29/mo | 10,000 compiles/month | No watermark, priority support |
+| Scale | $99/mo | 100,000 compiles/month | Volume pricing, SLA |
+
+### Integration Flow
+
+```typescript
+// Development: Local preview (free, unlimited)
+<EmailEditorReact
+  value={template}
+  onChange={setTemplate}
+  // No apiKey = client-side preview only
+/>
+
+// Production: API compilation (metered)
+<EmailEditorReact
+  value={template}
+  onChange={setTemplate}
+  apiKey="rh_live_xxxxx"
+  compileEndpoint="https://api.returnhypnosis.com/compile"
+/>
+```
+
+---
+
 ## The Boundary Interface (TypeScript Contract)
 
 ### Editor Exports (What the Editor Provides)
 
 ```typescript
-// @returnhypnosis/email-editor
+// @returnhypnosis/email-editor-core
 
-type EmailEditor = {
-  getValue(): EmailTemplateDoc;         // Get current JSON
-  setValue(doc: EmailTemplateDoc): void; // Load template
+// Store exports
+export { useEditorStore, createEditorStore } from './store';
+export type { 
+  DocumentState, 
+  InteractionState, 
+  APIState,
+  DropIntent,
+  EditorStore,
+} from './store';
 
-  export(): Promise<{
-    subject: string;
-    preheader?: string;
-    html: string;                       // Email-safe HTML
-    mjml?: string;                      // Optional MJML source
-  }>;
+// Schema exports
+export type { EmailTemplate, Section, Column, Block } from './schema';
 
-  validate(): ValidationIssue[];        // Check for errors
-  undo(): void;
-  redo(): void;
-  destroy(): void;
-};
+// Validation exports
+export { validateDropIntent, computeValidatedDropIntent } from './store/middleware';
+```
+
+### Store Actions (Document Slice)
+
+```typescript
+interface DocumentState {
+  template: EmailTemplate;
+  
+  // Block operations
+  insertBlock: (columnId: string, index: number, block: Block) => void;
+  moveBlock: (blockId: string, targetColumnId: string, targetIndex: number) => void;
+  updateBlock: (blockId: string, updates: Partial<Block>) => void;
+  deleteBlock: (blockId: string) => void;
+  
+  // Section operations
+  insertSection: (index: number, section: Section) => void;
+  moveSection: (sectionId: string, targetIndex: number) => void;
+  updateSection: (sectionId: string, updates: Partial<Section>) => void;
+  deleteSection: (sectionId: string) => void;
+  
+  // Column operations
+  updateColumn: (columnId: string, updates: Partial<Column>) => void;
+  setColumnCount: (sectionId: string, count: number) => void;
+  setMobileHorizontal: (sectionId: string, enabled: boolean) => void;
+  
+  // History
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+}
 ```
 
 ### Host Implements (What the Client App Provides)
@@ -189,34 +331,22 @@ type EmailEditorHost = {
 **Use case:** Embed the editor into an existing app
 
 ```typescript
-import { createEmailEditor } from '@returnhypnosis/email-editor';
+import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
+import '@returnhypnosis/email-editor/styles.css';
 
-const editor = createEmailEditor({
-  container: document.getElementById('editor'),
-  initialValue: savedTemplate,
+function TemplateEditor() {
+  const [template, setTemplate] = useState(initialTemplate);
   
-  // Host provides these adapters
-  uploadAsset: async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
-    return res.json(); // { url: 'https://cdn.example.com/image.png' }
-  },
-  
-  sendTestEmail: async ({ to, subject, html }) => {
-    await fetch('/api/email/test', {
-      method: 'POST',
-      body: JSON.stringify({ to, subject, html }),
-    });
-  },
-  
-  getMergeTags: async () => {
-    return [
-      { key: 'first_name', label: 'First Name', example: 'John' },
-      { key: 'company', label: 'Company', example: 'Acme Inc' },
-    ];
-  },
-});
+  return (
+    <EmailEditorReact
+      value={template}
+      onChange={setTemplate}
+      uploadAsset={uploadToS3}
+      apiKey={process.env.EMAIL_EDITOR_API_KEY}
+      onSave={saveToDatabase}
+    />
+  );
+}
 ```
 
 ### Pattern 2: Full Email Platform (Integrated Mode)
@@ -291,18 +421,13 @@ export async function sendCampaign({
   subject: string;
   html: string;
 }) {
-  // Option A: Use Resend audiences
-  const audience = await resend.audiences.get(audienceId);
-  // ... send to all contacts in audience
-
-  // Option B: Use your own DB
   const contacts = await db.contacts.findMany({ audienceId });
   for (const contact of contacts) {
     await resend.emails.send({
       from: 'noreply@example.com',
       to: contact.email,
       subject,
-      html: replaceVariables(html, contact), // {{first_name}} → contact.firstName
+      html: replaceVariables(html, contact),
     });
   }
 }
@@ -312,39 +437,6 @@ export async function sendCampaign({
 - Editor doesn't care about Resend
 - You can swap to SendGrid/SES later
 - You can support multiple providers
-
----
-
-## Example: Multi-Provider Support
-
-```typescript
-// lib/email/send.ts
-
-type EmailProvider = 'resend' | 'sendgrid' | 'ses';
-
-export async function sendEmail({
-  provider,
-  to,
-  subject,
-  html,
-}: {
-  provider: EmailProvider;
-  to: string;
-  subject: string;
-  html: string;
-}) {
-  switch (provider) {
-    case 'resend':
-      return sendViaResend({ to, subject, html });
-    case 'sendgrid':
-      return sendViaSendGrid({ to, subject, html });
-    case 'ses':
-      return sendViaSES({ to, subject, html });
-  }
-}
-```
-
-The editor never knows which provider you chose.
 
 ---
 
@@ -397,14 +489,6 @@ table campaigns {
   sent_at: timestamp
   provider: string            // 'resend', 'sendgrid', etc.
 }
-
-table campaign_analytics {
-  campaign_id: uuid
-  opens: int
-  clicks: int
-  bounces: int
-  unsubscribes: int
-}
 ```
 
 ---
@@ -453,6 +537,14 @@ You just swap the adapter in your host app.
 **A:** Yes! Ship it as `@returnhypnosis/email-editor` npm package.  
 Each app implements its own `uploadAsset()`, `sendTestEmail()`, etc.
 
+### Q: What's the state management approach?
+**A:** Zustand store with three slices (document, interaction, API).  
+History middleware provides undo/redo with Immer patches.
+
+### Q: How does mj-group work?
+**A:** Users toggle "Keep columns side-by-side on mobile" in section settings.  
+The editor internally sets `Section.noStack=true` and the compiler outputs `<mj-group>`.
+
 ---
 
 ## Summary
@@ -461,9 +553,11 @@ Each app implements its own `uploadAsset()`, `sendTestEmail()`, etc.
 |---------|-------|----------------|
 | Visual editing UI | **Editor** | React components |
 | Template JSON schema | **Editor** | Zod validation |
+| State management | **Editor** | Zustand store |
 | MJML → HTML compilation | **Editor** | `MJMLCompiler` |
 | Preview rendering | **Editor** | Iframe |
-| Undo/Redo | **Editor** | `HistoryManager` |
+| Undo/Redo | **Editor** | History middleware |
+| mj-group abstraction | **Editor** | `setMobileHorizontal()` |
 | Template storage | **Host** | PostgreSQL/Git/S3 |
 | Asset storage | **Host** | S3/Cloudinary/etc. |
 | Audience management | **Host** | DB + UI |
@@ -476,10 +570,18 @@ Each app implements its own `uploadAsset()`, `sendTestEmail()`, etc.
 
 ## Next Steps
 
-1. ✅ Define this boundary (done)
-2. ✅ Create `.cursor/boundary/` folder (done)
-3. [ ] Build editor core (in progress)
-4. [ ] Create example host adapter for Resend
-5. [ ] Document integration patterns
-6. [ ] Build reference implementation (Next.js + Resend)
+1. [x] Define this boundary (done)
+2. [x] Create `.cursor/boundary/` folder (done)
+3. [x] Build editor core (done)
+4. [x] Implement Zustand store architecture (done)
+5. [x] Add history middleware (done)
+6. [x] Add validation middleware (done)
+7. [ ] Complete Framer-like DnD UX
+8. [ ] Add canvas direct manipulation (resize handles)
+9. [ ] Build API monetization layer
+10. [ ] Create example host adapter for Resend
+11. [ ] Build reference implementation (Next.js + Resend)
 
+---
+
+**Last updated:** 2026-01-04
