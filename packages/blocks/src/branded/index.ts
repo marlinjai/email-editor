@@ -21,7 +21,7 @@ export const headerBlockDefinition: BlockDefinition<HeaderBlock> = {
   propSchema: HeaderBlockSchema.omit({ id: true, type: true }),
   toMJML: (block) => {
     return `
-<mj-wrapper background-color="#ffffff" padding="20px" data-block-id="${block.id}">
+<mj-wrapper background-color="#ffffff" padding="20px" css-class="el-header el-${block.id}">
   <mj-section>
     <mj-column>
       <mj-image src="https://via.placeholder.com/70x70" width="70px" align="center" />
@@ -51,7 +51,7 @@ export const footerBlockDefinition: BlockDefinition<FooterBlock> = {
   propSchema: FooterBlockSchema.omit({ id: true, type: true }),
   toMJML: (block) => {
     return `
-<mj-wrapper background-color="#f5f5f5" padding="20px" data-block-id="${block.id}">
+<mj-wrapper background-color="#f5f5f5" padding="20px" css-class="el-footer el-${block.id}">
   <mj-section>
     <mj-column>
       <mj-text align="center" font-size="12px" color="#666666">

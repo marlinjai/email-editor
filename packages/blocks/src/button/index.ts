@@ -42,7 +42,7 @@ export const buttonBlockDefinition: BlockDefinition<ButtonBlock> = {
       if (padding) attrs.push(`padding="${padding}"`);
     }
 
-    return `<mj-button ${attrs.join(' ')}>${block.label}</mj-button>`;
+    return `<mj-button ${attrs.join(' ')} css-class="el-button el-${block.id}">${block.label}</mj-button>`;
   },
 };
 

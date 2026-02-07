@@ -42,7 +42,7 @@ export const textBlockDefinition: BlockDefinition<TextBlock> = {
       if (padding) attrs.push(`padding="${padding}"`);
     }
 
-    return `<mj-text ${attrs.join(' ')} data-block-id="${block.id}">${block.content}</mj-text>`;
+    return `<mj-text ${attrs.join(' ')} css-class="el-text el-${block.id}">${block.content}</mj-text>`;
   },
 };
 

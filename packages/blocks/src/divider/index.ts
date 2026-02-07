@@ -36,7 +36,7 @@ export const dividerBlockDefinition: BlockDefinition<DividerBlock> = {
       if (padding) attrs.push(`padding="${padding}"`);
     }
 
-    return `<mj-divider ${attrs.join(' ')} />`;
+    return `<mj-divider ${attrs.join(' ')} css-class="el-divider el-${block.id}" />`;
   },
 };
 

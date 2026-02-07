@@ -13,10 +13,10 @@ export const imageBlockDefinition: BlockDefinition<ImageBlock> = {
   category: 'media',
   description: 'Insert an image',
   defaultProps: {
-    src: 'https://via.placeholder.com/600x400',
+    src: 'https://placehold.co/600x400',
     alt: 'Placeholder image',
     align: 'center',
-    width: '100%',
+    width: '600px',
   },
   propSchema: ImageBlockSchema.omit({ id: true, type: true }),
   toMJML: (block) => {
@@ -39,7 +39,7 @@ export const imageBlockDefinition: BlockDefinition<ImageBlock> = {
       if (padding) attrs.push(`padding="${padding}"`);
     }
 
-    return `<mj-image ${attrs.join(' ')} />`;
+    return `<mj-image ${attrs.join(' ')} css-class="el-image el-${block.id}" />`;
   },
 };
 

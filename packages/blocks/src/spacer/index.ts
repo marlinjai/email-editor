@@ -17,7 +17,7 @@ export const spacerBlockDefinition: BlockDefinition<SpacerBlock> = {
   },
   propSchema: SpacerBlockSchema.omit({ id: true, type: true }),
   toMJML: (block) => {
-    return `<mj-spacer height="${block.height}" data-block-id="${block.id}" />`;
+    return `<mj-spacer height="${block.height}" css-class="el-spacer el-${block.id}" />`;
   },
 };
 
