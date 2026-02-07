@@ -2,20 +2,24 @@
 // React wrapper component
 
 import { useState, useEffect } from 'react';
-import type { EmailTemplate, BlockDefinition } from '@returnhypnosis/email-editor-core';
-import { createStandardBlockRegistry } from '@returnhypnosis/email-editor-blocks';
+import type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@returnhypnosis/email-editor-core';
+import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@returnhypnosis/email-editor-blocks';
 import { EmailEditor } from '@returnhypnosis/email-editor-ui';
 import type { EditorTheme } from './types';
 
-// Import styles
-import '@returnhypnosis/email-editor-ui/styles.css';
-
 interface EmailEditorReactProps {
-  value: EmailTemplate;
-  onChange: (template: EmailTemplate) => void;
+  /** Initial template data (uncontrolled) */
+  initialTemplate?: TemplateSnapshotIn;
+  /** Called when template changes */
+  onChange?: (template: TemplateSnapshotOut) => void;
+  /** Editor theme */
   theme?: EditorTheme;
+  /** Additional block definitions */
   blocks?: BlockDefinition[];
+  /** Called when save button is clicked */
   onSave?: () => void;
+  /** Called when export is requested */
+  onExport?: (template: TemplateSnapshotOut) => void;
 }
 
 /**
@@ -23,17 +27,21 @@ interface EmailEditorReactProps {
  * Convenience component for React applications
  */
 export function EmailEditorReact({
-  value,
+  initialTemplate,
   onChange,
   theme,
   blocks = [],
   onSave,
+  onExport,
 }: EmailEditorReactProps) {
   const [registry] = useState(() => {
     const reg = createStandardBlockRegistry();
     blocks.forEach((block) => reg.register(block));
     return reg;
   });
+
+  // Create pre-built template registry
+  const [prebuiltRegistry] = useState(() => createStandardPrebuiltRegistry());
 
   // Apply theme if provided
   useEffect(() => {
@@ -56,15 +64,16 @@ export function EmailEditorReact({
 
   return (
     <EmailEditor
-      value={value}
+      initialTemplate={initialTemplate}
       onChange={onChange}
       blockRegistry={registry}
+      prebuiltRegistry={prebuiltRegistry}
       onSave={onSave}
+      onExport={onExport}
     />
   );
 }
 
 // Re-export types
-export type { EmailTemplate, BlockDefinition } from '@returnhypnosis/email-editor-core';
+export type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@returnhypnosis/email-editor-core';
 export type { EditorTheme } from './types';
-

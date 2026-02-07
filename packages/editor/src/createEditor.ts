@@ -3,10 +3,35 @@
 
 import { createRoot, Root } from 'react-dom/client';
 import { createElement } from 'react';
-import { EmailTemplate } from '@returnhypnosis/email-editor-core';
+import type { EmailTemplate, TemplateSnapshotIn, TemplateSnapshotOut } from '@returnhypnosis/email-editor-core';
 import { createStandardBlockRegistry } from '@returnhypnosis/email-editor-blocks';
 import { EmailEditor } from '@returnhypnosis/email-editor-ui';
 import type { EditorOptions, EditorInstance } from './types';
+
+/**
+ * Convert EmailTemplate to TemplateSnapshotIn
+ * Handles differences between schema types and MST types
+ */
+function toSnapshotIn(template: EmailTemplate | undefined): TemplateSnapshotIn {
+  if (!template) {
+    return {
+      id: `template-${Date.now()}`,
+      version: '1.0',
+      metadata: {
+        title: 'New Email',
+        subject: '',
+        previewText: '',
+      },
+      sections: [],
+    } as TemplateSnapshotIn;
+  }
+
+  // Use type assertion for compatibility
+  return {
+    id: (template as any).id || `template-${Date.now()}`,
+    ...template,
+  } as unknown as TemplateSnapshotIn;
+}
 
 /**
  * Create an email editor instance
@@ -22,15 +47,8 @@ export function createEditor(options: EditorOptions): EditorInstance {
     onSave,
   } = options;
 
-  // Create default template if not provided
-  const defaultTemplate: EmailTemplate = initialValue || {
-    version: '1.0',
-    metadata: {
-      subject: 'New Email',
-      previewText: '',
-    },
-    sections: [],
-  };
+  // Convert to MST-compatible snapshot
+  const initialSnapshot = toSnapshotIn(initialValue);
 
   // Create block registry with standard blocks
   const registry = createStandardBlockRegistry();
@@ -39,12 +57,17 @@ export function createEditor(options: EditorOptions): EditorInstance {
   blocks.forEach((block) => registry.register(block));
 
   // Current template state
-  let currentTemplate = defaultTemplate;
+  let currentTemplate: EmailTemplate = initialValue || ({
+    version: '1.0',
+    metadata: { title: 'New Email', subject: '', previewText: '' },
+    sections: [],
+  } as EmailTemplate);
 
   // Handle template changes
-  const handleChange = (template: EmailTemplate) => {
-    currentTemplate = template;
-    onChange?.(template);
+  const handleChange = (snapshot: TemplateSnapshotOut) => {
+    // Convert snapshot back to EmailTemplate
+    currentTemplate = snapshot as unknown as EmailTemplate;
+    onChange?.(currentTemplate);
   };
 
   // Handle save
@@ -61,11 +84,11 @@ export function createEditor(options: EditorOptions): EditorInstance {
 
     root.render(
       createElement(EmailEditor, {
-        value: currentTemplate,
+        initialTemplate: initialSnapshot,
         onChange: handleChange,
         blockRegistry: registry,
         onSave: handleSave,
-      })
+      } as any)
     );
   };
 
@@ -80,6 +103,8 @@ export function createEditor(options: EditorOptions): EditorInstance {
 
     setValue(template: EmailTemplate) {
       currentTemplate = template;
+      // Note: Setting value requires re-mounting the editor
+      // This is a limitation of the current implementation
       render();
     },
 
@@ -111,4 +136,3 @@ export function createEditor(options: EditorOptions): EditorInstance {
     },
   };
 }
-
