@@ -6,6 +6,41 @@ import clsx from 'clsx';
 import { Bold, Italic, Link, Strikethrough, Underline } from 'lucide-react';
 
 /**
+ * Normalize spacing values to ensure valid CSS units.
+ *
+ * CSS ignores unitless values (except 0), so we auto-append "px" for bare numbers.
+ * MJML supports: px, % (em/rem have poor email client support)
+ *
+ * @example
+ * normalizeSpacingValue("10")    // "10px" - bare number gets px
+ * normalizeSpacingValue("10px")  // "10px" - already has unit
+ * normalizeSpacingValue("5%")    // "5%"   - percent is valid
+ * normalizeSpacingValue("0")     // "0"    - zero works without unit
+ * normalizeSpacingValue("")      // undefined - empty clears value
+ */
+export function normalizeSpacingValue(value: string): string | undefined {
+  if (!value || value.trim() === '') return undefined;
+
+  const trimmed = value.trim();
+
+  // Zero is valid without unit
+  if (trimmed === '0') return '0';
+
+  // Already has valid unit - keep as-is
+  if (/^-?\d+(\.\d+)?(px|%|em|rem)$/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Bare number - append px
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    return `${trimmed}px`;
+  }
+
+  // Invalid - return as-is (let CSS handle it)
+  return trimmed;
+}
+
+/**
  * Formatting toolbar for text editing
  * Uses execCommand for contenteditable WYSIWYG editing
  *
@@ -286,6 +321,9 @@ export function CheckboxField({
 
 /**
  * 4-sided spacing input (top, right, bottom, left)
+ *
+ * Automatically normalizes values to ensure valid CSS units.
+ * Bare numbers like "10" become "10px".
  */
 export function SpacingField({
   label,
@@ -314,8 +352,11 @@ export function SpacingField({
             <input
               type="text"
               value={values[side] || ''}
-              onChange={(e) => onChange(side, e.target.value || undefined)}
-              placeholder="0"
+              onChange={(e) => {
+                const normalized = normalizeSpacingValue(e.target.value);
+                onChange(side, normalized);
+              }}
+              placeholder="0px"
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded text-center"
             />
             <div className="text-[10px] text-gray-400 text-center mt-0.5">

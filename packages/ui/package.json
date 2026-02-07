@@ -14,8 +14,8 @@
     "./styles.css": "./dist/styles.css"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean && npm run build:css",
-    "build:css": "tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify",
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean && BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify",
+    "build:css": "BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"
@@ -39,7 +39,7 @@
   "devDependencies": {
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
-    "autoprefixer": "^10.4.16",
+    "autoprefixer": "^10.4.24",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "tsup": "^8.0.1",
