@@ -100,28 +100,7 @@ export const SectionRenderer = observer(({ section, sectionIndex }: SectionRende
 
       {/* Section toolbar (shown on selection) */}
       {isSelected && (
-        <div className="absolute -top-6 right-0 flex gap-1">
-          <button
-            className="p-1 bg-amber-500 text-white text-xs rounded hover:bg-amber-600"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Duplicate section action would be called here
-            }}
-            title="Duplicate section"
-          >
-            ⎘
-          </button>
-          <button
-            className="p-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Delete section action would be called here
-            }}
-            title="Delete section"
-          >
-            ✕
-          </button>
-        </div>
+        <SectionToolbar section={section} />
       )}
 
       {/* Table-based layout for email compatibility */}
@@ -157,3 +136,45 @@ export const SectionRenderer = observer(({ section, sectionIndex }: SectionRende
 });
 
 SectionRenderer.displayName = 'SectionRenderer';
+
+/**
+ * Section toolbar with duplicate/delete actions
+ */
+const SectionToolbar = observer(({ section }: { section: SectionInstance }) => {
+  const { template, editorUI } = useStore();
+
+  const handleDuplicate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSection = template.duplicateSection(section.id);
+    if (newSection) {
+      editorUI.selectSection(newSection.id);
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    template.removeSection(section.id);
+    editorUI.clearSelection();
+  };
+
+  return (
+    <div className="absolute -top-6 right-0 flex gap-1">
+      <button
+        className="p-1 bg-amber-500 text-white text-xs rounded hover:bg-amber-600"
+        onClick={handleDuplicate}
+        title="Duplicate section"
+      >
+        ⎘
+      </button>
+      <button
+        className="p-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+        onClick={handleDelete}
+        title="Delete section"
+      >
+        ✕
+      </button>
+    </div>
+  );
+});
+
+SectionToolbar.displayName = 'SectionToolbar';

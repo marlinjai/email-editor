@@ -6,13 +6,26 @@ import { observer } from 'mobx-react-lite';
 import { BlockType, type BlockInstance } from '@returnhypnosis/email-editor-core';
 import { Trash2, EyeOff } from 'lucide-react';
 import clsx from 'clsx';
+import { useStore } from '../../store';
 import {
   TextField,
   ColorField,
   SelectField,
   AlignmentField,
   SpacingField,
+  FormattingToolbar,
 } from '../fields';
+
+/**
+ * Hook to get theme colors from template metadata
+ */
+function useThemeColors() {
+  const { template } = useStore();
+  return template.metadata.themeColors.map(c => ({
+    name: c.name,
+    value: c.value,
+  }));
+}
 
 interface BlockPropertiesProps {
   block: BlockInstance;
@@ -133,18 +146,26 @@ const TextBlockProperties = observer(function TextBlockProperties({
 }: {
   block: BlockInstance;
 }) {
+  const themeColors = useThemeColors();
   return (
     <>
+      <div className="space-y-1">
+        <label className="block text-xs font-medium text-gray-600">Formatting</label>
+        <FormattingToolbar />
+        <p className="text-xs text-gray-400">Select text in block, then click to format</p>
+      </div>
       <ColorField
         label="Text Color"
         value={block.color || '#000000'}
         onChange={(color) => block.updateStyle('color', color)}
+        themeColors={themeColors}
       />
       <ColorField
         label="Background"
         value={block.backgroundColor || ''}
         onChange={(color) => block.updateStyle('backgroundColor', color || undefined)}
         allowEmpty
+        themeColors={themeColors}
       />
       <SelectField
         label="Font Size"
@@ -229,6 +250,7 @@ const ButtonBlockProperties = observer(function ButtonBlockProperties({
 }: {
   block: BlockInstance;
 }) {
+  const themeColors = useThemeColors();
   return (
     <>
       <TextField
@@ -247,11 +269,13 @@ const ButtonBlockProperties = observer(function ButtonBlockProperties({
         label="Background Color"
         value={block.backgroundColor || '#1a73e8'}
         onChange={(color) => block.updateStyle('backgroundColor', color)}
+        themeColors={themeColors}
       />
       <ColorField
         label="Text Color"
         value={block.color || '#ffffff'}
         onChange={(color) => block.updateStyle('color', color)}
+        themeColors={themeColors}
       />
       <TextField
         label="Border Radius"
@@ -272,12 +296,14 @@ const DividerBlockProperties = observer(function DividerBlockProperties({
 }: {
   block: BlockInstance;
 }) {
+  const themeColors = useThemeColors();
   return (
     <>
       <ColorField
         label="Line Color"
         value={block.borderColor || '#e5e7eb'}
         onChange={(color) => block.updateStyle('borderColor', color)}
+        themeColors={themeColors}
       />
       <TextField
         label="Line Width"
@@ -348,6 +374,7 @@ const HeroBlockProperties = observer(function HeroBlockProperties({
 }: {
   block: BlockInstance;
 }) {
+  const themeColors = useThemeColors();
   return (
     <>
       <TextField
@@ -360,6 +387,7 @@ const HeroBlockProperties = observer(function HeroBlockProperties({
         label="Background Color"
         value={block.backgroundColor || '#f3f4f6'}
         onChange={(color) => block.updateStyle('backgroundColor', color)}
+        themeColors={themeColors}
       />
       <TextField
         label="Height"

@@ -20,6 +20,14 @@ export interface FontDefinition {
 }
 
 /**
+ * Theme color for reusable brand colors
+ */
+export interface ThemeColor {
+  name: string;
+  value: string;
+}
+
+/**
  * Email template metadata
  */
 export interface TemplateMetadata {
@@ -29,6 +37,7 @@ export interface TemplateMetadata {
   createdAt?: string;
   updatedAt?: string;
   fonts?: FontDefinition[];
+  themeColors?: ThemeColor[];
   breakpoint?: string;
   customCSS?: string;
   inlineCSS?: string;

@@ -33,6 +33,7 @@ export {
   TemplateModel,
   TemplateMetadataModel,
   FontDefinitionModel,
+  ThemeColorModel,
   createTemplate,
   createTemplateWithDefaultSection,
   type TemplateInstance,

@@ -15,6 +15,33 @@ export const FontDefinitionModel = types.model('FontDefinition', {
 });
 
 /**
+ * Theme color for reusable brand colors
+ */
+export const ThemeColorModel = types
+  .model('ThemeColor', {
+    name: types.string,
+    value: types.string,
+  })
+  .actions(self => ({
+    setValue(value: string) {
+      self.value = value;
+    },
+    setName(name: string) {
+      self.name = name;
+    },
+  }));
+
+/**
+ * Default theme colors
+ */
+const DEFAULT_THEME_COLORS = [
+  { name: 'Primary', value: '#944923' },
+  { name: 'Secondary', value: '#ffffff' },
+  { name: 'Text', value: '#333333' },
+  { name: 'Background', value: '#f5f5f5' },
+];
+
+/**
  * Template metadata
  */
 export const TemplateMetadataModel = types
@@ -25,6 +52,7 @@ export const TemplateMetadataModel = types
     createdAt: types.optional(types.Date, () => new Date()),
     updatedAt: types.optional(types.Date, () => new Date()),
     fonts: types.optional(types.array(FontDefinitionModel), []),
+    themeColors: types.optional(types.array(ThemeColorModel), DEFAULT_THEME_COLORS),
     breakpoint: types.maybe(types.string),
     customCSS: types.maybe(types.string),
     inlineCSS: types.maybe(types.string),
@@ -55,6 +83,27 @@ export const TemplateMetadataModel = types
       const index = self.fonts.findIndex(f => f.name === name);
       if (index !== -1) {
         self.fonts.splice(index, 1);
+        self.updatedAt = new Date();
+      }
+    },
+
+    addThemeColor(name: string, value: string) {
+      self.themeColors.push(ThemeColorModel.create({ name, value }));
+      self.updatedAt = new Date();
+    },
+
+    updateThemeColor(name: string, value: string) {
+      const color = self.themeColors.find(c => c.name === name);
+      if (color) {
+        color.setValue(value);
+        self.updatedAt = new Date();
+      }
+    },
+
+    removeThemeColor(name: string) {
+      const index = self.themeColors.findIndex(c => c.name === name);
+      if (index !== -1) {
+        self.themeColors.splice(index, 1);
         self.updatedAt = new Date();
       }
     },

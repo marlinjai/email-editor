@@ -1,14 +1,54 @@
 // packages/ui/src/sidebar/LayersPanel.tsx
-// Document structure tree view
+// Document structure tree view with drag-and-drop reordering
 
 import React from 'react';
 import { observer } from 'mobx-react-lite';
 import { useStore } from '../store';
-import { ChevronRight, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, Trash2, GripVertical, Copy } from 'lucide-react';
 import clsx from 'clsx';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export const LayersPanel = observer(function LayersPanel() {
   const { template, editorUI } = useStore();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = template.sections.findIndex((s) => s.id === active.id);
+    const newIndex = template.sections.findIndex((s) => s.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      template.moveSection(active.id as string, newIndex);
+    }
+  };
 
   if (template.sections.length === 0) {
     return (
@@ -18,28 +58,41 @@ export const LayersPanel = observer(function LayersPanel() {
     );
   }
 
+  const sectionIds = template.sections.map((s) => s.id);
+
   return (
     <div className="p-2">
       <h3 className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
         Document Structure
       </h3>
 
-      <div className="mt-2 space-y-1">
-        {template.sections.map((section, sIndex) => (
-          <SectionItem
-            key={section.id}
-            section={section}
-            index={sIndex}
-            isSelected={editorUI.selectedSectionId === section.id}
-            onSelect={() => editorUI.selectSection(section.id)}
-          />
-        ))}
-      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
+          <div className="mt-2 space-y-1">
+            {template.sections.map((section, sIndex) => (
+              <SortableSectionItem
+                key={section.id}
+                section={section}
+                index={sIndex}
+                isSelected={editorUI.selectedSectionId === section.id}
+                onSelect={() => editorUI.selectSection(section.id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 });
 
-const SectionItem = observer(function SectionItem({
+/**
+ * Sortable wrapper for SectionItem
+ */
+const SortableSectionItem = observer(function SortableSectionItem({
   section,
   index,
   isSelected,
@@ -50,8 +103,63 @@ const SectionItem = observer(function SectionItem({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <SectionItem
+        section={section}
+        index={index}
+        isSelected={isSelected}
+        onSelect={onSelect}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+});
+
+const SectionItem = observer(function SectionItem({
+  section,
+  index,
+  isSelected,
+  onSelect,
+  dragHandleProps,
+}: {
+  section: any;
+  index: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  dragHandleProps?: Record<string, any>;
+}) {
   const { template, editorUI } = useStore();
   const [expanded, setExpanded] = React.useState(true);
+
+  const handleDuplicate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSection = template.duplicateSection(section.id);
+    if (newSection) {
+      editorUI.selectSection(newSection.id);
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    template.removeSection(section.id);
+    if (isSelected) editorUI.clearSelection();
+  };
 
   return (
     <div className="rounded overflow-hidden">
@@ -65,6 +173,15 @@ const SectionItem = observer(function SectionItem({
         )}
         onClick={onSelect}
       >
+        {/* Drag handle */}
+        <button
+          className="p-0.5 cursor-grab hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
+          title="Drag to reorder"
+          {...dragHandleProps}
+        >
+          <GripVertical size={14} />
+        </button>
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -94,11 +211,15 @@ const SectionItem = observer(function SectionItem({
         </button>
 
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            template.removeSection(section.id);
-            if (isSelected) editorUI.clearSelection();
-          }}
+          onClick={handleDuplicate}
+          className="p-1 hover:bg-blue-100 text-blue-500 rounded opacity-50 hover:opacity-100"
+          title="Duplicate section"
+        >
+          <Copy size={12} />
+        </button>
+
+        <button
+          onClick={handleDelete}
           className="p-1 hover:bg-red-100 text-red-500 rounded opacity-50 hover:opacity-100"
           title="Delete section"
         >

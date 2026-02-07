@@ -3,6 +3,94 @@
 
 import React from 'react';
 import clsx from 'clsx';
+import { Bold, Italic, Link, Strikethrough, Underline } from 'lucide-react';
+
+/**
+ * Formatting toolbar for text editing
+ * Uses execCommand for contenteditable WYSIWYG editing
+ *
+ * Important: Uses onMouseDown with preventDefault to keep focus
+ * in the contenteditable text block while clicking buttons.
+ */
+export function FormattingToolbar() {
+  const applyFormat = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+  };
+
+  // Prevent button from stealing focus from contenteditable
+  const preventFocusLoss = (e: React.MouseEvent) => {
+    e.preventDefault();
+  };
+
+  const handleLink = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    // Check if already a link
+    const parentLink = selection.anchorNode?.parentElement?.closest('a');
+    if (parentLink) {
+      // Remove link
+      document.execCommand('unlink', false);
+    } else {
+      // Add link - note: prompt() will steal focus, but that's unavoidable
+      const url = prompt('Enter URL:', 'https://');
+      if (url) {
+        document.execCommand('createLink', false, url);
+      }
+    }
+  };
+
+  return (
+    <div className="flex gap-1 p-1 bg-gray-50 rounded border border-gray-200">
+      <button
+        type="button"
+        onMouseDown={preventFocusLoss}
+        onClick={() => applyFormat('bold')}
+        className="p-1.5 rounded hover:bg-gray-200 text-gray-700"
+        title="Bold (Ctrl+B)"
+      >
+        <Bold size={14} />
+      </button>
+      <button
+        type="button"
+        onMouseDown={preventFocusLoss}
+        onClick={() => applyFormat('italic')}
+        className="p-1.5 rounded hover:bg-gray-200 text-gray-700"
+        title="Italic (Ctrl+I)"
+      >
+        <Italic size={14} />
+      </button>
+      <button
+        type="button"
+        onMouseDown={preventFocusLoss}
+        onClick={() => applyFormat('underline')}
+        className="p-1.5 rounded hover:bg-gray-200 text-gray-700"
+        title="Underline (Ctrl+U)"
+      >
+        <Underline size={14} />
+      </button>
+      <button
+        type="button"
+        onMouseDown={preventFocusLoss}
+        onClick={() => applyFormat('strikeThrough')}
+        className="p-1.5 rounded hover:bg-gray-200 text-gray-700"
+        title="Strikethrough"
+      >
+        <Strikethrough size={14} />
+      </button>
+      <div className="w-px bg-gray-300 mx-1" />
+      <button
+        type="button"
+        onMouseDown={preventFocusLoss}
+        onClick={handleLink}
+        className="p-1.5 rounded hover:bg-gray-200 text-gray-700"
+        title="Insert Link"
+      >
+        <Link size={14} />
+      </button>
+    </div>
+  );
+}
 
 /**
  * Text input field
@@ -33,22 +121,50 @@ export function TextField({
 }
 
 /**
- * Color picker with text input
+ * Theme color swatch type
+ */
+interface ThemeColorSwatch {
+  name: string;
+  value: string;
+}
+
+/**
+ * Color picker with text input and theme color swatches
  */
 export function ColorField({
   label,
   value,
   onChange,
   allowEmpty = false,
+  themeColors = [],
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   allowEmpty?: boolean;
+  themeColors?: ThemeColorSwatch[];
 }) {
   return (
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      {/* Theme color swatches */}
+      {themeColors.length > 0 && (
+        <div className="flex gap-1 mb-2">
+          {themeColors.map((color) => (
+            <button
+              key={color.name}
+              type="button"
+              onClick={() => onChange(color.value)}
+              className={clsx(
+                'w-6 h-6 rounded border-2 cursor-pointer transition-transform hover:scale-110',
+                value === color.value ? 'border-blue-500 ring-1 ring-blue-300' : 'border-gray-300'
+              )}
+              style={{ backgroundColor: color.value }}
+              title={`${color.name}: ${color.value}`}
+            />
+          ))}
+        </div>
+      )}
       <div className="flex gap-2">
         <input
           type="color"
