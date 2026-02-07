@@ -7,14 +7,14 @@
 git clone <repo-url>
 cd email-editor
 
-# Install dependencies
-npm install
+# Install dependencies (uses pnpm)
+pnpm install
 
 # Build all packages
-npm run build
+pnpm run build
 
 # Start development mode
-npm run dev
+pnpm run dev
 ```
 
 ## Monorepo Structure
@@ -22,7 +22,7 @@ npm run dev
 ```
 email-editor/
 ├── packages/
-│   ├── core/          # Framework-agnostic core
+│   ├── core/          # Schema, compiler, Zustand store
 │   ├── ui/            # React UI components
 │   ├── blocks/        # Standard block library
 │   └── editor/        # Public API package
@@ -38,45 +38,150 @@ editor → ui → core
 editor → blocks → core
 ```
 
+## State Management Architecture
+
+The editor uses Zustand with three slices:
+
+### Document Slice
+Handles template state and CRUD operations:
+
+```typescript
+import { useEditorStore } from '@returnhypnosis/email-editor-core';
+
+function MyComponent() {
+  const template = useEditorStore((s) => s.document.template);
+  const insertBlock = useEditorStore((s) => s.document.insertBlock);
+  const undo = useEditorStore((s) => s.document.undo);
+}
+```
+
+### Interaction Slice
+Handles ephemeral UI state:
+
+```typescript
+const selectedId = useEditorStore((s) => s.interaction.selectedId);
+const dragState = useEditorStore((s) => s.interaction.dragState);
+const setSelection = useEditorStore((s) => s.interaction.setSelection);
+```
+
+### API Slice
+Handles compile endpoint configuration:
+
+```typescript
+const apiKey = useEditorStore((s) => s.api.apiKey);
+const setApiKey = useEditorStore((s) => s.api.setApiKey);
+```
+
+## Using the Store in Components
+
+### Direct Store Access
+
+```typescript
+import { useEditorStore } from '@returnhypnosis/email-editor-core';
+
+function BlockList() {
+  const template = useEditorStore((s) => s.document.template);
+  const deleteBlock = useEditorStore((s) => s.document.deleteBlock);
+  
+  return (
+    <ul>
+      {template.sections.map(section => (
+        // ...
+      ))}
+    </ul>
+  );
+}
+```
+
+### Using useEditorActions Hook
+
+For components that need many actions, use the bridge hook:
+
+```typescript
+import { useEditorActions } from '@returnhypnosis/email-editor-ui';
+
+function MyToolbar() {
+  const {
+    template,
+    addTextBlock,
+    addImageBlock,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useEditorActions();
+  
+  return (
+    <div>
+      <button onClick={() => addTextBlock(columnId)}>Add Text</button>
+      <button onClick={undo} disabled={!canUndo}>Undo</button>
+    </div>
+  );
+}
+```
+
+## Middleware
+
+### History Middleware
+Automatically tracks document changes for undo/redo:
+
+```typescript
+// Undo/redo works automatically
+const undo = useEditorStore((s) => s.document.undo);
+const redo = useEditorStore((s) => s.document.redo);
+const canUndo = useEditorStore((s) => s.document.canUndo);
+```
+
+### Validation Middleware
+Validates MJML constraints and provides fallbacks:
+
+```typescript
+import { validateDropIntent, computeValidatedDropIntent } from '@returnhypnosis/email-editor-core';
+
+// Check if a drop is valid
+const result = validateDropIntent(template, 'block', 'target-id', 'inside');
+// { isValid: true } or { isValid: false, reason: '...', fallback: {...} }
+```
+
 ## Development Workflow
 
 ### Building Packages
 
 ```bash
 # Build all packages
-npm run build
+pnpm run build
 
 # Build specific package
 cd packages/core
-npm run build
+pnpm run build
 
 # Watch mode
-npm run dev
+pnpm run dev
 ```
 
 ### Running Tests
 
 ```bash
 # Run all tests
-npm run test
+pnpm run test
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Run tests for specific package
 cd packages/core
-npm run test
+pnpm run test
 ```
 
 ### Linting
 
 ```bash
 # Lint all packages
-npm run lint
+pnpm run lint
 
 # Lint specific package
 cd packages/ui
-npm run lint
+pnpm run lint
 ```
 
 ## Making Changes
@@ -87,7 +192,7 @@ npm run lint
 2. Add Zod schema in `packages/core/src/schema/validation.ts`
 3. Create block definition in `packages/blocks/src/<block-name>/index.ts`
 4. Register in `packages/blocks/src/registry.ts`
-5. Add MJML compilation logic
+5. Add MJML compilation logic in `packages/core/src/compiler/MJMLCompiler.ts`
 
 ### Adding UI Components
 
@@ -95,6 +200,12 @@ npm run lint
 2. Export from `packages/ui/src/index.ts`
 3. Add styles in component file or `packages/ui/src/styles.css`
 4. Update Tailwind config if needed
+
+### Adding Store Actions
+
+1. Define action type in `packages/core/src/store/types.ts`
+2. Implement in appropriate slice (`documentSlice.ts`, `interactionSlice.ts`, or `apiSlice.ts`)
+3. Export from `packages/core/src/store/index.ts`
 
 ### Updating Core Logic
 
@@ -129,7 +240,7 @@ Test in example app:
 
 ```bash
 cd examples/nextjs
-npm run dev
+pnpm run dev
 ```
 
 Open browser and manually test features.
@@ -149,7 +260,7 @@ Open browser and manually test features.
 
 ```bash
 # From monorepo root
-npm run build
+pnpm run build
 
 # Publish each package
 cd packages/core
@@ -169,7 +280,7 @@ npm publish --access public
 
 ### "Cannot find module" errors
 
-Run `npm run build` from monorepo root.
+Run `pnpm run build` from monorepo root.
 
 ### TypeScript errors in imports
 
@@ -183,7 +294,27 @@ Check that `tailwindcss` is running and CSS is imported.
 
 Check the MJML syntax in block definitions and ensure official MJML package is installed.
 
+### Zustand store state not updating
+
+Make sure you're using selectors to avoid unnecessary re-renders:
+
+```typescript
+// Good - only re-renders when template changes
+const template = useEditorStore((s) => s.document.template);
+
+// Bad - re-renders on any store change
+const store = useEditorStore();
+const template = store.document.template;
+```
+
 ## Architecture Decisions
+
+### Why Zustand?
+
+- Simple API, minimal boilerplate
+- Built-in support for middleware (history, validation)
+- Great TypeScript support
+- Works well with React DevTools
 
 ### Why Monorepo?
 
@@ -216,3 +347,6 @@ Check the MJML syntax in block definitions and ensure official MJML package is i
 - Easier to customize
 - Sufficient for email use case
 
+---
+
+**Last updated:** 2026-01-04

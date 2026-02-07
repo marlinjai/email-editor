@@ -35,10 +35,10 @@ pnpm run build
 ```
 
 This builds:
-- `packages/core`
-- `packages/ui`
-- `packages/blocks`
-- `packages/editor`
+- `packages/core` - Schema, compiler, Zustand store
+- `packages/ui` - React components
+- `packages/blocks` - Block definitions
+- `packages/editor` - Public API
 
 ### 3. Run Example App
 
@@ -48,6 +48,38 @@ pnpm run dev
 ```
 
 Open http://localhost:3000 to see the editor.
+
+## Using the Editor in Your App
+
+### Basic Integration
+
+```tsx
+import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
+import '@returnhypnosis/email-editor/styles.css';
+
+function App() {
+  const [template, setTemplate] = useState(initialTemplate);
+  
+  return (
+    <EmailEditorReact
+      value={template}
+      onChange={setTemplate}
+      uploadAsset={uploadFn}
+    />
+  );
+}
+```
+
+### With API Key (Production)
+
+```tsx
+<EmailEditorReact
+  value={template}
+  onChange={setTemplate}
+  apiKey={process.env.EMAIL_EDITOR_API_KEY}
+  compileEndpoint="https://api.returnhypnosis.com/compile"
+/>
+```
 
 ## Alternative: Use npm with Local Packages
 
@@ -100,6 +132,17 @@ Change the port in `examples/nextjs`:
 PORT=3001 pnpm run dev
 ```
 
+### Zustand store not initializing
+
+Ensure you're importing from the correct package:
+```tsx
+// Correct
+import { useEditorStore } from '@returnhypnosis/email-editor-core';
+
+// Wrong
+import { useEditorStore } from '@returnhypnosis/email-editor-ui';
+```
+
 ## Development Workflow
 
 ### Watch Mode
@@ -136,7 +179,7 @@ pnpm run test:watch
 
 Once installed, check out:
 
-1. **[QUICKSTART.md](QUICKSTART.md)** - Quick overview
-2. **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** - Detailed usage guide
-3. **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development guide
-
+1. **[quickstart.md](quickstart.md)** - Quick overview
+2. **[integration.md](integration.md)** - Integration patterns
+3. **[../guides/development.md](../guides/development.md)** - Development guide
+4. **[../guides/api.md](../guides/api.md)** - API reference
