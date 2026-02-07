@@ -3,16 +3,17 @@
 
 'use client';
 
-import { useState } from 'react';
-import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
-import type { EmailTemplate } from '@returnhypnosis/email-editor';
+import { useState, useCallback } from 'react';
+import { EmailEditorReact, type TemplateSnapshotIn, type TemplateSnapshotOut } from '@returnhypnosis/email-editor/react';
 
 /**
  * Default template with ReTurn branding
  */
-const defaultTemplate: EmailTemplate = {
+const defaultTemplate: TemplateSnapshotIn = {
+  id: 'default-template',
   version: '1.0',
   metadata: {
+    title: 'Untitled Template',
     subject: 'Welcome to ReTurn Newsletter',
     previewText: 'Monthly insights on hypnosis and personal transformation',
   },
@@ -36,37 +37,83 @@ const returnTheme = {
 };
 
 export default function HomePage() {
-  const [template, setTemplate] = useState<EmailTemplate>(defaultTemplate);
+  const [currentTemplate, setCurrentTemplate] = useState<TemplateSnapshotOut | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
-  const handleSave = async () => {
-    setSaveStatus('Saving...');
+  // Handle template changes
+  const handleTemplateChange = useCallback((newTemplate: TemplateSnapshotOut) => {
+    setCurrentTemplate(newTemplate);
+  }, []);
 
+  // Handle export - compile to MJML on server
+  const handleExport = useCallback(async (template: TemplateSnapshotOut) => {
     try {
-      // Send to API route for server-side compilation
       const response = await fetch('/api/compile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(template),
       });
+      const result = await response.json();
+      if (result.success) {
+        // Download the HTML
+        const blob = new Blob([result.html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${template.metadata?.title || 'email'}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!currentTemplate) {
+      setSaveStatus('No changes to save');
+      setTimeout(() => setSaveStatus(''), 3000);
+      return;
+    }
+
+    setSaveStatus('Saving...');
+
+    try {
+      // Update timestamp
+      const templateToSave = {
+        ...currentTemplate,
+        metadata: {
+          ...currentTemplate.metadata,
+          updatedAt: new Date(),
+        },
+      };
+
+      // Send to API route for server-side compilation and saving
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(templateToSave),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const result = await response.json();
 
       if (result.success) {
         setSaveStatus('Saved successfully!');
-        console.log('Compiled HTML:', result.html);
-        console.log('MJML:', result.mjml);
-        
-        // Clear status after 2 seconds
-        setTimeout(() => setSaveStatus(''), 2000);
+        setTimeout(() => setSaveStatus(''), 3000);
       } else {
-        setSaveStatus('Error saving');
+        setSaveStatus('Error: ' + (result.error || 'Unknown error'));
+        setTimeout(() => setSaveStatus(''), 3000);
       }
     } catch (error) {
       console.error('Save failed:', error);
-      setSaveStatus('Error saving');
+      setSaveStatus('Error saving: ' + (error instanceof Error ? error.message : 'Unknown'));
+      setTimeout(() => setSaveStatus(''), 3000);
     }
-  };
+  }, [currentTemplate]);
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -83,12 +130,12 @@ export default function HomePage() {
         </div>
       )}
       <EmailEditorReact
-        value={template}
-        onChange={setTemplate}
+        initialTemplate={defaultTemplate}
+        onChange={handleTemplateChange}
         theme={returnTheme}
         onSave={handleSave}
+        onExport={handleExport}
       />
     </div>
   );
 }
-

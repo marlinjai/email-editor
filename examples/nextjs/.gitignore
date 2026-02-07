@@ -8,6 +8,9 @@ out
 # Build
 dist
 
+# Saved templates
+saved-templates/
+
 # Misc
 .DS_Store
 *.pem

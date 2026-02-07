@@ -8,20 +8,24 @@ const config: Config = {
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
-    // Include editor UI components
+    // Include editor packages
     '../../packages/ui/src/**/*.{ts,tsx}',
+    '../../packages/editor/src/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {
       colors: {
-        'brand-primary': '#944923',
-        'brand-surface': '#ffffff',
-        'brand-text': '#1a1a1a',
-        'brand-text-secondary': '#666666',
-        'brand-border': '#e5e5e5',
+        brand: {
+          primary: '#944923',
+          surface: '#ffffff',
+          border: '#e5e5e5',
+          text: '#1a1a1a',
+          'text-secondary': '#666666',
+        },
       },
       fontFamily: {
         serif: ['Georgia', 'serif'],
+        sans: ['system-ui', 'sans-serif'],
       },
     },
   },

@@ -1,5 +1,5 @@
 // examples/nextjs/next.config.js
-// Next.js configuration
+// Next.js 16 configuration
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -10,22 +10,10 @@ const nextConfig = {
     '@returnhypnosis/email-editor-ui',
     '@returnhypnosis/email-editor-blocks',
   ],
-  experimental: {
-    serverComponentsExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
-  },
-  webpack: (config, { isServer }) => {
-    // Handle workspace packages
-    if (isServer) {
-      config.externals = [...(config.externals || []), 'mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'];
-    }
-
-    config.resolve.extensionAlias = {
-      '.js': ['.ts', '.tsx', '.js', '.jsx'],
-      '.mjs': ['.mts', '.mjs'],
-    };
-    return config;
-  },
+  // Next.js 16: moved from experimental.serverComponentsExternalPackages
+  serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
+  // Next.js 16: Turbopack is default, add empty config to suppress warning
+  turbopack: {},
 };
 
 module.exports = nextConfig;
-
