@@ -6,28 +6,32 @@ Replace GrapesJS and Unlayer with a fully controllable, customizable email edito
 
 ---
 
-## ✨ Features
+## Features
 
-- ✅ **MJML Compilation** - Email-safe HTML that works across all clients
-- ✅ **React UI** - Clean 3-panel interface (Toolbar | Canvas | Inspector)
-- ✅ **Type-Safe** - Full TypeScript with Zod validation
-- ✅ **Drag & Drop** - Intuitive block placement with dnd-kit
-- ✅ **Undo/Redo** - Full history management with Immer
-- ✅ **Device Preview** - Desktop and mobile views
-- ✅ **Rich Text** - TipTap editor for text blocks
-- ✅ **Themeable** - Customize colors and fonts
-- ✅ **Extensible** - Add custom blocks easily
-- ✅ **Framework-Agnostic Core** - Use with or without React
+- **MJML Compilation** - Email-safe HTML that works across all clients
+- **React UI** - Clean 3-panel interface (Toolbar | Canvas | Inspector)
+- **Type-Safe** - Full TypeScript with Zod validation
+- **Centralized State** - Zustand store with document/interaction/api slices
+- **Drag & Drop** - Intuitive block placement with 3-way drop intent
+- **Undo/Redo** - Efficient history with Immer patches
+- **Device Preview** - Desktop and mobile views
+- **Rich Text** - TipTap editor for text blocks
+- **Themeable** - Customize colors and fonts
+- **Extensible** - Add custom blocks easily
+- **MJML-Aware** - Validation middleware prevents invalid states
+- **API Ready** - Optional compile API for production (coming soon)
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Install
 npm install @returnhypnosis/email-editor
+```
 
-# Use in React
+```tsx
+// Use in React
 import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
 import '@returnhypnosis/email-editor/styles.css';
 
@@ -42,48 +46,82 @@ function App() {
 }
 ```
 
-👉 **[See Full Quick Start Guide](docs/getting-started/quickstart.md)**
+See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 
 ---
 
-## 📦 Packages
+## Packages
 
 | Package | Description |
 |---------|-------------|
 | `@returnhypnosis/email-editor` | Main package (public API + React wrapper) |
-| `@returnhypnosis/email-editor-core` | Framework-agnostic core engine |
+| `@returnhypnosis/email-editor-core` | Schema, compiler, Zustand store |
 | `@returnhypnosis/email-editor-ui` | React UI components |
 | `@returnhypnosis/email-editor-blocks` | Standard block library |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Your App (Next.js, React, Vanilla JS)         │
-└─────────────────┬───────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│           Your App (Next.js, React, etc.)               │
+└──────────────────────┬──────────────────────────────────┘
                   │ imports
-┌─────────────────▼───────────────────────────────┐
-│  @returnhypnosis/email-editor                   │
-│  ├─ createEditor() - Vanilla JS API             │
-│  └─ EmailEditorReact - React component          │
-└─────────────────┬───────────────────────────────┘
+┌──────────────────────▼──────────────────────────────────┐
+│            @returnhypnosis/email-editor                  │
+│  ├─ createEditor() - Vanilla JS API                     │
+│  └─ EmailEditorReact - React component                  │
+└──────────────────────┬──────────────────────────────────┘
                   │
-        ┌─────────┴─────────┐
-        │                   │
-┌───────▼─────────┐  ┌──────▼──────────┐
-│  email-editor-ui│  │email-editor-core│
-│  - Canvas       │  │ - Schema        │
-│  - Toolbar      │  │ - Registry      │
-│  - Inspector    │  │ - Compiler      │
-└─────────────────┘  │ - History       │
-                     └─────────────────┘
+          ┌────────────┴────────────┐
+          │                         │
+┌─────────▼───────────┐  ┌──────────▼──────────┐
+│  email-editor-ui    │  │  email-editor-core  │
+│  ┌────────────────┐ │  │  ┌───────────────┐  │
+│  │ React          │ │  │  │ Zustand Store │  │
+│  │ Components     │ │  │  │ ├─ document   │  │
+│  │ ├─ Canvas      │ │  │  │ ├─ interaction│  │
+│  │ ├─ Toolbar     │ │  │  │ └─ api        │  │
+│  │ ├─ Inspector   │ │  │  └───────────────┘  │
+│  │ ├─ Layers      │ │  │  ┌───────────────┐  │
+│  │ └─ Hooks       │ │  │  │ Middleware    │  │
+│  └────────────────┘ │  │  │ ├─ history    │  │
+└─────────────────────┘  │  │ └─ validation │  │
+                         │  └───────────────┘  │
+                         │  ┌───────────────┐  │
+                         │  │ Compiler      │  │
+                         │  │ (MJML→HTML)   │  │
+                         │  └───────────────┘  │
+                         └─────────────────────┘
 ```
 
 ---
 
-## 🎨 Available Blocks
+## State Management
+
+The editor uses Zustand with three slices:
+
+**Document Slice** - Template state (sections, columns, blocks)
+```typescript
+const template = useEditorStore((s) => s.document.template);
+const insertBlock = useEditorStore((s) => s.document.insertBlock);
+```
+
+**Interaction Slice** - UI state (selection, drag, resize)
+```typescript
+const selectedId = useEditorStore((s) => s.interaction.selectedId);
+const setSelection = useEditorStore((s) => s.interaction.setSelection);
+```
+
+**API Slice** - Compile configuration
+```typescript
+const apiKey = useEditorStore((s) => s.api.apiKey);
+```
+
+---
+
+## Available Blocks
 
 ### Standard Blocks
 - **Text** - Rich text with formatting (bold, italic, links, headings)
@@ -98,7 +136,7 @@ function App() {
 
 ---
 
-## 💻 Development
+## Development
 
 ```bash
 # Clone and install
@@ -114,26 +152,27 @@ cd examples/nextjs
 pnpm run dev
 ```
 
-👉 **[Development Guide](docs/guides/development.md)**
+See [docs/guides/development.md](docs/guides/development.md)
 
 ---
 
-## 📖 Documentation
+## Documentation
 
-- 📘 [Getting Started](docs/getting-started/integration.md) - Installation and basic usage
-- 📗 [API Reference](docs/guides/api.md) - Complete API documentation
-- 📕 [Development Guide](docs/guides/development.md) - Contributing and architecture
-- 📙 [Installation](docs/getting-started/installation.md) - Setup instructions
-- 📓 [Quick Start](docs/getting-started/quickstart.md) - 5-minute overview
+- [Getting Started](docs/getting-started/integration.md) - Installation and basic usage
+- [API Reference](docs/guides/api.md) - Complete API documentation
+- [Development Guide](docs/guides/development.md) - Contributing and architecture
+- [Installation](docs/getting-started/installation.md) - Setup instructions
+- [Quick Start](docs/getting-started/quickstart.md) - 5-minute overview
 
 ---
 
-## 🔧 Tech Stack
+## Tech Stack
 
 **Core**
 - TypeScript (strict mode)
 - Zod (schema validation)
-- Immer (immutable state)
+- Zustand (state management)
+- Immer (immutable updates)
 - MJML (email compilation)
 
 **UI**
@@ -151,7 +190,7 @@ pnpm run dev
 
 ---
 
-## 🎯 Why This Exists
+## Why This Exists
 
 **Problems with existing solutions:**
 - GrapesJS: Complex, outdated UI, hard to customize
@@ -159,27 +198,36 @@ pnpm run dev
 - Building from scratch: Too time-consuming
 
 **This editor provides:**
-- ✅ Full control over UI/UX
-- ✅ No vendor lock-in
-- ✅ Extensible architecture
-- ✅ Production-ready code
-- ✅ Type-safe from the ground up
+- Full control over UI/UX
+- No vendor lock-in
+- Extensible architecture
+- Production-ready code
+- Type-safe from the ground up
 
 ---
 
-## 📄 License
+## API Monetization (Coming Soon)
+
+| Tier | Price | Limits |
+|------|-------|--------|
+| Free | $0 | 100 compiles/month (watermark) |
+| Pro | $29/mo | 10,000 compiles/month |
+| Scale | $99/mo | 100,000 compiles/month |
+
+---
+
+## License
 
 MIT License - See LICENSE file for details
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! See [docs/guides/development.md](docs/guides/development.md) for guidelines.
 
 ---
 
-## 🌟 Made for ReTurn Hypnosis
+## Made for ReTurn Hypnosis
 
-Built with ❤️ to power beautiful email newsletters.
-
+Built with care to power beautiful email newsletters.
