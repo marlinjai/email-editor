@@ -1,261 +1,475 @@
 // packages/ui/src/EmailEditor.tsx
-// Main email editor component with 3-panel layout
+// Main Email Editor component with MST state management
 
-import { useState, useEffect } from 'react';
-import { DndContext, DragEndEvent, DragOverlay } from '@dnd-kit/core';
-import { Undo, Redo, Save } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { observer } from 'mobx-react-lite';
 import {
-  EmailTemplate,
-  Block,
-  createHistoryManager,
-  BlockRegistryImpl,
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  closestCenter,
+} from '@dnd-kit/core';
+import {
+  Undo,
+  Redo,
+  Save,
+  Monitor,
+  Smartphone,
+  ZoomIn,
+  ZoomOut,
+  Download,
+} from 'lucide-react';
+import {
+  createRootStore,
+  BlockType,
+  createSection,
+  type RootStoreInstance,
+  type TemplateSnapshotIn,
+  type TemplateSnapshotOut,
+  type BlockSnapshotIn,
+  type SectionSnapshotIn,
 } from '@returnhypnosis/email-editor-core';
-import { Canvas } from './canvas';
-import { BlockToolbar } from './toolbar';
+import { StoreProvider, useStore } from './store';
+import { EmailRenderer } from './renderer';
 import { PropertyInspector } from './inspector';
+import { LeftSidebar } from './sidebar/LeftSidebar';
+import { DragOverlayContent } from './DragOverlayContent';
 import { nanoid } from 'nanoid';
 import clsx from 'clsx';
+import type { BlockRegistryImpl, PrebuiltTemplateRegistry } from '@returnhypnosis/email-editor-core';
 
-interface EmailEditorProps {
-  value: EmailTemplate;
-  onChange: (template: EmailTemplate) => void;
+export interface EmailEditorProps {
+  /** Initial template data */
+  initialTemplate?: TemplateSnapshotIn;
+  /** Called when template changes */
+  onChange?: (template: TemplateSnapshotOut) => void;
+  /** Block registry for available block types */
   blockRegistry: BlockRegistryImpl;
+  /** Pre-built template registry */
+  prebuiltRegistry?: PrebuiltTemplateRegistry;
+  /** Called when save button is clicked */
   onSave?: () => void;
-  compiler?: { compile: (template: EmailTemplate) => { html: string } };
+  /** Called when export is requested */
+  onExport?: (template: TemplateSnapshotOut) => void;
 }
 
 /**
- * Main email editor component
- * 3-panel layout: Toolbar | Canvas | Inspector
+ * EmailEditor - Main email editor component
+ *
+ * Uses MobX State Tree for instant visual feedback on property changes.
+ * MJML compilation only happens on export, not during editing.
  */
-export function EmailEditor({
-  value,
+export const EmailEditor = observer(function EmailEditor({
+  initialTemplate,
   onChange,
   blockRegistry,
+  prebuiltRegistry,
   onSave,
-  compiler,
+  onExport,
 }: EmailEditorProps) {
-  const [template, setTemplate] = useState(value);
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [compiledHtml, setCompiledHtml] = useState('');
-  const [history] = useState(() => createHistoryManager(value));
+  const [store] = useState(() =>
+    createRootStore({
+      template: initialTemplate,
+      onChange: onChange as any,
+    })
+  );
 
-  // Compile template to HTML whenever it changes
-  useEffect(() => {
-    if (compiler) {
-      const result = compiler.compile(template);
-      setCompiledHtml(result.html);
-    } else {
-      // Fallback or just empty
-      setCompiledHtml('<!-- MJML compiler not available in browser -->');
+  return (
+    <StoreProvider value={store}>
+      <EmailEditorContent
+        blockRegistry={blockRegistry}
+        prebuiltRegistry={prebuiltRegistry}
+        onSave={onSave}
+        onExport={onExport}
+      />
+    </StoreProvider>
+  );
+});
+
+// === Inner Content Component ===
+
+interface ContentProps {
+  blockRegistry: BlockRegistryImpl;
+  prebuiltRegistry?: PrebuiltTemplateRegistry;
+  onSave?: () => void;
+  onExport?: (template: TemplateSnapshotOut) => void;
+}
+
+const EmailEditorContent = observer(function EmailEditorContent({
+  blockRegistry,
+  prebuiltRegistry,
+  onSave,
+  onExport,
+}: ContentProps) {
+  const store = useStore();
+  const { template, editorUI } = store;
+
+  const [activeDragItem, setActiveDragItem] = useState<{
+    type: 'block' | 'template';
+    id: string;
+    label: string;
+  } | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts(store);
+
+  // === Drag Handlers ===
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event;
+    const blockType = active.data.current?.blockType as string;
+    const templateId = active.data.current?.templateId as string;
+
+    if (blockType) {
+      const definition = blockRegistry.get(blockType);
+      setActiveDragItem({
+        type: 'block',
+        id: blockType,
+        label: definition?.label || blockType,
+      });
+      editorUI.startNewBlockDrag(blockType);
+    } else if (templateId) {
+      const prebuilt = prebuiltRegistry?.get(templateId);
+      setActiveDragItem({
+        type: 'template',
+        id: templateId,
+        label: prebuilt?.name || templateId,
+      });
     }
-  }, [template, compiler]);
+  }, [blockRegistry, prebuiltRegistry, editorUI]);
 
-  // Update parent when template changes
-  useEffect(() => {
-    onChange(template);
-  }, [template, onChange]);
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragItem(null);
+    editorUI.endDrag();
 
-  // Handle undo
-  const handleUndo = () => {
-    const prevState = history.undo();
-    if (prevState) {
-      setTemplate(prevState);
+    handleDrop(active, over, template, blockRegistry, prebuiltRegistry, editorUI);
+  }, [template, blockRegistry, prebuiltRegistry, editorUI]);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragItem(null);
+    editorUI.endDrag();
+  }, [editorUI]);
+
+  // === Section/Block Actions ===
+  const handleAddSection = useCallback((columnCount: 1 | 2 | 3) => {
+    const section = createSection({ columnCount });
+    template.addSection(section);
+    editorUI.selectSection(section.id);
+  }, [template, editorUI]);
+
+  const handleDeleteBlock = useCallback((blockId: string) => {
+    template.deleteBlock(blockId);
+    if (editorUI.selectedBlockId === blockId) {
+      editorUI.clearSelection();
     }
-  };
+  }, [template, editorUI]);
 
-  // Handle redo
-  const handleRedo = () => {
-    const nextState = history.redo();
-    if (nextState) {
-      setTemplate(nextState);
+  const handleExport = useCallback(() => {
+    if (onExport) {
+      const snapshot = JSON.parse(JSON.stringify(template)) as TemplateSnapshotOut;
+      onExport(snapshot);
     }
-  };
+  }, [template, onExport]);
 
-  // Handle keyboard shortcuts
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="email-editor h-screen flex flex-col bg-gray-50">
+        <EditorToolbar
+          onSave={onSave}
+          onExport={onExport ? handleExport : undefined}
+        />
+
+        <div className="flex-1 flex overflow-hidden">
+          <LeftSidebar
+            blockRegistry={blockRegistry}
+            prebuiltRegistry={prebuiltRegistry}
+            onAddSection={handleAddSection}
+          />
+
+          <div className="flex-1 overflow-auto bg-gray-100 p-8">
+            <EmailRenderer />
+          </div>
+
+          <PropertyInspector onDeleteBlock={handleDeleteBlock} />
+        </div>
+      </div>
+
+      <DragOverlay
+        dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}
+      >
+        {activeDragItem && <DragOverlayContent item={activeDragItem} />}
+      </DragOverlay>
+    </DndContext>
+  );
+});
+
+// === Toolbar Component ===
+
+interface ToolbarProps {
+  onSave?: () => void;
+  onExport?: () => void;
+}
+
+const EditorToolbar = observer(function EditorToolbar({ onSave, onExport }: ToolbarProps) {
+  const store = useStore();
+  const { template, editorUI } = store;
+
+  return (
+    <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-4">
+      <h1 className="text-xl font-semibold font-serif">Email Editor</h1>
+
+      <input
+        type="text"
+        placeholder="Template title..."
+        value={template.metadata.title}
+        onChange={(e) => template.updateMetadata({ title: e.target.value })}
+        className="px-3 py-1.5 border border-gray-300 rounded text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+
+      <div className="flex-1" />
+
+      {/* Device toggle */}
+      <DeviceToggle />
+
+      {/* Zoom controls */}
+      <ZoomControls />
+
+      {/* Undo/Redo */}
+      <button
+        onClick={() => store.undo()}
+        disabled={!store.canUndo}
+        className={clsx(
+          'p-2 rounded transition-colors',
+          store.canUndo ? 'hover:bg-gray-100' : 'opacity-30 cursor-not-allowed'
+        )}
+        title="Undo (Cmd+Z)"
+      >
+        <Undo size={18} />
+      </button>
+      <button
+        onClick={() => store.redo()}
+        disabled={!store.canRedo}
+        className={clsx(
+          'p-2 rounded transition-colors',
+          store.canRedo ? 'hover:bg-gray-100' : 'opacity-30 cursor-not-allowed'
+        )}
+        title="Redo (Cmd+Shift+Z)"
+      >
+        <Redo size={18} />
+      </button>
+
+      {/* Export button */}
+      {onExport && (
+        <button
+          onClick={onExport}
+          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-sm flex items-center gap-2"
+        >
+          <Download size={16} />
+          Export
+        </button>
+      )}
+
+      {/* Save button */}
+      {onSave && (
+        <button
+          onClick={onSave}
+          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2"
+        >
+          <Save size={16} />
+          Save
+        </button>
+      )}
+    </div>
+  );
+});
+
+const DeviceToggle = observer(function DeviceToggle() {
+  const { editorUI } = useStore();
+
+  return (
+    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+      <button
+        onClick={() => editorUI.setPreviewDevice('desktop')}
+        className={clsx(
+          'p-1.5 rounded',
+          editorUI.previewDevice === 'desktop'
+            ? 'bg-white shadow-sm'
+            : 'hover:bg-gray-200'
+        )}
+        title="Desktop preview"
+      >
+        <Monitor size={16} />
+      </button>
+      <button
+        onClick={() => editorUI.setPreviewDevice('mobile')}
+        className={clsx(
+          'p-1.5 rounded',
+          editorUI.previewDevice === 'mobile'
+            ? 'bg-white shadow-sm'
+            : 'hover:bg-gray-200'
+        )}
+        title="Mobile preview"
+      >
+        <Smartphone size={16} />
+      </button>
+    </div>
+  );
+});
+
+const ZoomControls = observer(function ZoomControls() {
+  const { editorUI } = useStore();
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => editorUI.zoomOut()}
+        className="p-1.5 hover:bg-gray-100 rounded"
+        title="Zoom out"
+      >
+        <ZoomOut size={16} />
+      </button>
+      <span className="text-sm text-gray-600 w-12 text-center">
+        {editorUI.zoomPercentage}%
+      </span>
+      <button
+        onClick={() => editorUI.zoomIn()}
+        className="p-1.5 hover:bg-gray-100 rounded"
+        title="Zoom in"
+      >
+        <ZoomIn size={16} />
+      </button>
+    </div>
+  );
+});
+
+// === Utility Functions ===
+
+function useKeyboardShortcuts(store: RootStoreInstance) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Undo/Redo
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
-        if (e.shiftKey) {
-          handleRedo();
-        } else {
-          handleUndo();
+        e.shiftKey ? store.redo() : store.undo();
+      }
+
+      // Delete
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeEl = document.activeElement;
+        if (activeEl?.tagName !== 'INPUT' && activeEl?.tagName !== 'TEXTAREA') {
+          if (store.editorUI.selectedBlockId) {
+            e.preventDefault();
+            store.template.deleteBlock(store.editorUI.selectedBlockId);
+            store.editorUI.clearSelection();
+          }
         }
       }
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedBlockId && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          handleDeleteBlock();
-        }
+
+      // Escape
+      if (e.key === 'Escape') {
+        store.editorUI.clearSelection();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedBlockId]);
-
-  // Handle block drag end
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active } = event;
-    const blockType = active.data.current?.blockType as string;
-
-    if (!blockType) return;
-
-    const definition = blockRegistry.get(blockType);
-    if (!definition) return;
-
-    // Create new block with default props
-    const newBlock: Block = {
-      id: nanoid(),
-      type: blockType,
-      ...definition.defaultProps,
-    } as Block;
-
-    // Add block to first section's first column
-    // TODO: Make this more sophisticated with drop zones
-    const newTemplate = history.updateState((draft) => {
-      if (draft.sections.length === 0) {
-        draft.sections.push({
-          id: nanoid(),
-          type: 'section',
-          columns: [{ id: nanoid(), blocks: [newBlock] }],
-        });
-      } else {
-        draft.sections[0].columns[0].blocks.push(newBlock);
-      }
-    });
-
-    setTemplate(newTemplate);
-    setSelectedBlockId(newBlock.id);
-  };
-
-  // Handle block selection
-  const handleBlockClick = (blockId: string) => {
-    setSelectedBlockId(blockId);
-  };
-
-  // Find selected block
-  const selectedBlock = template.sections
-    .flatMap((s) => s.columns)
-    .flatMap((c) => c.blocks)
-    .find((b) => b.id === selectedBlockId) || null;
-
-  // Handle block property update
-  const handleBlockUpdate = (updates: Partial<Block>) => {
-    if (!selectedBlockId) return;
-
-    const newTemplate = history.updateState((draft) => {
-      for (const section of draft.sections) {
-        for (const column of section.columns) {
-          const block = column.blocks.find((b) => b.id === selectedBlockId);
-          if (block) {
-            Object.assign(block, updates);
-            break;
-          }
-        }
-      }
-    });
-
-    setTemplate(newTemplate);
-  };
-
-  // Handle block deletion
-  const handleDeleteBlock = () => {
-    if (!selectedBlockId) return;
-
-    const newTemplate = history.updateState((draft) => {
-      for (const section of draft.sections) {
-        for (const column of section.columns) {
-          const index = column.blocks.findIndex((b) => b.id === selectedBlockId);
-          if (index !== -1) {
-            column.blocks.splice(index, 1);
-            break;
-          }
-        }
-      }
-    });
-
-    setTemplate(newTemplate);
-    setSelectedBlockId(null);
-  };
-
-  return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <div className="email-editor">
-        {/* Top toolbar */}
-        <div className="bg-white border-b border-brand-border px-4 py-2 flex items-center gap-4">
-          <h1 className="text-xl font-semibold font-serif">Email Editor</h1>
-          <div className="flex-1" />
-
-          {/* Undo/Redo */}
-          <button
-            onClick={handleUndo}
-            disabled={!history.canUndo()}
-            className={clsx(
-              'p-2 rounded transition-colors',
-              history.canUndo()
-                ? 'hover:bg-gray-100'
-                : 'opacity-30 cursor-not-allowed'
-            )}
-            title="Undo (Cmd+Z)"
-          >
-            <Undo size={18} />
-          </button>
-          <button
-            onClick={handleRedo}
-            disabled={!history.canRedo()}
-            className={clsx(
-              'p-2 rounded transition-colors',
-              history.canRedo()
-                ? 'hover:bg-gray-100'
-                : 'opacity-30 cursor-not-allowed'
-            )}
-            title="Redo (Cmd+Shift+Z)"
-          >
-            <Redo size={18} />
-          </button>
-
-          {/* Save button */}
-          {onSave && (
-            <button
-              onClick={onSave}
-              className="btn btn-primary flex items-center gap-2"
-            >
-              <Save size={16} />
-              Save
-            </button>
-          )}
-        </div>
-
-        {/* 3-panel layout */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left: Block toolbar */}
-          <BlockToolbar blocks={blockRegistry.getAll()} />
-
-          {/* Center: Canvas */}
-          <Canvas
-            html={compiledHtml}
-            selectedBlockId={selectedBlockId}
-            onBlockClick={handleBlockClick}
-          />
-
-          {/* Right: Property inspector */}
-          <PropertyInspector
-            block={selectedBlock}
-            onChange={handleBlockUpdate}
-            onDelete={handleDeleteBlock}
-          />
-        </div>
-      </div>
-
-      {/* Drag overlay */}
-      <DragOverlay>
-        <div className="bg-white p-3 rounded border-2 border-brand-primary shadow-lg">
-          Dragging block...
-        </div>
-      </DragOverlay>
-    </DndContext>
-  );
+  }, [store]);
 }
 
+function handleDrop(
+  active: any,
+  over: any,
+  template: any,
+  blockRegistry: BlockRegistryImpl,
+  prebuiltRegistry: PrebuiltTemplateRegistry | undefined,
+  editorUI: any
+) {
+  // Handle template drop
+  const templateId = active.data.current?.templateId as string;
+  if (templateId && prebuiltRegistry) {
+    const prebuilt = prebuiltRegistry.get(templateId);
+    if (prebuilt) {
+      const newSection = cloneSectionWithNewIds(prebuilt.section);
+      template.addSection(newSection);
+      editorUI.selectSection(newSection.id);
+      return;
+    }
+  }
+
+  // Handle block drop
+  const blockType = active.data.current?.blockType as string;
+  if (!blockType) return;
+
+  const definition = blockRegistry.get(blockType);
+  if (!definition) return;
+
+  const newBlock: BlockSnapshotIn = {
+    id: nanoid(),
+    type: blockType as BlockType,
+    ...definition.defaultProps,
+  };
+
+  if (!over) {
+    // No target - add to last section or create new
+    if (template.sections.length === 0) {
+      const section = createSection();
+      template.addSection(section);
+      template.insertBlock(template.sections[0].columns[0].id, newBlock, 0);
+    } else {
+      const lastSection = template.sections[template.sections.length - 1];
+      const lastColumn = lastSection.columns[0];
+      template.insertBlock(lastColumn.id, newBlock, lastColumn.blocks.length);
+    }
+  } else {
+    const dropId = over.id.toString();
+
+    if (dropId === 'drop-empty') {
+      const section = createSection();
+      template.addSection(section);
+      template.insertBlock(template.sections[0].columns[0].id, newBlock, 0);
+    } else if (dropId.startsWith('drop-column-')) {
+      const columnId = dropId.replace('drop-column-', '').replace('-end', '');
+      const column = template.findColumnById(columnId);
+      if (column) {
+        template.insertBlock(columnId, newBlock, column.blocks.length);
+      }
+    } else if (editorUI.dropIntent) {
+      template.insertBlock(
+        editorUI.dropIntent.targetColumnId,
+        newBlock,
+        editorUI.dropIntent.targetIndex
+      );
+    }
+  }
+
+  editorUI.selectBlock(newBlock.id);
+}
+
+function cloneSectionWithNewIds(section: any): SectionSnapshotIn {
+  return {
+    ...section,
+    id: nanoid(),
+    columns: section.columns.map((col: any) => ({
+      ...col,
+      id: nanoid(),
+      blocks: col.blocks.map((block: any) => ({
+        ...block,
+        id: nanoid(),
+      })),
+    })),
+  };
+}

@@ -1,6 +1,5 @@
 // packages/ui/src/inspector/index.ts
-// Inspector exports
-
-export * from './PropertyInspector';
+export { PropertyInspector } from './PropertyInspector';
 export * from './fields';
+export * from './properties';
 

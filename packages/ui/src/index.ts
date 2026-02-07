@@ -1,8 +1,20 @@
 // packages/ui/src/index.ts
-// UI component exports
+// Email Editor UI Package
 
-export * from './canvas';
-export * from './toolbar';
+// Main editor component
+export { EmailEditor, type EmailEditorProps } from './EmailEditor';
+
+// Store bindings (React-specific)
+export * from './store';
+
+// Renderer components
+export * from './renderer';
+
+// Inspector components
 export * from './inspector';
-export * from './EmailEditor';
 
+// Sidebar components
+export * from './sidebar';
+
+// Drag overlay
+export { DragOverlayContent } from './DragOverlayContent';
