@@ -1,3 +1,9 @@
+---
+title: API Reference
+description: Complete API documentation for the email editor
+order: 5
+---
+
 # API Reference
 
 ## createEditor(options)

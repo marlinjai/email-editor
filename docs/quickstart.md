@@ -1,3 +1,9 @@
+---
+title: Quick Start
+description: Get up and running with the email editor
+order: 2
+---
+
 # Quick Start Guide
 
 ## Installation & Setup

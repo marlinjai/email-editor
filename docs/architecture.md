@@ -1,3 +1,9 @@
+---
+title: Architecture
+description: Package layering, data flow, and design decisions for the email editor
+order: 1
+---
+
 # Email Editor Architecture
 
 ## Overview

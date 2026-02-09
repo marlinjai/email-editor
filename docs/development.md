@@ -1,3 +1,9 @@
+---
+title: Development
+description: Development workflow, testing, and contributing guide
+order: 6
+---
+
 # Development Guide
 
 ## Setup

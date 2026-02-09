@@ -1,3 +1,9 @@
+---
+title: Integration
+description: React and vanilla JS integration patterns
+order: 4
+---
+
 # Getting Started with @returnhypnosis/email-editor
 
 ## Installation

@@ -1,3 +1,9 @@
+---
+title: Installation
+description: Detailed installation instructions for the email editor monorepo
+order: 3
+---
+
 # Installation Instructions
 
 ## Prerequisites
