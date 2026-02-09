@@ -10,6 +10,9 @@ docs-dist
 out
 build
 
+# Claude Code
+.agents/
+
 # Misc
 .DS_Store
 *.pem
