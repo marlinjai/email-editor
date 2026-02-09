@@ -11,10 +11,13 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "docs:dev": "clearify dev",
+    "docs:build": "clearify build"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "clearify": "link:../clearify",
     "prettier": "^3.1.0",
     "turbo": "^2.0.0",
     "typescript": "^5.3.0"
@@ -24,4 +27,3 @@
     "node": ">=18.0.0"
   }
 }
-
