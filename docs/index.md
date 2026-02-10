@@ -38,9 +38,9 @@ function App() {
 
 ## Documentation
 
-- [Architecture](./architecture) — Package layering, data flow, design decisions
-- [Quick Start](./quickstart) — Installation and setup
-- [Installation](./installation) — Detailed installation instructions
-- [Integration](./integration) — React and vanilla JS integration patterns
-- [API Reference](./api) — Full API documentation
-- [Development](./development) — Development workflow and contributing
+- [Architecture](/projects/email-editor/architecture) — Package layering, data flow, design decisions
+- [Quick Start](/projects/email-editor/quickstart) — Installation and setup
+- [Installation](/projects/email-editor/installation) — Detailed installation instructions
+- [Integration](/projects/email-editor/integration) — React and vanilla JS integration patterns
+- [API Reference](/projects/email-editor/api) — Full API documentation
+- [Development](/projects/email-editor/development) — Development workflow and contributing

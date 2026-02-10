@@ -44,9 +44,9 @@ Open http://localhost:3000 to see the editor in action.
    ```
 
 2. **Read the Docs**
-   - [Installation](./installation)
-   - [API Reference](./api)
-   - [Development Guide](./development)
+   - [Installation](/projects/email-editor/installation)
+   - [API Reference](/projects/email-editor/api)
+   - [Development Guide](/projects/email-editor/development)
 
 3. **Integrate into Your App**
    ```bash
@@ -157,7 +157,7 @@ Import `@returnhypnosis/email-editor/styles.css` in your app.
 
 ## Support
 
-- [Full Documentation](./installation)
+- [Full Documentation](/projects/email-editor/installation)
 - [Example App](../examples/nextjs)
-- Issues? Check [Development Guide](./development)
+- Issues? Check [Development Guide](/projects/email-editor/development)
 

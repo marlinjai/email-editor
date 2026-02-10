@@ -166,6 +166,6 @@ const editor = createEditor({
 ## Next Steps
 
 - See the [Next.js example](../examples/nextjs) for a complete integration
-- Read the [API Reference](./api) for detailed documentation
-- Check the [Architecture](./architecture) for design decisions
+- Read the [API Reference](/projects/email-editor/api) for detailed documentation
+- Check the [Architecture](/projects/email-editor/architecture) for design decisions
 
