@@ -166,6 +166,6 @@ const editor = createEditor({
 ## Next Steps
 
 - See the [Next.js example](../examples/nextjs) for a complete integration
-- Read the [API Reference](./API.md) for detailed documentation
-- Check out [Custom Blocks](./CUSTOM_BLOCKS.md) for advanced usage
+- Read the [API Reference](./api) for detailed documentation
+- Check the [Architecture](./architecture) for design decisions
 

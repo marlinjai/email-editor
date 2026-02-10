@@ -185,7 +185,7 @@ pnpm run test:watch
 
 Once installed, check out:
 
-1. **[quickstart.md](quickstart.md)** - Quick overview
-2. **[integration.md](integration.md)** - Integration patterns
-3. **[../guides/development.md](../guides/development.md)** - Development guide
-4. **[../guides/api.md](../guides/api.md)** - API reference
+1. **[Quick Start](./quickstart)** - Quick overview
+2. **[Integration](./integration)** - Integration patterns
+3. **[Development](./development)** - Development guide
+4. **[API Reference](./api)** - API reference
