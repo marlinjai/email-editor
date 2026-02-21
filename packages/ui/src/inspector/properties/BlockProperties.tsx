@@ -65,8 +65,8 @@ const BlockHeader = observer(function BlockHeader({
         <button
           onClick={() => block.toggleHidden()}
           className={clsx(
-            'p-1.5 rounded hover:bg-gray-100',
-            block.hidden && 'text-amber-500'
+            'p-1.5 rounded hover:bg-canvas-3',
+            block.hidden && 'text-accent'
           )}
           title={block.hidden ? 'Show block' : 'Hide block'}
         >
@@ -74,7 +74,7 @@ const BlockHeader = observer(function BlockHeader({
         </button>
         <button
           onClick={onDelete}
-          className="p-1.5 rounded hover:bg-red-50 text-red-500"
+          className="p-1.5 rounded hover:bg-danger/5 text-danger"
           title="Delete block"
         >
           <Trash2 size={14} />
@@ -109,7 +109,7 @@ const TypeSpecificProperties = observer(function TypeSpecificProperties({
       return <HeroBlockProperties block={block} />;
     default:
       return (
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-text-dark-muted">
           No properties available for this block type
         </div>
       );
@@ -150,9 +150,9 @@ const TextBlockProperties = observer(function TextBlockProperties({
   return (
     <>
       <div className="space-y-1">
-        <label className="block text-xs font-medium text-gray-600">Formatting</label>
+        <label className="block text-xs font-medium text-text-dark-muted">Formatting</label>
         <FormattingToolbar />
-        <p className="text-xs text-gray-400">Select text in block, then click to format</p>
+        <p className="text-xs text-text-dark-muted">Select text in block, then click to format</p>
       </div>
       <ColorField
         label="Text Color"

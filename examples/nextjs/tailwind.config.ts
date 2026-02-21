@@ -10,17 +10,48 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        midnight: {
+          1: 'var(--midnight-1)',
+          2: 'var(--midnight-2)',
+          3: 'var(--midnight-3)',
+          4: 'var(--midnight-4)',
+        },
+        canvas: {
+          1: 'var(--canvas-1)',
+          2: 'var(--canvas-2)',
+          3: 'var(--canvas-3)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          muted: 'var(--accent-muted)',
+        },
+        'border-default': 'var(--border-default)',
+        'border-subtle': 'var(--border-subtle)',
+        'border-light': 'var(--border-light)',
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        'text-tertiary': 'var(--text-tertiary)',
+        'text-dark': 'var(--text-dark)',
+        'text-dark-muted': 'var(--text-dark-muted)',
+        success: {
+          DEFAULT: 'var(--success)',
+          muted: 'var(--success-muted)',
+        },
+        danger: {
+          DEFAULT: 'var(--danger)',
+          muted: 'var(--danger-muted)',
+        },
         brand: {
-          primary: '#944923',
-          surface: '#ffffff',
-          border: '#e5e5e5',
-          text: '#1a1a1a',
-          'text-secondary': '#666666',
+          primary: 'var(--accent)',
+          surface: 'var(--canvas-2)',
+          border: 'var(--border-light)',
+          text: 'var(--text-dark)',
+          'text-secondary': 'var(--text-dark-muted)',
         },
       },
       fontFamily: {
-        serif: ['Georgia', 'serif'],
-        sans: ['system-ui', 'sans-serif'],
+        sans: ['var(--font-jakarta)', 'system-ui', 'sans-serif'],
       },
     },
   },

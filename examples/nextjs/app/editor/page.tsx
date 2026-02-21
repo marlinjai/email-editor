@@ -4,39 +4,25 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { EmailEditorReact, type TemplateSnapshotIn, type TemplateSnapshotOut } from '@marlinjai/email-editor/react';
 
 /**
- * Default template with ReTurn branding
+ * Default template
  */
 const defaultTemplate: TemplateSnapshotIn = {
   id: 'default-template',
   version: '1.0',
   metadata: {
     title: 'Untitled Template',
-    subject: 'Welcome to ReTurn Newsletter',
-    previewText: 'Monthly insights on hypnosis and personal transformation',
+    subject: 'Your Email Subject',
+    previewText: 'Preview text shown in inbox',
   },
   sections: [],
 };
 
-/**
- * ReTurn theme configuration
- */
-const returnTheme = {
-  colors: {
-    primary: '#944923',
-    surface: '#ffffff',
-    text: '#1a1a1a',
-    border: '#e5e5e5',
-  },
-  fonts: {
-    heading: 'Georgia, serif',
-    body: 'Georgia, serif',
-  },
-};
-
 export default function EditorPage() {
+  const router = useRouter();
   const [currentTemplate, setCurrentTemplate] = useState<TemplateSnapshotOut | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
@@ -122,8 +108,8 @@ export default function EditorPage() {
           style={{
             padding: '12px',
             textAlign: 'center',
-            background: saveStatus.includes('Error') ? '#fee' : '#efe',
-            color: saveStatus.includes('Error') ? '#c33' : '#363',
+            background: saveStatus.includes('Error') ? 'var(--danger-muted)' : 'var(--success-muted)',
+            color: saveStatus.includes('Error') ? 'var(--danger)' : 'var(--success)',
           }}
         >
           {saveStatus}
@@ -132,9 +118,9 @@ export default function EditorPage() {
       <EmailEditorReact
         initialTemplate={defaultTemplate}
         onChange={handleTemplateChange}
-        theme={returnTheme}
         onSave={handleSave}
         onExport={handleExport}
+        onNavigateBack={() => router.push('/dashboard')}
       />
     </div>
   );

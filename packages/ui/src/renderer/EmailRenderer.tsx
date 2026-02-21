@@ -31,7 +31,7 @@ export const EmailRenderer = observer(({ className }: EmailRendererProps) => {
   return (
     <div
       className={clsx(
-        'email-renderer bg-white shadow-lg rounded-lg overflow-hidden',
+        'email-renderer bg-canvas-2 shadow-lg rounded-lg overflow-hidden',
         className
       )}
       style={{
@@ -82,11 +82,11 @@ const EmptyStateDropZone = observer(() => {
     <div
       className={clsx(
         'empty-state p-12 min-h-[400px] flex flex-col items-center justify-center',
-        'border-2 border-dashed border-gray-200 rounded-lg m-4',
-        editorUI.isDragging && 'border-blue-400 bg-blue-50'
+        'border-2 border-dashed border-border-light rounded-lg m-4',
+        editorUI.isDragging && 'border-accent bg-accent/5'
       )}
     >
-      <div className="text-gray-400 text-center">
+      <div className="text-text-dark-muted text-center">
         <div className="text-4xl mb-4">📧</div>
         <h3 className="text-lg font-medium mb-2">Start building your email</h3>
         <p className="text-sm">

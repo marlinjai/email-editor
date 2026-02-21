@@ -72,8 +72,8 @@ export default function DashboardOverview() {
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
-                    background: 'rgba(52, 211, 153, 0.12)',
-                    color: '#34d399',
+                    background: 'var(--success-muted)',
+                    color: 'var(--success)',
                   }}>
                     {c.status}
                   </span>
@@ -98,33 +98,9 @@ export default function DashboardOverview() {
           <Link
             key={action.label}
             href={action.href}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '14px 16px',
-              background: 'var(--db-surface)',
-              border: '1px solid var(--db-border)',
-              borderRadius: 10,
-              textDecoration: 'none',
-              color: 'var(--db-text)',
-              fontSize: 13,
-              fontWeight: 500,
-              transition: 'background 0.15s',
-            }}
+            className="dashboard-quick-action"
           >
-            <span style={{
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              background: 'rgba(99, 102, 241, 0.12)',
-              color: '#6366f1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 16,
-              fontWeight: 700,
-            }}>
+            <span className="dashboard-quick-action__icon">
               {action.icon}
             </span>
             {action.label}

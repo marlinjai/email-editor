@@ -20,6 +20,8 @@ interface EmailEditorReactProps {
   onSave?: () => void;
   /** Called when export is requested */
   onExport?: (template: TemplateSnapshotOut) => void;
+  /** Called when back button is clicked to navigate away from editor */
+  onNavigateBack?: () => void;
 }
 
 /**
@@ -33,6 +35,7 @@ export function EmailEditorReact({
   blocks = [],
   onSave,
   onExport,
+  onNavigateBack,
 }: EmailEditorReactProps) {
   const [registry] = useState(() => {
     const reg = createStandardBlockRegistry();
@@ -70,6 +73,7 @@ export function EmailEditorReact({
       prebuiltRegistry={prebuiltRegistry}
       onSave={onSave}
       onExport={onExport}
+      onNavigateBack={onNavigateBack}
     />
   );
 }

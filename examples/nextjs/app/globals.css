@@ -2,20 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Landing page theme ─── */
+/* ─── Unified "Refined Midnight" palette ─── */
 :root {
-  --background: #0c0c0e;
-  --foreground: #e8e6e3;
-  --surface: #16161a;
-  --surface-elevated: #1e1e23;
-  --border: #2a2a30;
-  --border-subtle: #1f1f25;
-  --muted: #72717a;
+  /* Midnight surfaces (dark contexts) */
+  --midnight-1: #0b0b10;
+  --midnight-2: #111118;
+  --midnight-3: #171720;
+  --midnight-4: #1e1e2a;
+
+  /* Canvas surfaces (editor light contexts) */
+  --canvas-1: #f8f8fa;
+  --canvas-2: #ffffff;
+  --canvas-3: #f1f1f5;
+
+  /* Borders */
+  --border-default: #252530;
+  --border-subtle: #1c1c28;
+  --border-light: #e2e2ea;
+
+  /* Text */
+  --text-primary: #e8e6f0;
+  --text-secondary: #8886a0;
+  --text-tertiary: #5c5a72;
+  --text-dark: #1a1a2e;
+  --text-dark-muted: #6b6b80;
+
+  /* Accent */
   --accent: #6366f1;
-  --accent-muted: rgba(99, 102, 241, 0.12);
   --accent-hover: #818cf8;
-  --danger: #e5534b;
-  --danger-muted: rgba(229, 83, 75, 0.12);
+  --accent-muted: rgba(99, 102, 241, 0.12);
+  --accent-strong: rgba(99, 102, 241, 0.20);
+
+  /* Semantic */
+  --success: #34d399;
+  --success-muted: rgba(52, 211, 153, 0.12);
+  --danger: #ef4444;
+  --danger-muted: rgba(239, 68, 68, 0.12);
+
+  /* Aliases (landing page references these inline) */
+  --background: var(--midnight-1);
+  --foreground: var(--text-primary);
+  --surface: var(--midnight-3);
+  --surface-elevated: var(--midnight-4);
+  --border: var(--border-default);
+  --muted: var(--text-secondary);
 }
 
 /* ─── Base layer ─── */
@@ -42,7 +72,7 @@
 /* ─── Editor component styles ─── */
 @layer components {
   .email-editor {
-    @apply w-full h-screen flex flex-col bg-gray-50 text-brand-text;
+    @apply w-full h-screen flex flex-col bg-canvas-1 text-brand-text;
   }
 
   .btn {
@@ -54,7 +84,7 @@
   }
 
   .btn-secondary {
-    @apply bg-white border border-brand-border hover:bg-gray-50;
+    @apply bg-canvas-2 border border-brand-border hover:bg-canvas-3;
   }
 
   .input {
@@ -62,25 +92,25 @@
   }
 
   .panel {
-    @apply bg-white border-r border-brand-border overflow-y-auto;
+    @apply bg-canvas-2 border-r border-brand-border overflow-y-auto;
   }
 }
 
 /* ─── Dashboard theme ─── */
 .dashboard-layout {
-  --db-bg: #0f0f1a;
-  --db-sidebar: #13132b;
-  --db-sidebar-hover: #1c1c3a;
-  --db-sidebar-active: rgba(99, 102, 241, 0.15);
-  --db-topbar: #16162e;
-  --db-border: #252545;
-  --db-text: #e8e6f0;
-  --db-text-muted: #8886a0;
-  --db-accent: #6366f1;
-  --db-accent-hover: #818cf8;
-  --db-surface: #1a1a35;
-  --db-surface-elevated: #22223f;
-  --db-card-bg: #1e1e38;
+  --db-bg: var(--midnight-1);
+  --db-sidebar: var(--midnight-2);
+  --db-sidebar-hover: var(--midnight-4);
+  --db-sidebar-active: var(--accent-strong);
+  --db-topbar: var(--midnight-2);
+  --db-border: var(--border-default);
+  --db-text: var(--text-primary);
+  --db-text-muted: var(--text-secondary);
+  --db-accent: var(--accent);
+  --db-accent-hover: var(--accent-hover);
+  --db-surface: var(--midnight-3);
+  --db-surface-elevated: var(--midnight-4);
+  --db-card-bg: var(--midnight-3);
 }
 
 .dashboard-layout {
@@ -118,7 +148,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(99, 102, 241, 0.15);
+  background: var(--accent-muted);
 }
 
 .dashboard-sidebar__brand-name {
@@ -157,6 +187,8 @@
 .dashboard-sidebar__link--active {
   background: var(--db-sidebar-active);
   color: var(--db-accent);
+  border-left: 3px solid var(--db-accent);
+  padding-left: 9px;
 }
 
 .dashboard-sidebar__link svg {
@@ -255,6 +287,12 @@
   border: 1px solid var(--db-border);
   border-radius: 12px;
   padding: 20px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.dashboard-stat-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 102, 241, 0.3);
 }
 
 .dashboard-stat-card__label {
@@ -278,7 +316,7 @@
 }
 
 .dashboard-stat-card__change--positive {
-  color: #34d399;
+  color: var(--success);
 }
 
 .dashboard-stat-card__change--neutral {
@@ -338,6 +376,47 @@
   color: var(--db-text);
 }
 
+/* Dashboard section button overrides */
+.dashboard-layout button[style] {
+  background: var(--db-surface) !important;
+  color: var(--db-text) !important;
+  border-color: var(--db-border) !important;
+}
+
+/* Quick action cards */
+.dashboard-quick-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--db-surface);
+  border: 1px solid var(--db-border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--db-text);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.dashboard-quick-action:hover {
+  background: var(--db-surface-elevated);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.dashboard-quick-action__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--accent-muted);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+
 /* Empty state */
 .dashboard-empty {
   text-align: center;
@@ -390,4 +469,10 @@ body::after {
   background: radial-gradient(ellipse, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
+}
+
+/* Hide atmosphere effects on editor page */
+body:has(.email-editor)::before,
+body:has(.email-editor)::after {
+  display: none;
 }

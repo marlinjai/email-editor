@@ -30,14 +30,14 @@ export const PropertyInspector = observer(function PropertyInspector({
   // No selection - show empty state
   if (!selectedBlock && !selectedSection && !selectedColumn) {
     return (
-      <div className="w-72 border-l border-brand-border bg-white p-6 flex items-center justify-center text-gray-400 text-sm">
+      <div className="w-72 border-l border-brand-border bg-canvas-2 p-6 flex items-center justify-center text-text-dark-muted text-sm">
         Select an element to edit its properties
       </div>
     );
   }
 
   return (
-    <div className="w-72 border-l border-brand-border bg-white overflow-y-auto">
+    <div className="w-72 border-l border-brand-border bg-canvas-2 overflow-y-auto">
       {selectedBlock && (
         <BlockProperties
           block={selectedBlock}

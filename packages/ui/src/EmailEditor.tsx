@@ -22,6 +22,7 @@ import {
   ZoomIn,
   ZoomOut,
   Download,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   createRootStore,
@@ -55,6 +56,8 @@ export interface EmailEditorProps {
   onSave?: () => void;
   /** Called when export is requested */
   onExport?: (template: TemplateSnapshotOut) => void;
+  /** Called when back button is clicked to navigate away from editor */
+  onNavigateBack?: () => void;
 }
 
 /**
@@ -70,6 +73,7 @@ export const EmailEditor = observer(function EmailEditor({
   prebuiltRegistry,
   onSave,
   onExport,
+  onNavigateBack,
 }: EmailEditorProps) {
   const [store] = useState(() =>
     createRootStore({
@@ -85,6 +89,7 @@ export const EmailEditor = observer(function EmailEditor({
         prebuiltRegistry={prebuiltRegistry}
         onSave={onSave}
         onExport={onExport}
+        onNavigateBack={onNavigateBack}
       />
     </StoreProvider>
   );
@@ -97,6 +102,7 @@ interface ContentProps {
   prebuiltRegistry?: PrebuiltTemplateRegistry;
   onSave?: () => void;
   onExport?: (template: TemplateSnapshotOut) => void;
+  onNavigateBack?: () => void;
 }
 
 const EmailEditorContent = observer(function EmailEditorContent({
@@ -104,6 +110,7 @@ const EmailEditorContent = observer(function EmailEditorContent({
   prebuiltRegistry,
   onSave,
   onExport,
+  onNavigateBack,
 }: ContentProps) {
   const store = useStore();
   const { template, editorUI } = store;
@@ -187,10 +194,11 @@ const EmailEditorContent = observer(function EmailEditorContent({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="email-editor h-screen flex flex-col bg-gray-50">
+      <div className="email-editor h-screen flex flex-col bg-canvas-1">
         <EditorToolbar
           onSave={onSave}
           onExport={onExport ? handleExport : undefined}
+          onNavigateBack={onNavigateBack}
         />
 
         <div className="flex-1 flex overflow-hidden">
@@ -200,7 +208,7 @@ const EmailEditorContent = observer(function EmailEditorContent({
             onAddSection={handleAddSection}
           />
 
-          <div className="flex-1 overflow-auto bg-gray-100 p-8">
+          <div className="flex-1 overflow-auto bg-canvas-1 p-8">
             <EmailRenderer />
           </div>
 
@@ -222,22 +230,34 @@ const EmailEditorContent = observer(function EmailEditorContent({
 interface ToolbarProps {
   onSave?: () => void;
   onExport?: () => void;
+  onNavigateBack?: () => void;
 }
 
-const EditorToolbar = observer(function EditorToolbar({ onSave, onExport }: ToolbarProps) {
+const EditorToolbar = observer(function EditorToolbar({ onSave, onExport, onNavigateBack }: ToolbarProps) {
   const store = useStore();
   const { template, editorUI } = store;
 
   return (
-    <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-4">
-      <h1 className="text-xl font-semibold font-serif">Email Editor</h1>
+    <div className="bg-midnight-2 border-b border-border-default px-4 py-2 flex items-center gap-4">
+      {/* Back button */}
+      {onNavigateBack && (
+        <button
+          onClick={onNavigateBack}
+          className="p-2 rounded transition-colors hover:bg-midnight-3 text-text-secondary hover:text-text-primary"
+          title="Back to dashboard"
+        >
+          <ArrowLeft size={18} />
+        </button>
+      )}
+
+      <h1 className="text-sm font-semibold text-text-primary">Email Editor</h1>
 
       <input
         type="text"
         placeholder="Template title..."
         value={template.metadata.title}
         onChange={(e) => template.updateMetadata({ title: e.target.value })}
-        className="px-3 py-1.5 border border-gray-300 rounded text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="px-3 py-1.5 bg-midnight-3 border border-border-default rounded text-sm w-64 text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
       />
 
       <div className="flex-1" />
@@ -253,8 +273,8 @@ const EditorToolbar = observer(function EditorToolbar({ onSave, onExport }: Tool
         onClick={() => store.undo()}
         disabled={!store.canUndo}
         className={clsx(
-          'p-2 rounded transition-colors',
-          store.canUndo ? 'hover:bg-gray-100' : 'opacity-30 cursor-not-allowed'
+          'p-2 rounded transition-colors text-text-secondary',
+          store.canUndo ? 'hover:bg-midnight-3 hover:text-text-primary' : 'opacity-30 cursor-not-allowed'
         )}
         title="Undo (Cmd+Z)"
       >
@@ -264,8 +284,8 @@ const EditorToolbar = observer(function EditorToolbar({ onSave, onExport }: Tool
         onClick={() => store.redo()}
         disabled={!store.canRedo}
         className={clsx(
-          'p-2 rounded transition-colors',
-          store.canRedo ? 'hover:bg-gray-100' : 'opacity-30 cursor-not-allowed'
+          'p-2 rounded transition-colors text-text-secondary',
+          store.canRedo ? 'hover:bg-midnight-3 hover:text-text-primary' : 'opacity-30 cursor-not-allowed'
         )}
         title="Redo (Cmd+Shift+Z)"
       >
@@ -276,7 +296,7 @@ const EditorToolbar = observer(function EditorToolbar({ onSave, onExport }: Tool
       {onExport && (
         <button
           onClick={onExport}
-          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-sm flex items-center gap-2"
+          className="px-3 py-1.5 bg-midnight-3 hover:bg-midnight-4 text-text-secondary hover:text-text-primary rounded text-sm flex items-center gap-2 transition-colors"
         >
           <Download size={16} />
           Export
@@ -287,7 +307,7 @@ const EditorToolbar = observer(function EditorToolbar({ onSave, onExport }: Tool
       {onSave && (
         <button
           onClick={onSave}
-          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2"
+          className="px-4 py-1.5 bg-accent hover:bg-accent-hover text-white rounded text-sm flex items-center gap-2 transition-colors"
         >
           <Save size={16} />
           Save
@@ -301,14 +321,14 @@ const DeviceToggle = observer(function DeviceToggle() {
   const { editorUI } = useStore();
 
   return (
-    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+    <div className="flex items-center gap-1 bg-midnight-3 rounded-lg p-1">
       <button
         onClick={() => editorUI.setPreviewDevice('desktop')}
         className={clsx(
-          'p-1.5 rounded',
+          'p-1.5 rounded transition-colors',
           editorUI.previewDevice === 'desktop'
-            ? 'bg-white shadow-sm'
-            : 'hover:bg-gray-200'
+            ? 'bg-midnight-4 text-text-primary shadow-sm'
+            : 'text-text-secondary hover:text-text-primary'
         )}
         title="Desktop preview"
       >
@@ -317,10 +337,10 @@ const DeviceToggle = observer(function DeviceToggle() {
       <button
         onClick={() => editorUI.setPreviewDevice('mobile')}
         className={clsx(
-          'p-1.5 rounded',
+          'p-1.5 rounded transition-colors',
           editorUI.previewDevice === 'mobile'
-            ? 'bg-white shadow-sm'
-            : 'hover:bg-gray-200'
+            ? 'bg-midnight-4 text-text-primary shadow-sm'
+            : 'text-text-secondary hover:text-text-primary'
         )}
         title="Mobile preview"
       >
@@ -337,17 +357,17 @@ const ZoomControls = observer(function ZoomControls() {
     <div className="flex items-center gap-1">
       <button
         onClick={() => editorUI.zoomOut()}
-        className="p-1.5 hover:bg-gray-100 rounded"
+        className="p-1.5 hover:bg-midnight-3 rounded text-text-secondary hover:text-text-primary transition-colors"
         title="Zoom out"
       >
         <ZoomOut size={16} />
       </button>
-      <span className="text-sm text-gray-600 w-12 text-center">
+      <span className="text-sm text-text-secondary w-12 text-center">
         {editorUI.zoomPercentage}%
       </span>
       <button
         onClick={() => editorUI.zoomIn()}
-        className="p-1.5 hover:bg-gray-100 rounded"
+        className="p-1.5 hover:bg-midnight-3 rounded text-text-secondary hover:text-text-primary transition-colors"
         title="Zoom in"
       >
         <ZoomIn size={16} />

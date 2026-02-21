@@ -9,7 +9,7 @@
   * {
     @apply border-brand-border;
   }
-  
+
   body {
     @apply font-sans text-brand-text;
   }
@@ -18,7 +18,7 @@
 @layer components {
   /* Editor layout */
   .email-editor {
-    @apply w-full h-screen flex flex-col bg-gray-50;
+    @apply w-full h-screen flex flex-col bg-canvas-1;
   }
 
   /* Button styles */
@@ -31,7 +31,7 @@
   }
 
   .btn-secondary {
-    @apply bg-white border border-brand-border hover:bg-gray-50;
+    @apply bg-canvas-2 border border-brand-border hover:bg-canvas-3;
   }
 
   /* Input styles */
@@ -41,7 +41,6 @@
 
   /* Panel styles */
   .panel {
-    @apply bg-white border-r border-brand-border overflow-y-auto;
+    @apply bg-canvas-2 border-r border-brand-border overflow-y-auto;
   }
 }
-
