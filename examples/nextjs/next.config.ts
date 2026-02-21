@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
     "@marlinjai/email-campaigns",
     "@marlinjai/email-analytics",
     "@marlinjai/email-teams",
+    "@marlinjai/email-automation",
   ],
   serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
 };

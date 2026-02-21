@@ -29,6 +29,9 @@ importers:
       '@marlinjai/email-analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@marlinjai/email-automation':
+        specifier: workspace:*
+        version: link:../../packages/automation
       '@marlinjai/email-campaigns':
         specifier: workspace:*
         version: link:../../packages/campaigns

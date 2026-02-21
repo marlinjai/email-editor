@@ -11,7 +11,7 @@ const MOCK_MEMBERS: WorkspaceMember[] = [
     email: 'admin@example.com',
     name: 'Admin User',
     role: 'owner',
-    joinedAt: '2025-12-01T10:00:00Z',
+    invitedAt: '2025-12-01T10:00:00Z',
   },
   {
     id: 'm2',
@@ -20,7 +20,7 @@ const MOCK_MEMBERS: WorkspaceMember[] = [
     email: 'editor@example.com',
     name: 'Editor User',
     role: 'editor',
-    joinedAt: '2026-01-15T08:00:00Z',
+    invitedAt: '2026-01-15T08:00:00Z',
   },
   {
     id: 'm3',
@@ -29,7 +29,7 @@ const MOCK_MEMBERS: WorkspaceMember[] = [
     email: 'viewer@example.com',
     name: 'Viewer User',
     role: 'viewer',
-    joinedAt: '2026-02-01T12:00:00Z',
+    invitedAt: '2026-02-01T12:00:00Z',
   },
 ];
 
@@ -43,8 +43,8 @@ const MOCK_AUDIT_ENTRIES: AuditLogEntry[] = [
     action: 'template.create',
     resourceType: 'template',
     resourceId: 't3',
-    details: 'Created template "Product Launch"',
-    timestamp: '2026-02-20T11:00:00Z',
+    details: { description: 'Created template "Product Launch"' },
+    occurredAt: '2026-02-20T11:00:00Z',
   },
   {
     id: 'al2',
@@ -53,8 +53,8 @@ const MOCK_AUDIT_ENTRIES: AuditLogEntry[] = [
     action: 'campaign.send',
     resourceType: 'campaign',
     resourceId: 'camp1',
-    details: 'Sent campaign "February Newsletter"',
-    timestamp: '2026-02-18T10:00:00Z',
+    details: { description: 'Sent campaign "February Newsletter"' },
+    occurredAt: '2026-02-18T10:00:00Z',
   },
 ];
 
