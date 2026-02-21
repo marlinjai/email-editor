@@ -65,4 +65,4 @@ export {
   type CreateRootStoreOptions,
 } from './RootStore';
 
-// Note: React bindings (StoreProvider, useStore, etc.) are in @returnhypnosis/email-editor-ui
+// Note: React bindings (StoreProvider, useStore, etc.) are in @marlinjai/email-editor-ui

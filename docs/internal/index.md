@@ -29,13 +29,15 @@ pnpm run dev
 ```
 email-editor/
 ├── packages/
-│   ├── core/          # Schema, compiler, Zustand store
+│   ├── core/          # Schema, MJML compiler, MobX State Tree store
 │   ├── ui/            # React UI components
 │   ├── blocks/        # Standard block library
 │   └── editor/        # Public API package
 ├── examples/
-│   └── nextjs/        # Next.js integration example
-└── docs/              # Documentation
+│   └── nextjs/        # Next.js integration example (deployed at email-editor.lumitra.co)
+└── docs/
+    ├── public/        # Public documentation (Clearify)
+    └── internal/      # Internal development docs
 ```
 
 ## Package Dependencies
@@ -47,48 +49,59 @@ editor → blocks → core
 
 ## State Management Architecture
 
-The editor uses Zustand with three slices:
+The editor uses **MobX State Tree (MST)** with a hierarchical model structure:
 
-### Document Slice
+### Root Store
+The top-level store composes template data and editor UI state:
+
+```typescript
+import { createRootStore } from '@marlinjai/email-editor-core';
+
+const store = createRootStore({
+  template: myTemplateSnapshot,
+});
+```
+
+### Template Model
 Handles template state and CRUD operations:
 
 ```typescript
-import { useEditorStore } from '@returnhypnosis/email-editor-core';
+// Access template data through the store
+const template = store.template;
+const sections = template.sections;
 
-function MyComponent() {
-  const template = useEditorStore((s) => s.document.template);
-  const insertBlock = useEditorStore((s) => s.document.insertBlock);
-  const undo = useEditorStore((s) => s.document.undo);
-}
+// Mutate via MST actions
+template.addSection(sectionSnapshot);
+template.removeSection(sectionId);
 ```
 
-### Interaction Slice
-Handles ephemeral UI state:
+### Editor UI Store
+Handles ephemeral UI state (selection, drag, preview device):
 
 ```typescript
-const selectedId = useEditorStore((s) => s.interaction.selectedId);
-const dragState = useEditorStore((s) => s.interaction.dragState);
-const setSelection = useEditorStore((s) => s.interaction.setSelection);
+const editorUI = store.editorUI;
+
+// Selection
+editorUI.setSelection('block', blockId);
+const selectedId = editorUI.selectedId;
+
+// Drag state
+editorUI.startDrag(dragData);
+
+// Preview device
+editorUI.setPreviewDevice('mobile');
 ```
 
-### API Slice
-Handles compile endpoint configuration:
+## Using the Store in React Components
+
+### Via StoreProvider (from UI package)
 
 ```typescript
-const apiKey = useEditorStore((s) => s.api.apiKey);
-const setApiKey = useEditorStore((s) => s.api.setApiKey);
-```
-
-## Using the Store in Components
-
-### Direct Store Access
-
-```typescript
-import { useEditorStore } from '@returnhypnosis/email-editor-core';
+import { useStore } from '@marlinjai/email-editor-ui';
 
 function BlockList() {
-  const template = useEditorStore((s) => s.document.template);
-  const deleteBlock = useEditorStore((s) => s.document.deleteBlock);
+  const store = useStore();
+  const template = store.template;
 
   return (
     <ul>
@@ -105,7 +118,7 @@ function BlockList() {
 For components that need many actions, use the bridge hook:
 
 ```typescript
-import { useEditorActions } from '@returnhypnosis/email-editor-ui';
+import { useEditorActions } from '@marlinjai/email-editor-ui';
 
 function MyToolbar() {
   const {
@@ -129,21 +142,21 @@ function MyToolbar() {
 
 ## Middleware
 
-### History Middleware
-Automatically tracks document changes for undo/redo:
+### History (Undo/Redo)
+Undo/redo is built into the MST store via Immer patches:
 
 ```typescript
-// Undo/redo works automatically
-const undo = useEditorStore((s) => s.document.undo);
-const redo = useEditorStore((s) => s.document.redo);
-const canUndo = useEditorStore((s) => s.document.canUndo);
+// Undo/redo via store actions
+store.undo();
+store.redo();
+const canUndo = store.canUndo;
 ```
 
-### Validation Middleware
-Validates MJML constraints and provides fallbacks:
+### Validation
+Validates MJML constraints and provides fallbacks for drag-and-drop:
 
 ```typescript
-import { validateDropIntent, computeValidatedDropIntent } from '@returnhypnosis/email-editor-core';
+import { validateDropIntent, computeValidatedDropIntent } from '@marlinjai/email-editor-core';
 
 // Check if a drop is valid
 const result = validateDropIntent(template, 'block', 'target-id', 'inside');
@@ -210,9 +223,9 @@ pnpm run lint
 
 ### Adding Store Actions
 
-1. Define action type in `packages/core/src/store/types.ts`
-2. Implement in appropriate slice (`documentSlice.ts`, `interactionSlice.ts`, or `apiSlice.ts`)
-3. Export from `packages/core/src/store/index.ts`
+1. Add MST action in the appropriate model (`TemplateModel.ts`, `SectionModel.ts`, `BlockModel.ts`, or `EditorUIStore.ts`)
+2. Export types from `packages/core/src/store/mst/index.ts`
+3. Update React bindings in `packages/ui/` if needed
 
 ### Updating Core Logic
 
@@ -295,33 +308,34 @@ Ensure `composite: true` in tsconfig.json and rebuild packages.
 
 ### Tailwind styles not applying
 
-Check that `tailwindcss` is running and CSS is imported.
+The example app uses Tailwind v3. Check that `tailwindcss` is running and CSS is imported. Do not upgrade to Tailwind v4 — the editor UI components are built against v3 classes.
 
 ### MJML compilation errors
 
-Check the MJML syntax in block definitions and ensure official MJML package is installed.
+Check the MJML syntax in block definitions and ensure official MJML package is installed. MJML compilation is server-side only — use the `/server` entry point from `@marlinjai/email-editor-core/server`.
 
-### Zustand store state not updating
+### MST store state not updating
 
-Make sure you're using selectors to avoid unnecessary re-renders:
+Make sure you're observing the correct MST node. Use `observer()` from `mobx-react-lite` to make React components reactive:
 
 ```typescript
-// Good - only re-renders when template changes
-const template = useEditorStore((s) => s.document.template);
+import { observer } from 'mobx-react-lite';
 
-// Bad - re-renders on any store change
-const store = useEditorStore();
-const template = store.document.template;
+const MyComponent = observer(() => {
+  const store = useStore();
+  // This component will re-render when observed MST properties change
+  return <div>{store.template.name}</div>;
+});
 ```
 
 ## Architecture Decisions
 
-### Why Zustand?
+### Why MobX State Tree?
 
-- Simple API, minimal boilerplate
-- Built-in support for middleware (history, validation)
-- Great TypeScript support
-- Works well with React DevTools
+- Hierarchical models map naturally to email template structure (template > sections > columns > blocks)
+- Built-in snapshots and patches enable undo/redo
+- Type-safe actions enforce valid state transitions
+- Observable properties give fine-grained React reactivity
 
 ### Why Monorepo?
 
@@ -341,11 +355,11 @@ const template = store.document.template;
 - Works across all email clients
 - Better than hand-coding HTML tables
 
-### Why Immer for State?
+### Why Immer for Undo/Redo?
 
-- Simpler immutable updates
-- Critical for undo/redo
-- Better developer experience
+- Simpler immutable state snapshots
+- Patch-based history is memory-efficient
+- Integrates well with MST's snapshot system
 
 ### Why TipTap over Lexical?
 

@@ -1,5 +1,8 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* ─── Landing page theme ─── */
 :root {
   --background: #0c0c0e;
   --foreground: #e8e6e3;
@@ -15,20 +18,55 @@
   --danger-muted: rgba(229, 83, 75, 0.12);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ─── Base layer ─── */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    @apply border-brand-border;
+  }
+
+  html,
+  body {
+    height: 100%;
+    @apply font-sans text-brand-text;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+  }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+/* ─── Editor component styles ─── */
+@layer components {
+  .email-editor {
+    @apply w-full h-screen flex flex-col bg-gray-50 text-brand-text;
+  }
+
+  .btn {
+    @apply px-4 py-2 rounded font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-brand-primary text-white hover:bg-opacity-90;
+  }
+
+  .btn-secondary {
+    @apply bg-white border border-brand-border hover:bg-gray-50;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 border border-brand-border rounded focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-opacity-50;
+  }
+
+  .panel {
+    @apply bg-white border-r border-brand-border overflow-y-auto;
+  }
 }
 
-/* Subtle noise texture overlay */
+/* ─── Landing page atmosphere ─── */
 body::before {
   content: '';
   position: fixed;
@@ -38,7 +76,6 @@ body::before {
   z-index: 0;
 }
 
-/* Subtle radial glow behind the main content */
 body::after {
   content: '';
   position: fixed;
