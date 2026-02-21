@@ -53,5 +53,9 @@ export {
 } from './unsubscribe';
 export type { UnsubscribeConfig } from './unsubscribe';
 
+// Workspace-scoped manager
+export { WorkspaceScopedContactManager } from './workspace-scoped';
+export type { WorkspaceScopedContactConfig } from './workspace-scoped';
+
 // Schema
 export { CONTACT_TABLES } from './schema';

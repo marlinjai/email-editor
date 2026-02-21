@@ -22,6 +22,10 @@ export type { TemplateManagerConfig } from './manager';
 export { TEMPLATE_TABLES, bootstrapTemplateTables } from './schema';
 export type { TableColumnDef, TableSchemaDef } from './schema';
 
+// Workspace-scoped manager
+export { WorkspaceScopedTemplateManager } from './workspace-scoped';
+export type { WorkspaceScopedConfig } from './workspace-scoped';
+
 // React components
 export {
   TemplateDashboard,

@@ -26,6 +26,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@marlinjai/email-teams": "workspace:*",
     "@marlinjai/data-brain-sdk": "^0.2.0",
     "nanoid": "^5.0.4",
     "zod": "^3.22.4"
