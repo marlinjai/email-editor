@@ -22,7 +22,7 @@ export function ElementsPanel({ blocks }: ElementsPanelProps) {
 
   return (
     <div className="p-4">
-      <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">
+      <h3 className="text-sm font-semibold text-text-dark-muted mb-3 uppercase tracking-wide">
         Content
       </h3>
       <div className="grid grid-cols-2 gap-2">
@@ -57,8 +57,8 @@ function ElementItem({ definition }: { definition: BlockDefinition }) {
         isDragging && 'opacity-50 border-brand-primary'
       )}
     >
-      <Icon size={24} className="text-gray-500 mb-1" />
-      <span className="text-xs text-gray-700 text-center">{definition.label}</span>
+      <Icon size={24} className="text-text-dark-muted mb-1" />
+      <span className="text-xs text-text-dark text-center">{definition.label}</span>
     </div>
   );
 }
@@ -90,4 +90,3 @@ function getElementIcon(type: string) {
       return Square;
   }
 }
-

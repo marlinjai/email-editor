@@ -20,14 +20,14 @@ export function LayoutPanel({ templates, onAddSection }: LayoutPanelProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Sub-tabs */}
-      <div className="flex border-b border-gray-200 bg-gray-50">
+      <div className="flex border-b border-border-light bg-canvas-1">
         <button
           onClick={() => setActiveTab('sections')}
           className={clsx(
             'flex-1 py-2 text-xs font-medium transition-colors',
             activeTab === 'sections'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'text-accent border-b-2 border-accent bg-canvas-2'
+              : 'text-text-dark-muted hover:text-text-dark'
           )}
         >
           Sections
@@ -37,8 +37,8 @@ export function LayoutPanel({ templates, onAddSection }: LayoutPanelProps) {
           className={clsx(
             'flex-1 py-2 text-xs font-medium transition-colors',
             activeTab === 'prebuilt'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'text-accent border-b-2 border-accent bg-canvas-2'
+              : 'text-text-dark-muted hover:text-text-dark'
           )}
         >
           Pre-built
@@ -60,7 +60,7 @@ function SectionStructures({ onAddSection }: { onAddSection: (cols: 1 | 2 | 3) =
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+        <h4 className="text-xs font-semibold text-text-dark-muted uppercase mb-2">
           Add Section
         </h4>
         <div className="grid grid-cols-3 gap-2">
@@ -70,7 +70,7 @@ function SectionStructures({ onAddSection }: { onAddSection: (cols: 1 | 2 | 3) =
         </div>
       </div>
 
-      <p className="text-xs text-gray-500 text-center">
+      <p className="text-xs text-text-dark-muted text-center">
         Click to add a section with the specified column layout.
       </p>
     </div>
@@ -81,17 +81,17 @@ function SectionButton({ columns, onClick }: { columns: 1 | 2 | 3; onClick: () =
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+      className="flex flex-col items-center p-3 rounded-lg border border-border-light hover:border-accent hover:bg-accent/5 transition-colors"
     >
       <div className="flex gap-1 mb-1">
         {Array.from({ length: columns }).map((_, i) => (
           <div
             key={i}
-            className="w-4 h-8 bg-gray-300 rounded-sm"
+            className="w-4 h-8 bg-canvas-3 rounded-sm"
           />
         ))}
       </div>
-      <span className="text-xs text-gray-600">
+      <span className="text-xs text-text-dark-muted">
         {columns} {columns === 1 ? 'Column' : 'Columns'}
       </span>
     </button>
@@ -103,7 +103,7 @@ function SectionButton({ columns, onClick }: { columns: 1 | 2 | 3; onClick: () =
 function PrebuiltTemplates({ templates }: { templates: PrebuiltTemplate[] }) {
   if (templates.length === 0) {
     return (
-      <div className="text-center text-gray-400 text-sm py-8">
+      <div className="text-center text-text-dark-muted text-sm py-8">
         No pre-built templates available
       </div>
     );
@@ -111,7 +111,7 @@ function PrebuiltTemplates({ templates }: { templates: PrebuiltTemplate[] }) {
 
   return (
     <div className="space-y-2">
-      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+      <h4 className="text-xs font-semibold text-text-dark-muted uppercase mb-2">
         Drag to Add
       </h4>
       {templates.map((template) => (
@@ -133,17 +133,17 @@ function PrebuiltTemplateItem({ template }: { template: PrebuiltTemplate }) {
       {...attributes}
       {...listeners}
       className={clsx(
-        'p-3 rounded-lg border border-gray-200 cursor-grab',
-        'hover:border-blue-500 hover:bg-blue-50 transition-colors',
+        'p-3 rounded-lg border border-border-light cursor-grab',
+        'hover:border-accent hover:bg-accent/5 transition-colors',
         isDragging && 'opacity-50'
       )}
     >
       <div className="flex items-center gap-2">
-        <Layout size={16} className="text-gray-400" />
-        <span className="text-sm font-medium text-gray-700">{template.name}</span>
+        <Layout size={16} className="text-text-dark-muted" />
+        <span className="text-sm font-medium text-text-dark">{template.name}</span>
       </div>
       {template.description && (
-        <p className="mt-1 text-xs text-gray-500">{template.description}</p>
+        <p className="mt-1 text-xs text-text-dark-muted">{template.description}</p>
       )}
     </div>
   );

@@ -27,9 +27,9 @@ export const LeftSidebar = observer(function LeftSidebar({
   const { editorUI } = useStore();
 
   return (
-    <div className="w-64 flex flex-col border-r border-gray-200 bg-white">
+    <div className="w-64 flex flex-col border-r border-border-light bg-canvas-2">
       {/* Tab headers */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-border-light">
         {TABS.map((tab) => (
           <button
             key={tab}
@@ -37,8 +37,8 @@ export const LeftSidebar = observer(function LeftSidebar({
             className={clsx(
               'flex-1 py-3 text-xs font-medium transition-colors capitalize',
               editorUI.activeTab === tab
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                ? 'text-accent border-b-2 border-accent'
+                : 'text-text-dark-muted hover:text-text-dark hover:bg-canvas-1'
             )}
           >
             {tab}

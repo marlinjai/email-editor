@@ -52,7 +52,7 @@ export const LayersPanel = observer(function LayersPanel() {
 
   if (template.sections.length === 0) {
     return (
-      <div className="p-4 text-gray-400 text-sm text-center">
+      <div className="p-4 text-text-dark-muted text-sm text-center">
         No sections yet. Add a section from the Layout tab.
       </div>
     );
@@ -62,7 +62,7 @@ export const LayersPanel = observer(function LayersPanel() {
 
   return (
     <div className="p-2">
-      <h3 className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+      <h3 className="px-2 py-1 text-xs font-semibold text-text-dark-muted uppercase tracking-wider">
         Document Structure
       </h3>
 
@@ -168,14 +168,14 @@ const SectionItem = observer(function SectionItem({
         className={clsx(
           'flex items-center gap-1 px-2 py-1.5 cursor-pointer',
           isSelected
-            ? 'bg-amber-100 text-amber-800'
-            : 'hover:bg-gray-100'
+            ? 'bg-accent-muted text-accent'
+            : 'hover:bg-canvas-3'
         )}
         onClick={onSelect}
       >
         {/* Drag handle */}
         <button
-          className="p-0.5 cursor-grab hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
+          className="p-0.5 cursor-grab hover:bg-canvas-3 rounded text-text-dark-muted hover:text-text-dark"
           title="Drag to reorder"
           {...dragHandleProps}
         >
@@ -187,7 +187,7 @@ const SectionItem = observer(function SectionItem({
             e.stopPropagation();
             setExpanded(!expanded);
           }}
-          className="p-0.5 hover:bg-gray-200 rounded"
+          className="p-0.5 hover:bg-canvas-3 rounded"
         >
           <ChevronRight
             size={14}
@@ -204,7 +204,7 @@ const SectionItem = observer(function SectionItem({
             e.stopPropagation();
             section.toggleHidden();
           }}
-          className="p-1 hover:bg-gray-200 rounded opacity-50 hover:opacity-100"
+          className="p-1 hover:bg-canvas-3 rounded opacity-50 hover:opacity-100"
           title={section.hidden ? 'Show' : 'Hide'}
         >
           {section.hidden ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -212,7 +212,7 @@ const SectionItem = observer(function SectionItem({
 
         <button
           onClick={handleDuplicate}
-          className="p-1 hover:bg-blue-100 text-blue-500 rounded opacity-50 hover:opacity-100"
+          className="p-1 hover:bg-accent-muted text-accent rounded opacity-50 hover:opacity-100"
           title="Duplicate section"
         >
           <Copy size={12} />
@@ -220,7 +220,7 @@ const SectionItem = observer(function SectionItem({
 
         <button
           onClick={handleDelete}
-          className="p-1 hover:bg-red-100 text-red-500 rounded opacity-50 hover:opacity-100"
+          className="p-1 hover:bg-danger/10 text-danger rounded opacity-50 hover:opacity-100"
           title="Delete section"
         >
           <Trash2 size={12} />
@@ -229,7 +229,7 @@ const SectionItem = observer(function SectionItem({
 
       {/* Columns and blocks */}
       {expanded && (
-        <div className="ml-4 border-l border-gray-200">
+        <div className="ml-4 border-l border-border-light">
           {section.columns.map((column: any, cIndex: number) => (
             <ColumnItem
               key={column.id}
@@ -257,7 +257,7 @@ const ColumnItem = observer(function ColumnItem({
 
   return (
     <div className="ml-2">
-      <div className="px-2 py-1 text-xs text-gray-500">
+      <div className="px-2 py-1 text-xs text-text-dark-muted">
         Column {index + 1} ({column.width}%)
       </div>
 
@@ -271,7 +271,7 @@ const ColumnItem = observer(function ColumnItem({
       ))}
 
       {column.blocks.length === 0 && (
-        <div className="px-4 py-1 text-xs text-gray-400 italic">
+        <div className="px-4 py-1 text-xs text-text-dark-muted italic">
           Empty
         </div>
       )}
@@ -294,7 +294,7 @@ const BlockItem = observer(function BlockItem({
     <div
       className={clsx(
         'flex items-center gap-1 px-3 py-1 cursor-pointer text-sm',
-        isSelected ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-50',
+        isSelected ? 'bg-accent-muted text-accent' : 'hover:bg-canvas-1',
         block.hidden && 'opacity-50'
       )}
       onClick={onSelect}
@@ -306,7 +306,7 @@ const BlockItem = observer(function BlockItem({
           e.stopPropagation();
           block.toggleHidden();
         }}
-        className="p-0.5 hover:bg-gray-200 rounded opacity-50 hover:opacity-100"
+        className="p-0.5 hover:bg-canvas-3 rounded opacity-50 hover:opacity-100"
         title={block.hidden ? 'Show' : 'Hide'}
       >
         {block.hidden ? <EyeOff size={10} /> : <Eye size={10} />}
@@ -318,7 +318,7 @@ const BlockItem = observer(function BlockItem({
           template.deleteBlock(block.id);
           if (isSelected) editorUI.clearSelection();
         }}
-        className="p-0.5 hover:bg-red-100 text-red-500 rounded opacity-50 hover:opacity-100"
+        className="p-0.5 hover:bg-danger/10 text-danger rounded opacity-50 hover:opacity-100"
         title="Delete"
       >
         <Trash2 size={10} />
