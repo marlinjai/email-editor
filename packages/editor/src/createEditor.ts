@@ -3,9 +3,9 @@
 
 import { createRoot, Root } from 'react-dom/client';
 import { createElement } from 'react';
-import type { EmailTemplate, TemplateSnapshotIn, TemplateSnapshotOut } from '@returnhypnosis/email-editor-core';
-import { createStandardBlockRegistry } from '@returnhypnosis/email-editor-blocks';
-import { EmailEditor } from '@returnhypnosis/email-editor-ui';
+import type { EmailTemplate, TemplateSnapshotIn, TemplateSnapshotOut } from '@marlinjai/email-editor-core';
+import { createStandardBlockRegistry } from '@marlinjai/email-editor-blocks';
+import { EmailEditor } from '@marlinjai/email-editor-ui';
 import type { EditorOptions, EditorInstance } from './types';
 
 /**

@@ -1,8 +1,8 @@
 // packages/blocks/src/button/index.ts
 // Button block
 
-import type { BlockDefinition, ButtonBlock } from '@returnhypnosis/email-editor-core';
-import { ButtonBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, ButtonBlock } from '@marlinjai/email-editor-core';
+import { ButtonBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Button block definition

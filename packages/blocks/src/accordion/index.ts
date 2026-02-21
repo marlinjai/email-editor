@@ -1,8 +1,8 @@
 // packages/blocks/src/accordion/index.ts
 // Accordion block with collapsible items
 
-import type { BlockDefinition, AccordionBlock } from '@returnhypnosis/email-editor-core';
-import { AccordionBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, AccordionBlock } from '@marlinjai/email-editor-core';
+import { AccordionBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Accordion block definition

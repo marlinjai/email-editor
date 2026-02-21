@@ -1,7 +1,7 @@
 // packages/ui/src/renderer/blocks/SpacerBlock.tsx
 import React from 'react';
 import { observer } from 'mobx-react-lite';
-import type { BlockInstance } from '@returnhypnosis/email-editor-core';
+import type { BlockInstance } from '@marlinjai/email-editor-core';
 
 interface SpacerBlockProps {
   block: BlockInstance;

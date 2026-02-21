@@ -243,7 +243,7 @@ export const createHistoryMiddleware = (config: StateCreator<EditorStore>) => {
 
 ```tsx
 // In app code or EmailEditor.tsx
-import { EditorStoreProvider } from '@returnhypnosis/email-editor-ui/store';
+import { EditorStoreProvider } from '@marlinjai/email-editor-ui/store';
 
 <EditorStoreProvider>
   <EmailEditor {...props} />

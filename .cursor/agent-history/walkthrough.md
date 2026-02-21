@@ -6,18 +6,18 @@ I've successfully resolved the build and CSS resolution issues in the Next.js ex
 
 ### 1. Workspace Dependency Resolution
 The Next.js example was missing direct dependencies on the workspace packages it uses. I added them to `examples/nextjs/package.json`:
-- `@returnhypnosis/email-editor-core`
-- `@returnhypnosis/email-editor-ui`
-- `@returnhypnosis/email-editor-blocks`
+- `@marlinjai/email-editor-core`
+- `@marlinjai/email-editor-ui`
+- `@marlinjai/email-editor-blocks`
 
 ### 2. CSS Export Fix
-The `@returnhypnosis/email-editor` package had a broken `./styles.css` export. I fixed this by:
+The `@marlinjai/email-editor` package had a broken `./styles.css` export. I fixed this by:
 - Adding a post-build step to `packages/editor/package.json` to copy the CSS from the UI package to the editor's `dist` folder.
 - Re-enabling the `./styles.css` export in the `exports` map.
 
 ### 3. MJML Bundling and 'fs' Error Fix
 The MJML library (which uses Node.js `fs`) was being bundled into the client-side code because it was exported from the core package's main entry point. I fixed this by:
-- Separating the MJML compiler into a subpath export: `@returnhypnosis/email-editor-core/compiler`.
+- Separating the MJML compiler into a subpath export: `@marlinjai/email-editor-core/compiler`.
 - Updating the Next.js API route to use this new subpath.
 - Updating `EmailEditor` and `EmailEditorReact` to take the compiler as an optional prop, removing its direct usage from client-side paths.
 

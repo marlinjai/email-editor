@@ -1,8 +1,8 @@
 // packages/blocks/src/spacer/index.ts
 // Spacer block
 
-import type { BlockDefinition, SpacerBlock } from '@returnhypnosis/email-editor-core';
-import { SpacerBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, SpacerBlock } from '@marlinjai/email-editor-core';
+import { SpacerBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Spacer block definition

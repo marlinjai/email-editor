@@ -17,16 +17,16 @@ graph TB
     end
 
     subgraph "Convenience Layer"
-        EDITOR["@returnhypnosis/email-editor<br/>(High-level API)"]
+        EDITOR["@marlinjai/email-editor<br/>(High-level API)"]
     end
 
     subgraph "Implementation Layer"
-        UI["@returnhypnosis/email-editor-ui<br/>(React Components)"]
-        BLOCKS["@returnhypnosis/email-editor-blocks<br/>(Block Definitions)"]
+        UI["@marlinjai/email-editor-ui<br/>(React Components)"]
+        BLOCKS["@marlinjai/email-editor-blocks<br/>(Block Definitions)"]
     end
 
     subgraph "Foundation Layer"
-        CORE["@returnhypnosis/email-editor-core<br/>(Framework-Agnostic Engine)"]
+        CORE["@marlinjai/email-editor-core<br/>(Framework-Agnostic Engine)"]
     end
 
     APP --> EDITOR
@@ -38,7 +38,7 @@ graph TB
 
 ## Package Responsibilities
 
-### 1. Core Package (`@returnhypnosis/email-editor-core`)
+### 1. Core Package (`@marlinjai/email-editor-core`)
 
 **Purpose:** Framework-agnostic state management, types, and MJML compilation.
 
@@ -46,7 +46,7 @@ graph TB
 
 ```mermaid
 graph LR
-    subgraph "@returnhypnosis/email-editor-core"
+    subgraph "@marlinjai/email-editor-core"
         subgraph "State (MST)"
             ROOT[RootStore]
             TEMPLATE[TemplateModel]
@@ -84,12 +84,12 @@ graph LR
 | `MJMLExporter` (from `/server`) | MJML compiler | Server-side HTML generation |
 
 **Entry Points:**
-- `@returnhypnosis/email-editor-core` - Client-safe (no MJML)
-- `@returnhypnosis/email-editor-core/server` - Server-only (includes MJML)
+- `@marlinjai/email-editor-core` - Client-safe (no MJML)
+- `@marlinjai/email-editor-core/server` - Server-only (includes MJML)
 
 ---
 
-### 2. UI Package (`@returnhypnosis/email-editor-ui`)
+### 2. UI Package (`@marlinjai/email-editor-ui`)
 
 **Purpose:** React implementation of the visual editor.
 
@@ -97,7 +97,7 @@ graph LR
 
 ```mermaid
 graph TB
-    subgraph "@returnhypnosis/email-editor-ui"
+    subgraph "@marlinjai/email-editor-ui"
         subgraph "Main Component"
             EDITOR_COMP[EmailEditor]
         end
@@ -160,7 +160,7 @@ graph TB
 
 ---
 
-### 3. Blocks Package (`@returnhypnosis/email-editor-blocks`)
+### 3. Blocks Package (`@marlinjai/email-editor-blocks`)
 
 **Purpose:** Standard block library and prebuilt templates.
 
@@ -168,7 +168,7 @@ graph TB
 
 ```mermaid
 graph LR
-    subgraph "@returnhypnosis/email-editor-blocks"
+    subgraph "@marlinjai/email-editor-blocks"
         subgraph "Block Definitions"
             TEXT_DEF[Text Block]
             IMAGE_DEF[Image Block]
@@ -200,7 +200,7 @@ graph LR
 
 ---
 
-### 4. Editor Package (`@returnhypnosis/email-editor`)
+### 4. Editor Package (`@marlinjai/email-editor`)
 
 **Purpose:** High-level convenience wrapper for easy integration.
 
@@ -208,7 +208,7 @@ graph LR
 
 ```mermaid
 graph TB
-    subgraph "@returnhypnosis/email-editor"
+    subgraph "@marlinjai/email-editor"
         subgraph "Vanilla JS API"
             CREATE[createEditor]
         end
@@ -230,8 +230,8 @@ graph TB
 
 | Export | Entry Point | Description |
 |--------|-------------|-------------|
-| `createEditor()` | `@returnhypnosis/email-editor` | Vanilla JS factory |
-| `EmailEditorReact` | `@returnhypnosis/email-editor/react` | React component |
+| `createEditor()` | `@marlinjai/email-editor` | Vanilla JS factory |
+| `EmailEditorReact` | `@marlinjai/email-editor/react` | React component |
 | Types | Both | Re-exported for convenience |
 
 ---
@@ -295,8 +295,8 @@ Export button → MJML compile (once) → HTML output
 Use the high-level wrapper for complete functionality:
 
 ```tsx
-import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
-import '@returnhypnosis/email-editor/styles.css';
+import { EmailEditorReact } from '@marlinjai/email-editor/react';
+import '@marlinjai/email-editor/styles.css';
 
 function App() {
   return (
@@ -314,7 +314,7 @@ function App() {
 Use core package directly for custom implementations:
 
 ```tsx
-import { createRootStore, RootStore } from '@returnhypnosis/email-editor-core';
+import { createRootStore, RootStore } from '@marlinjai/email-editor-core';
 
 // Works with any framework!
 const store = createRootStore({
@@ -333,7 +333,7 @@ Use the server export for MJML:
 
 ```ts
 // api/compile.ts
-import { MJMLExporter } from '@returnhypnosis/email-editor-core/server';
+import { MJMLExporter } from '@marlinjai/email-editor-core/server';
 
 const exporter = new MJMLExporter();
 
@@ -350,7 +350,7 @@ The core is framework-agnostic. You could build a Vue UI:
 
 ```ts
 // Hypothetical Vue implementation
-import { createRootStore } from '@returnhypnosis/email-editor-core';
+import { createRootStore } from '@marlinjai/email-editor-core';
 
 // Create store (same as React)
 const store = createRootStore({ template });

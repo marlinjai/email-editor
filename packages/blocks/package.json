@@ -1,5 +1,5 @@
 {
-  "name": "@returnhypnosis/email-editor-blocks",
+  "name": "@marlinjai/email-editor-blocks",
   "version": "0.0.1",
   "description": "Standard block library for email editor",
   "main": "./dist/index.js",
@@ -19,7 +19,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@returnhypnosis/email-editor-core": "workspace:*",
+    "@marlinjai/email-editor-core": "workspace:*",
     "@tiptap/core": "^2.1.13",
     "@tiptap/extension-bold": "^2.1.13",
     "@tiptap/extension-italic": "^2.1.13",

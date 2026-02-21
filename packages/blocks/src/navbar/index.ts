@@ -2,8 +2,8 @@
 // Navbar block for navigation menus
 // Maps to MJML's <mj-navbar> component
 
-import type { BlockDefinition, NavbarBlock } from '@returnhypnosis/email-editor-core';
-import { NavbarBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, NavbarBlock } from '@marlinjai/email-editor-core';
+import { NavbarBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Navbar block definition

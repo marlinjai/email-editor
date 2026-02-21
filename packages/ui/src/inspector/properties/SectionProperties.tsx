@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { observer } from 'mobx-react-lite';
-import type { SectionInstance } from '@returnhypnosis/email-editor-core';
+import type { SectionInstance } from '@marlinjai/email-editor-core';
 import {
   TextField,
   ColorField,

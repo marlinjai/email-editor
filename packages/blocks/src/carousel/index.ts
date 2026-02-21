@@ -2,8 +2,8 @@
 // Carousel block for image galleries
 // Maps to MJML's <mj-carousel> component
 
-import type { BlockDefinition, CarouselBlock } from '@returnhypnosis/email-editor-core';
-import { CarouselBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, CarouselBlock } from '@marlinjai/email-editor-core';
+import { CarouselBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Carousel block definition

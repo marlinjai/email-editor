@@ -158,7 +158,7 @@ interface TextBlock {
 Creates a registry with all standard blocks pre-registered.
 
 ```typescript
-import { createStandardBlockRegistry } from '@returnhypnosis/email-editor-blocks';
+import { createStandardBlockRegistry } from '@marlinjai/email-editor-blocks';
 
 const registry = createStandardBlockRegistry();
 ```
@@ -186,7 +186,7 @@ interface BlockDefinition<T extends Block = Block> {
 Create a compiler instance.
 
 ```typescript
-import { createMJMLCompiler } from '@returnhypnosis/email-editor-core';
+import { createMJMLCompiler } from '@marlinjai/email-editor-core';
 
 const compiler = createMJMLCompiler();
 const result = compiler.compile(template);
@@ -203,7 +203,7 @@ console.log(result.errors); // Validation errors (if any)
 Create an undo/redo manager.
 
 ```typescript
-import { createHistoryManager } from '@returnhypnosis/email-editor-core';
+import { createHistoryManager } from '@marlinjai/email-editor-core';
 
 const history = createHistoryManager(initialTemplate, 50);
 

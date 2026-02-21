@@ -11,5 +11,5 @@ export type {
   Section,
   Column,
   BlockDefinition,
-} from '@returnhypnosis/email-editor-core';
+} from '@marlinjai/email-editor-core';
 

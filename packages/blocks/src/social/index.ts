@@ -1,8 +1,8 @@
 // packages/blocks/src/social/index.ts
 // Social icons block - renders as buttons with icon images for reliable sizing
 
-import type { BlockDefinition, SocialBlock, SocialLink } from '@returnhypnosis/email-editor-core';
-import { SocialBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, SocialBlock, SocialLink } from '@marlinjai/email-editor-core';
+import { SocialBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Platform brand colors for social icons (exported for UI use)

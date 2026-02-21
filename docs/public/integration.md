@@ -4,12 +4,12 @@ description: React and vanilla JS integration patterns
 order: 4
 ---
 
-# Getting Started with @returnhypnosis/email-editor
+# Getting Started with @marlinjai/email-editor
 
 ## Installation
 
 ```bash
-npm install @returnhypnosis/email-editor
+npm install @marlinjai/email-editor
 ```
 
 ## Quick Start
@@ -17,8 +17,8 @@ npm install @returnhypnosis/email-editor
 ### React Integration
 
 ```tsx
-import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
-import '@returnhypnosis/email-editor/styles.css';
+import { EmailEditorReact } from '@marlinjai/email-editor/react';
+import '@marlinjai/email-editor/styles.css';
 import { useState } from 'react';
 
 function App() {
@@ -41,8 +41,8 @@ function App() {
 ### Vanilla JavaScript
 
 ```javascript
-import { createEditor } from '@returnhypnosis/email-editor';
-import '@returnhypnosis/email-editor/styles.css';
+import { createEditor } from '@marlinjai/email-editor';
+import '@marlinjai/email-editor/styles.css';
 
 const editor = createEditor({
   container: document.getElementById('editor'),
@@ -130,7 +130,7 @@ For production use, compile MJML on the server:
 
 ```typescript
 // API route (Next.js example)
-import { createMJMLCompiler } from '@returnhypnosis/email-editor-core';
+import { createMJMLCompiler } from '@marlinjai/email-editor-core';
 
 export async function POST(request) {
   const template = await request.json();
@@ -146,7 +146,7 @@ export async function POST(request) {
 Register your own custom blocks:
 
 ```typescript
-import { createEditor } from '@returnhypnosis/email-editor';
+import { createEditor } from '@marlinjai/email-editor';
 
 const customBlock = {
   type: 'custom',

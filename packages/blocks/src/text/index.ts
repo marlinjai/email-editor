@@ -2,8 +2,8 @@
 // Text block with TipTap
 
 import { z } from 'zod';
-import type { BlockDefinition, TextBlock } from '@returnhypnosis/email-editor-core';
-import { TextBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, TextBlock } from '@marlinjai/email-editor-core';
+import { TextBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Text block definition

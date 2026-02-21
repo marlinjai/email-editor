@@ -1,7 +1,7 @@
 // packages/ui/src/renderer/blocks/TextBlock.tsx
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import type { BlockInstance } from '@returnhypnosis/email-editor-core';
+import type { BlockInstance } from '@marlinjai/email-editor-core';
 import { useStore } from '../../store';
 
 interface TextBlockProps {

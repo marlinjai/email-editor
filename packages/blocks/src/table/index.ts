@@ -2,8 +2,8 @@
 // Table block for data display
 // Maps to MJML's <mj-table> component
 
-import type { BlockDefinition, TableBlock } from '@returnhypnosis/email-editor-core';
-import { TableBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, TableBlock } from '@marlinjai/email-editor-core';
+import { TableBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Table block definition

@@ -1,8 +1,8 @@
 // packages/blocks/src/hero/index.ts
 // Hero section block
 
-import type { BlockDefinition, HeroBlock } from '@returnhypnosis/email-editor-core';
-import { HeroBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, HeroBlock } from '@marlinjai/email-editor-core';
+import { HeroBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Hero block definition

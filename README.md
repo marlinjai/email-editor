@@ -1,4 +1,4 @@
-# @returnhypnosis/email-editor
+# @marlinjai/email-editor
 
 **A standalone, pluggable email editor built with MJML, React, and TypeScript.**
 
@@ -27,13 +27,13 @@ Replace GrapesJS and Unlayer with a fully controllable, customizable email edito
 
 ```bash
 # Install
-npm install @returnhypnosis/email-editor
+npm install @marlinjai/email-editor
 ```
 
 ```tsx
 // Use in React
-import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
-import '@returnhypnosis/email-editor/styles.css';
+import { EmailEditorReact } from '@marlinjai/email-editor/react';
+import '@marlinjai/email-editor/styles.css';
 
 function App() {
   const [template, setTemplate] = useState({
@@ -54,10 +54,10 @@ See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 
 | Package | Description |
 |---------|-------------|
-| `@returnhypnosis/email-editor` | Main package (public API + React wrapper) |
-| `@returnhypnosis/email-editor-core` | Schema, compiler, Zustand store |
-| `@returnhypnosis/email-editor-ui` | React UI components |
-| `@returnhypnosis/email-editor-blocks` | Standard block library |
+| `@marlinjai/email-editor` | Main package (public API + React wrapper) |
+| `@marlinjai/email-editor-core` | Schema, compiler, Zustand store |
+| `@marlinjai/email-editor-ui` | React UI components |
+| `@marlinjai/email-editor-blocks` | Standard block library |
 
 ---
 
@@ -69,7 +69,7 @@ See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 └──────────────────────┬──────────────────────────────────┘
                   │ imports
 ┌──────────────────────▼──────────────────────────────────┐
-│            @returnhypnosis/email-editor                  │
+│            @marlinjai/email-editor                  │
 │  ├─ createEditor() - Vanilla JS API                     │
 │  └─ EmailEditorReact - React component                  │
 └──────────────────────┬──────────────────────────────────┘

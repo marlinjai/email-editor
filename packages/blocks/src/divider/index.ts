@@ -1,8 +1,8 @@
 // packages/blocks/src/divider/index.ts
 // Divider block
 
-import type { BlockDefinition, DividerBlock } from '@returnhypnosis/email-editor-core';
-import { DividerBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, DividerBlock } from '@marlinjai/email-editor-core';
+import { DividerBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Divider block definition

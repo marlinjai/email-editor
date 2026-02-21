@@ -5,10 +5,10 @@ initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
   transpilePackages: [
-    "@returnhypnosis/email-editor",
-    "@returnhypnosis/email-editor-core",
-    "@returnhypnosis/email-editor-ui",
-    "@returnhypnosis/email-editor-blocks",
+    "@marlinjai/email-editor",
+    "@marlinjai/email-editor-core",
+    "@marlinjai/email-editor-ui",
+    "@marlinjai/email-editor-blocks",
   ],
   serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
 };

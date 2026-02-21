@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { observer } from 'mobx-react-lite';
-import type { ColumnInstance } from '@returnhypnosis/email-editor-core';
+import type { ColumnInstance } from '@marlinjai/email-editor-core';
 import {
   ColorField,
   SelectField,

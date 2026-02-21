@@ -2,8 +2,8 @@
 // ReTurn branded blocks (header and footer)
 
 import { z } from 'zod';
-import type { BlockDefinition, HeaderBlock, FooterBlock } from '@returnhypnosis/email-editor-core';
-import { HeaderBlockSchema, FooterBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, HeaderBlock, FooterBlock } from '@marlinjai/email-editor-core';
+import { HeaderBlockSchema, FooterBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * ReTurn branded header block

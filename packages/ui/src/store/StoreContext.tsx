@@ -9,7 +9,7 @@ import type {
   BlockInstance,
   SectionInstance,
   ColumnInstance,
-} from '@returnhypnosis/email-editor-core';
+} from '@marlinjai/email-editor-core';
 
 /**
  * React context for the store

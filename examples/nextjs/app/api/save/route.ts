@@ -2,8 +2,8 @@
 // Save template and compile MJML
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createMJMLCompiler } from '@returnhypnosis/email-editor-core/server';
-import type { EmailTemplate } from '@returnhypnosis/email-editor-core';
+import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
+import type { EmailTemplate } from '@marlinjai/email-editor-core';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 

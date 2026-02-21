@@ -2,7 +2,7 @@
 import React from 'react';
 import { observer } from 'mobx-react-lite';
 import clsx from 'clsx';
-import type { ColumnInstance, SectionInstance } from '@returnhypnosis/email-editor-core';
+import type { ColumnInstance, SectionInstance } from '@marlinjai/email-editor-core';
 import { useStore } from '../store';
 import { BlockRenderer } from './BlockRenderer';
 

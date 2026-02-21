@@ -116,10 +116,10 @@ Adapter pattern consistent with the ERP suite architecture:
 
 Before any new development, rename all existing packages from `@returnhypnosis/` to `@marlinjai/`:
 
-- `@returnhypnosis/email-editor` -> `@marlinjai/email-editor`
-- `@returnhypnosis/email-editor-core` -> `@marlinjai/email-editor-core`
-- `@returnhypnosis/email-editor-ui` -> `@marlinjai/email-editor-ui`
-- `@returnhypnosis/email-editor-blocks` -> `@marlinjai/email-editor-blocks`
+- `@marlinjai/email-editor` -> `@marlinjai/email-editor`
+- `@marlinjai/email-editor-core` -> `@marlinjai/email-editor-core`
+- `@marlinjai/email-editor-ui` -> `@marlinjai/email-editor-ui`
+- `@marlinjai/email-editor-blocks` -> `@marlinjai/email-editor-blocks`
 
 ## Implementation Priority
 

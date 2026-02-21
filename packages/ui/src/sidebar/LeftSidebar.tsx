@@ -5,7 +5,7 @@ import React from 'react';
 import { observer } from 'mobx-react-lite';
 import { useStore } from '../store';
 import clsx from 'clsx';
-import type { BlockRegistryImpl, PrebuiltTemplateRegistry } from '@returnhypnosis/email-editor-core';
+import type { BlockRegistryImpl, PrebuiltTemplateRegistry } from '@marlinjai/email-editor-core';
 import { ElementsPanel } from './ElementsPanel';
 import { LayoutPanel } from './LayoutPanel';
 import { LayersPanel } from './LayersPanel';

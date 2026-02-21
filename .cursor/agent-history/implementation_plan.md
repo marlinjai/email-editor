@@ -6,7 +6,7 @@ The Next.js example is failing to build because it's missing direct dependencies
 
 ### Next.js Example
 #### [MODIFY] [package.json](file:///Users/marlin.pohl/software%20development/email-editor/examples/nextjs/package.json)
-- Add `@returnhypnosis/email-editor-core`, `@returnhypnosis/email-editor-ui`, and `@returnhypnosis/email-editor-blocks` to `dependencies`.
+- Add `@marlinjai/email-editor-core`, `@marlinjai/email-editor-ui`, and `@marlinjai/email-editor-blocks` to `dependencies`.
 
 ### Editor Package
 #### [MODIFY] [package.json](file:///Users/marlin.pohl/software%20development/email-editor/packages/editor/package.json)
@@ -22,7 +22,7 @@ The Next.js example is failing to build because it's missing direct dependencies
 
 ### Next.js Example (Fix for 'fs' and 'EBADF' errors)
 #### [MODIFY] [route.ts](file:///Users/marlin.pohl/software%20development/email-editor/examples/nextjs/app/api/compile/route.ts)
-- Update import to use `@returnhypnosis/email-editor-core/compiler`.
+- Update import to use `@marlinjai/email-editor-core/compiler`.
 #### [MODIFY] [next.config.js](file:///Users/marlin.pohl/software%20development/email-editor/examples/nextjs/next.config.js)
 - Add `experimental.serverComponentsExternalPackages: ['mjml']` to prevent bundling MJML and avoid filesystem issues during build.
 

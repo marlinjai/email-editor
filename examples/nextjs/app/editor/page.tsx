@@ -4,7 +4,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { EmailEditorReact, type TemplateSnapshotIn, type TemplateSnapshotOut } from '@returnhypnosis/email-editor/react';
+import { EmailEditorReact, type TemplateSnapshotIn, type TemplateSnapshotOut } from '@marlinjai/email-editor/react';
 
 /**
  * Default template with ReTurn branding

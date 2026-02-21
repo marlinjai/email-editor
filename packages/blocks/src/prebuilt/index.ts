@@ -1,7 +1,7 @@
 // packages/blocks/src/prebuilt/index.ts
 // Pre-built template exports and registry with ReTurn Hypnosis branding
 
-import { createPrebuiltTemplateRegistry } from '@returnhypnosis/email-editor-core';
+import { createPrebuiltTemplateRegistry } from '@marlinjai/email-editor-core';
 
 // Import brand constants
 export * from './return-brand';

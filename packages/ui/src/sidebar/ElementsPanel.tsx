@@ -3,7 +3,7 @@
 
 import { useDraggable } from '@dnd-kit/core';
 import { Type, Image, Square, Minus, Space, Share2, List, Code } from 'lucide-react';
-import type { BlockDefinition } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition } from '@marlinjai/email-editor-core';
 import clsx from 'clsx';
 
 interface ElementsPanelProps {

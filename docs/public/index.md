@@ -23,12 +23,12 @@ A visual drag-and-drop email template builder built on MobX State Tree with MJML
 ## Quick Start
 
 ```bash
-npm install @returnhypnosis/email-editor
+npm install @marlinjai/email-editor
 ```
 
 ```tsx
-import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
-import '@returnhypnosis/email-editor/styles.css';
+import { EmailEditorReact } from '@marlinjai/email-editor/react';
+import '@marlinjai/email-editor/styles.css';
 
 function App() {
   const [template, setTemplate] = useState(initialTemplate);

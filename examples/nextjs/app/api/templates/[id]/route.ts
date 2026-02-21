@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile, unlink, access } from 'fs/promises';
 import { join } from 'path';
-import type { EmailTemplate } from '@returnhypnosis/email-editor-core';
+import type { EmailTemplate } from '@marlinjai/email-editor-core';
 
 interface RouteParams {
   params: Promise<{ id: string }>;

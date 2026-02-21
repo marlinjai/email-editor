@@ -237,7 +237,7 @@ The editor follows a hybrid monetization model:
 ### Editor Exports (What the Editor Provides)
 
 ```typescript
-// @returnhypnosis/email-editor-core
+// @marlinjai/email-editor-core
 
 // Store exports
 export { useEditorStore, createEditorStore } from './store';
@@ -331,8 +331,8 @@ type EmailEditorHost = {
 **Use case:** Embed the editor into an existing app
 
 ```typescript
-import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
-import '@returnhypnosis/email-editor/styles.css';
+import { EmailEditorReact } from '@marlinjai/email-editor/react';
+import '@marlinjai/email-editor/styles.css';
 
 function TemplateEditor() {
   const [template, setTemplate] = useState(initialTemplate);
@@ -534,7 +534,7 @@ You manage that in your app/DB and optionally provide `listAudiences()` hook.
 You just swap the adapter in your host app.
 
 ### Q: Can multiple apps use the same editor?
-**A:** Yes! Ship it as `@returnhypnosis/email-editor` npm package.  
+**A:** Yes! Ship it as `@marlinjai/email-editor` npm package.  
 Each app implements its own `uploadAsset()`, `sendTestEmail()`, etc.
 
 ### Q: What's the state management approach?

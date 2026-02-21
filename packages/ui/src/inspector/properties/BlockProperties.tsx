@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { observer } from 'mobx-react-lite';
-import { BlockType, type BlockInstance } from '@returnhypnosis/email-editor-core';
+import { BlockType, type BlockInstance } from '@marlinjai/email-editor-core';
 import { Trash2, EyeOff } from 'lucide-react';
 import clsx from 'clsx';
 import { useStore } from '../../store';

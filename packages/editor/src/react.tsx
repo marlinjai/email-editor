@@ -2,9 +2,9 @@
 // React wrapper component
 
 import { useState, useEffect } from 'react';
-import type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@returnhypnosis/email-editor-core';
-import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@returnhypnosis/email-editor-blocks';
-import { EmailEditor } from '@returnhypnosis/email-editor-ui';
+import type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@marlinjai/email-editor-core';
+import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
+import { EmailEditor } from '@marlinjai/email-editor-ui';
 import type { EditorTheme } from './types';
 
 interface EmailEditorReactProps {
@@ -75,5 +75,5 @@ export function EmailEditorReact({
 }
 
 // Re-export types
-export type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@returnhypnosis/email-editor-core';
+export type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@marlinjai/email-editor-core';
 export type { EditorTheme } from './types';

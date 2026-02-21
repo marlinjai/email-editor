@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { Columns, Square, Layout } from 'lucide-react';
 import clsx from 'clsx';
-import type { PrebuiltTemplate } from '@returnhypnosis/email-editor-core';
+import type { PrebuiltTemplate } from '@marlinjai/email-editor-core';
 
 interface LayoutPanelProps {
   templates: PrebuiltTemplate[];

@@ -1,8 +1,8 @@
 // packages/blocks/src/image/index.ts
 // Image block
 
-import type { BlockDefinition, ImageBlock } from '@returnhypnosis/email-editor-core';
-import { ImageBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, ImageBlock } from '@marlinjai/email-editor-core';
+import { ImageBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Image block definition

@@ -1,6 +1,6 @@
 # Email Editor - High-Level Roadmap
 
-**Project:** `@returnhypnosis/email-editor`  
+**Project:** `@marlinjai/email-editor`  
 **Type:** Embeddable email template authoring tool  
 **Current Phase:** Phase 9 (Framer-like DnD UX) - In Progress
 
@@ -37,7 +37,7 @@ Build a standalone, pluggable email editor that:
                    │ imports & configures
                    ▼
 ┌─────────────────────────────────────────────────────────┐
-│        @returnhypnosis/email-editor (npm package)       │
+│        @marlinjai/email-editor (npm package)       │
 │                                                          │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
 │  │   Core     │  │  UI Layer  │  │  Blocks    │        │

@@ -1,5 +1,5 @@
 {
-  "name": "@returnhypnosis/email-editor",
+  "name": "@marlinjai/email-editor",
   "version": "0.0.1",
   "description": "Email editor with MJML compilation",
   "main": "./dist/index.js",
@@ -25,9 +25,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@returnhypnosis/email-editor-core": "workspace:*",
-    "@returnhypnosis/email-editor-ui": "workspace:*",
-    "@returnhypnosis/email-editor-blocks": "workspace:*"
+    "@marlinjai/email-editor-core": "workspace:*",
+    "@marlinjai/email-editor-ui": "workspace:*",
+    "@marlinjai/email-editor-blocks": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.2.45",

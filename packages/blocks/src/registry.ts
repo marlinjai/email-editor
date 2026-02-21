@@ -1,7 +1,7 @@
 // packages/blocks/src/registry.ts
 // Register all standard blocks
 
-import { createBlockRegistry } from '@returnhypnosis/email-editor-core';
+import { createBlockRegistry } from '@marlinjai/email-editor-core';
 import { textBlockDefinition } from './text';
 import { imageBlockDefinition } from './image';
 import { buttonBlockDefinition } from './button';

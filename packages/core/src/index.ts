@@ -9,5 +9,5 @@ export * from './selection';
 export * from './templates';
 export * from './store';
 
-// Note: Import compiler separately from '@returnhypnosis/email-editor-core/server' for server-side use
+// Note: Import compiler separately from '@marlinjai/email-editor-core/server' for server-side use
 

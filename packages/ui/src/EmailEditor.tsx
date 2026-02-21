@@ -32,7 +32,7 @@ import {
   type TemplateSnapshotOut,
   type BlockSnapshotIn,
   type SectionSnapshotIn,
-} from '@returnhypnosis/email-editor-core';
+} from '@marlinjai/email-editor-core';
 import { StoreProvider, useStore } from './store';
 import { EmailRenderer } from './renderer';
 import { PropertyInspector } from './inspector';
@@ -40,7 +40,7 @@ import { LeftSidebar } from './sidebar/LeftSidebar';
 import { DragOverlayContent } from './DragOverlayContent';
 import { nanoid } from 'nanoid';
 import clsx from 'clsx';
-import type { BlockRegistryImpl, PrebuiltTemplateRegistry } from '@returnhypnosis/email-editor-core';
+import type { BlockRegistryImpl, PrebuiltTemplateRegistry } from '@marlinjai/email-editor-core';
 
 export interface EmailEditorProps {
   /** Initial template data */

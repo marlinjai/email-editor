@@ -1,7 +1,7 @@
 // packages/blocks/src/prebuilt/hero-templates.ts
 // Pre-built hero section templates with ReTurn Hypnosis branding
 
-import type { PrebuiltTemplate } from '@returnhypnosis/email-editor-core';
+import type { PrebuiltTemplate } from '@marlinjai/email-editor-core';
 import { BRAND, TYPOGRAPHY, CONTENT } from './return-brand';
 
 /**

@@ -1,7 +1,7 @@
 // packages/blocks/src/prebuilt/feature-templates.ts
 // Pre-built feature grid templates with ReTurn Hypnosis branding
 
-import type { PrebuiltTemplate } from '@returnhypnosis/email-editor-core';
+import type { PrebuiltTemplate } from '@marlinjai/email-editor-core';
 import { BRAND, TYPOGRAPHY, CONTENT } from './return-brand';
 
 /**

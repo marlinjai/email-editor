@@ -1,8 +1,8 @@
 // packages/blocks/src/raw/index.ts
 // Raw HTML block for custom code
 
-import type { BlockDefinition, RawBlock } from '@returnhypnosis/email-editor-core';
-import { RawBlockSchema } from '@returnhypnosis/email-editor-core';
+import type { BlockDefinition, RawBlock } from '@marlinjai/email-editor-core';
+import { RawBlockSchema } from '@marlinjai/email-editor-core';
 
 /**
  * Raw HTML block definition

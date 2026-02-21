@@ -60,8 +60,8 @@ Open http://localhost:3000 to see the editor.
 ### Basic Integration
 
 ```tsx
-import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
-import '@returnhypnosis/email-editor/styles.css';
+import { EmailEditorReact } from '@marlinjai/email-editor/react';
+import '@marlinjai/email-editor/styles.css';
 
 function App() {
   const [template, setTemplate] = useState(initialTemplate);
@@ -102,15 +102,15 @@ If you prefer npm without workspaces:
 2. Link packages locally:
    ```bash
    cd packages/core && npm link
-   cd ../ui && npm link @returnhypnosis/email-editor-core && npm link
-   cd ../blocks && npm link @returnhypnosis/email-editor-core && npm link
-   cd ../editor && npm link @returnhypnosis/email-editor-core @returnhypnosis/email-editor-ui @returnhypnosis/email-editor-blocks && npm link
+   cd ../ui && npm link @marlinjai/email-editor-core && npm link
+   cd ../blocks && npm link @marlinjai/email-editor-core && npm link
+   cd ../editor && npm link @marlinjai/email-editor-core @marlinjai/email-editor-ui @marlinjai/email-editor-blocks && npm link
    ```
 
 3. Run example:
    ```bash
    cd examples/nextjs
-   npm link @returnhypnosis/email-editor
+   npm link @marlinjai/email-editor
    npm run dev
    ```
 
@@ -143,10 +143,10 @@ PORT=3001 pnpm run dev
 Ensure you're importing from the correct package:
 ```tsx
 // Correct
-import { useEditorStore } from '@returnhypnosis/email-editor-core';
+import { useEditorStore } from '@marlinjai/email-editor-core';
 
 // Wrong
-import { useEditorStore } from '@returnhypnosis/email-editor-ui';
+import { useEditorStore } from '@marlinjai/email-editor-ui';
 ```
 
 ## Development Workflow

@@ -1,7 +1,7 @@
 // packages/editor/src/types.ts
 // Public API types
 
-import type { EmailTemplate, BlockDefinition } from '@returnhypnosis/email-editor-core';
+import type { EmailTemplate, BlockDefinition } from '@marlinjai/email-editor-core';
 
 /**
  * Editor theme configuration

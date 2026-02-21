@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server';
 import { readdir, readFile, stat } from 'fs/promises';
 import { join } from 'path';
-import type { EmailTemplate } from '@returnhypnosis/email-editor-core';
+import type { EmailTemplate } from '@marlinjai/email-editor-core';
 
 export interface SavedTemplateInfo {
   id: string;

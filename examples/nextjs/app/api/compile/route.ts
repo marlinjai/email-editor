@@ -4,14 +4,14 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createMJMLCompiler } from '@returnhypnosis/email-editor-core/server';
+import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
 import {
   validateApiKey,
   incrementUsage,
   shouldAddWatermark,
   injectWatermark,
-} from '@returnhypnosis/email-editor-core/server';
-import type { EmailTemplate } from '@returnhypnosis/email-editor-core';
+} from '@marlinjai/email-editor-core/server';
+import type { EmailTemplate } from '@marlinjai/email-editor-core';
 
 /**
  * POST /api/compile

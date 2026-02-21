@@ -1,6 +1,6 @@
 # Email Editor - Next.js Example
 
-This example demonstrates how to integrate `@returnhypnosis/email-editor` into a Next.js application.
+This example demonstrates how to integrate `@marlinjai/email-editor` into a Next.js application.
 
 ## Features
 
@@ -26,8 +26,8 @@ Open [http://localhost:3000](http://localhost:3000) to see the editor.
 ### Basic Integration
 
 ```tsx
-import { EmailEditorReact } from '@returnhypnosis/email-editor/react';
-import type { EmailTemplate } from '@returnhypnosis/email-editor';
+import { EmailEditorReact } from '@marlinjai/email-editor/react';
+import type { EmailTemplate } from '@marlinjai/email-editor';
 
 export default function MyPage() {
   const [template, setTemplate] = useState<EmailTemplate>(/* ... */);
