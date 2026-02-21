@@ -12,6 +12,12 @@ import { SpacerBlock } from './blocks/SpacerBlock';
 import { SocialBlock } from './blocks/SocialBlock';
 import { HeroBlock } from './blocks/HeroBlock';
 import { RawBlock } from './blocks/RawBlock';
+import { AccordionBlock } from './blocks/AccordionBlock';
+import { NavbarBlock } from './blocks/NavbarBlock';
+import { CarouselBlock } from './blocks/CarouselBlock';
+import { TableBlock } from './blocks/TableBlock';
+import { HeaderBlock } from './blocks/HeaderBlock';
+import { FooterBlock } from './blocks/FooterBlock';
 
 /**
  * Block component map - routes block types to their renderers
@@ -25,13 +31,12 @@ const BLOCK_COMPONENTS: Record<string, React.ComponentType<{ block: BlockInstanc
   [BlockType.SOCIAL]: SocialBlock,
   [BlockType.HERO]: HeroBlock,
   [BlockType.RAW]: RawBlock,
-  // Additional blocks can be added here
-  // [BlockType.ACCORDION]: AccordionBlock,
-  // [BlockType.NAVBAR]: NavbarBlock,
-  // [BlockType.CAROUSEL]: CarouselBlock,
-  // [BlockType.TABLE]: TableBlock,
-  // [BlockType.HEADER]: HeaderBlock,
-  // [BlockType.FOOTER]: FooterBlock,
+  [BlockType.ACCORDION]: AccordionBlock,
+  [BlockType.NAVBAR]: NavbarBlock,
+  [BlockType.CAROUSEL]: CarouselBlock,
+  [BlockType.TABLE]: TableBlock,
+  [BlockType.HEADER]: HeaderBlock,
+  [BlockType.FOOTER]: FooterBlock,
 };
 
 interface BlockRendererProps {
