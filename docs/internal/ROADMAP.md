@@ -7,20 +7,20 @@ icon: milestone
 
 # Roadmap
 
-## Phase 0 - Foundation (current)
+## Phase 0 - Foundation (complete)
 
 - [x] Core editor with drag-and-drop blocks
 - [x] MJML compilation (server-side)
 - [x] MobX State Tree state management
-- [x] 8 of 14 block types with visual renderers
+- [x] 14 of 14 block types with visual renderers
 - [x] 35 prebuilt section templates
 - [x] Undo/redo, device preview, theming
 - [x] Next.js example app
 - [x] Clearify documentation
 - [x] Cloudflare deployment at email-editor.lumitra.co
-- [ ] Rename packages from `@returnhypnosis/` to `@marlinjai/`
-- [ ] Complete remaining 6 block type renderers (Accordion, Navbar, Carousel, Table, Header, Footer)
-- [ ] Add test coverage (Vitest configured but no tests yet)
+- [x] Rename packages from `@returnhypnosis/` to `@marlinjai/`
+- [x] Complete remaining 6 block type renderers (Accordion, Navbar, Carousel, Table, Header, Footer)
+- [x] Add test coverage (181 tests: schema, registry, store, compiler)
 
 ## Phase 1 - Template Management
 

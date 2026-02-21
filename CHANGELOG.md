@@ -15,8 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom domain: email-editor.lumitra.co
 - Docs site: docs.email-editor.lumitra.co
 - Platform vision and roadmap for template management, campaigns, and analytics
+- Accordion block renderer (interactive expand/collapse preview)
+- Navbar block renderer (navigation link preview with hamburger icon)
+- Carousel block renderer (image slideshow with thumbnails and navigation)
+- Table block renderer (data table with headers and rows)
+- Header block renderer (branded/locked newsletter header)
+- Footer block renderer (branded/locked newsletter footer)
+- Vitest test infrastructure across core, blocks, and editor packages
+- 161 unit tests for core (schema validation, block registry, MST store, MJML compiler)
+- 20 integration tests for standard block registry (all 14 types)
 
 ### Changed
+- All packages renamed from `@returnhypnosis/` to `@marlinjai/` scope
 - Clearify dependency switched from local link to `@marlinjai/clearify@^1.6.6`
 - Documentation reorganized into `docs/public/` and `docs/internal/` sections
 - Mermaid diagrams enabled via client-side strategy
