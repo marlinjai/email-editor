@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+#### Phase 0 - Foundation
 - Marketing landing page at `/` with indigo-themed design
 - Editor moved to `/editor` route
 - Clearify documentation with public and internal sections
@@ -22,8 +24,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Header block renderer (branded/locked newsletter header)
 - Footer block renderer (branded/locked newsletter footer)
 - Vitest test infrastructure across core, blocks, and editor packages
-- 161 unit tests for core (schema validation, block registry, MST store, MJML compiler)
+- 181 unit tests for core (schema validation, block registry, MST store, MJML compiler)
 - 20 integration tests for standard block registry (all 14 types)
+
+#### Phase 1 - Template Management (`@marlinjai/email-templates`)
+- Template library dashboard with card grid, filters, and pagination
+- Template CRUD (create, duplicate, rename, delete, archive)
+- Template categories and tags
+- Version history per template with restore capability
+- Import/export templates (JSON + HTML)
+- Data Brain adapter for template storage
+- 39 tests
+
+#### Phase 2 - Contacts & Audiences (`@marlinjai/email-contacts`)
+- Contact list management with bulk operations
+- CSV import with delimiter detection and field mapping
+- Segments with rule-based evaluation (10 operators, AND/OR logic)
+- Merge fields / personalization tokens (`{{first_name}}`)
+- Unsubscribe management with signed tokens (CAN-SPAM / GDPR / RFC 8058)
+- 96 tests
+
+#### Phase 3 - Campaign Builder (`@marlinjai/email-campaigns`)
+- Campaign creation wizard (template -> audience -> configure -> send)
+- Resend sending adapter (`@marlinjai/email-send-adapter-resend`)
+- Campaign scheduling (now, later, timezone-aware)
+- Send preview / test email
+- A/B testing (subject line variants, content variants, automatic winner selection)
+- Campaign status dashboard (draft, scheduled, sending, sent, failed)
+- Tracking pixel injection and click-wrap link rewriting
+- 51 tests (45 campaigns + 6 resend adapter)
+
+#### Phase 4 - Analytics (`@marlinjai/email-analytics`)
+- Open/click/bounce/unsubscribe tracking with event ingestion
+- Click heatmap overlay with intensity levels
+- Per-contact engagement scoring with recency decay
+- Campaign comparison reports (side-by-side metrics)
+- CSV export for stats, events, and link clicks
+- Tracking pixel endpoint (1x1 GIF) and click redirect endpoint
+- 61 tests
+
+#### Phase 5 - Teams & Workspaces (`@marlinjai/email-teams`)
+- Multi-user workspaces with roles (owner, admin, editor, viewer)
+- Approval workflows (request, approve, reject)
+- Template locking for approved templates
+- Audit trail with filtered queries
+- Brand kit (colors, fonts, logo upload via Storage Brain)
+- Workspace scoping for templates and contacts with permission checks
+- WorkspaceSwitcher component with role badges
+- 59 tests
+
+#### Phase 6 - Automation (`@marlinjai/email-automation`)
+- Trigger-based email sequences (event, schedule, manual triggers)
+- Automation engine with enrollment tracking and step execution
+- Conditional logic evaluator (contact data, engagement, event data)
+- Step types: send_email, wait, condition (if/else), split (A/B)
+- Webhook receiver for external event integration
+- Visual sequence builder component
+- 50 tests
+
+#### Dashboard UI Shell
+- SaaS dashboard layout with sidebar navigation
+- Dashboard routes: Overview, Templates, Contacts, Campaigns, Analytics, Automations, Settings
+- Mock data adapters for each route demonstrating component integration
+- Link to visual email editor from dashboard sidebar
+
+#### Shared Infrastructure (`@email-editor/shared`)
+- Data Brain and Storage Brain client factories
+- WorkspaceProvider, AuthProvider, PlatformProvider contexts
+- Paginated query hook
+- Schema bootstrapper for idempotent table creation
+- 12 tests
 
 ### Changed
 - All packages renamed from `@returnhypnosis/` to `@marlinjai/` scope

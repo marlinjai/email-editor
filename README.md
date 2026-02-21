@@ -8,18 +8,26 @@ Replace GrapesJS and Unlayer with a fully controllable, customizable email edito
 
 ## Features
 
+### Editor
 - **MJML Compilation** - Email-safe HTML that works across all clients
 - **React UI** - Clean 3-panel interface (Toolbar | Canvas | Inspector)
 - **Type-Safe** - Full TypeScript with Zod validation
-- **Centralized State** - Zustand store with document/interaction/api slices
+- **MobX State Tree** - Hierarchical state management with snapshots and patches
 - **Drag & Drop** - Intuitive block placement with 3-way drop intent
 - **Undo/Redo** - Efficient history with Immer patches
 - **Device Preview** - Desktop and mobile views
 - **Rich Text** - TipTap editor for text blocks
 - **Themeable** - Customize colors and fonts
 - **Extensible** - Add custom blocks easily
-- **MJML-Aware** - Validation middleware prevents invalid states
-- **API Ready** - Optional compile API for production (coming soon)
+- **14 Block Types** - Text, Image, Button, Divider, Spacer, Social, Navbar, Carousel, Accordion, Table, Header, Footer, Hero, Raw HTML
+
+### Platform
+- **Template Management** - Library dashboard, CRUD, versioning, import/export, categories
+- **Contacts & Audiences** - Contact lists, CSV import, segments, merge fields, unsubscribe management
+- **Campaign Builder** - Creation wizard, scheduling, A/B testing, Resend integration
+- **Analytics** - Open/click/bounce tracking, heatmaps, engagement scoring, CSV export
+- **Teams & Workspaces** - Multi-user roles, approval workflows, template locking, audit trail, brand kit
+- **Automation** - Trigger-based sequences, conditional logic, webhook integration
 
 ---
 
@@ -52,12 +60,29 @@ See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 
 ## Packages
 
+### Editor
 | Package | Description |
 |---------|-------------|
 | `@marlinjai/email-editor` | Main package (public API + React wrapper) |
-| `@marlinjai/email-editor-core` | Schema, compiler, Zustand store |
+| `@marlinjai/email-editor-core` | Schema, MJML compiler, MobX State Tree store |
 | `@marlinjai/email-editor-ui` | React UI components |
-| `@marlinjai/email-editor-blocks` | Standard block library |
+| `@marlinjai/email-editor-blocks` | Standard block library (14 block types) |
+
+### Infrastructure
+| Package | Description |
+|---------|-------------|
+| `@email-editor/shared` | Client factories, context providers, schema bootstrapper |
+
+### Platform
+| Package | Description |
+|---------|-------------|
+| `@marlinjai/email-templates` | Template management with versioning and Data Brain storage |
+| `@marlinjai/email-contacts` | Contact lists, segments, CSV import, unsubscribe management |
+| `@marlinjai/email-campaigns` | Campaign builder with scheduling and A/B testing |
+| `@marlinjai/email-send-adapter-resend` | Resend email sending adapter |
+| `@marlinjai/email-analytics` | Tracking, heatmaps, engagement scoring, reports |
+| `@marlinjai/email-teams` | Workspaces, roles, approvals, audit trail, brand kit |
+| `@marlinjai/email-automation` | Trigger-based sequences and conditional workflows |
 
 ---
 
@@ -79,7 +104,7 @@ See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 ┌─────────▼───────────┐  ┌──────────▼──────────┐
 │  email-editor-ui    │  │  email-editor-core  │
 │  ┌────────────────┐ │  │  ┌───────────────┐  │
-│  │ React          │ │  │  │ Zustand Store │  │
+│  │ React          │ │  │  │ MST Store     │  │
 │  │ Components     │ │  │  │ ├─ document   │  │
 │  │ ├─ Canvas      │ │  │  │ ├─ interaction│  │
 │  │ ├─ Toolbar     │ │  │  │ └─ api        │  │
@@ -100,23 +125,28 @@ See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 
 ## State Management
 
-The editor uses Zustand with three slices:
+The editor uses **MobX State Tree (MST)** with a hierarchical model structure:
 
-**Document Slice** - Template state (sections, columns, blocks)
+**Template Model** - Template state (sections, columns, blocks)
 ```typescript
-const template = useEditorStore((s) => s.document.template);
-const insertBlock = useEditorStore((s) => s.document.insertBlock);
+import { createRootStore } from '@marlinjai/email-editor-core';
+
+const store = createRootStore({ template: myTemplateSnapshot });
+const template = store.template;
+template.addSection(sectionSnapshot);
 ```
 
-**Interaction Slice** - UI state (selection, drag, resize)
+**Editor UI Store** - UI state (selection, drag, preview device)
 ```typescript
-const selectedId = useEditorStore((s) => s.interaction.selectedId);
-const setSelection = useEditorStore((s) => s.interaction.setSelection);
+const editorUI = store.editorUI;
+editorUI.setSelection('block', blockId);
+editorUI.setPreviewDevice('mobile');
 ```
 
-**API Slice** - Compile configuration
+**Undo/Redo** - Built-in via Immer patches
 ```typescript
-const apiKey = useEditorStore((s) => s.api.apiKey);
+store.undo();
+store.redo();
 ```
 
 ---
@@ -130,9 +160,16 @@ const apiKey = useEditorStore((s) => s.api.apiKey);
 - **Divider** - Horizontal separator lines
 - **Spacer** - Vertical spacing control
 
-### Branded Blocks (ReTurn)
-- **Header** - Locked branded header with logo
-- **Footer** - Locked branded footer with unsubscribe
+### Layout & Structure
+- **Header** - Branded header with logo
+- **Footer** - Branded footer with unsubscribe
+- **Accordion** - Interactive expand/collapse sections
+- **Navbar** - Navigation links with hamburger icon
+- **Carousel** - Image slideshow with thumbnails
+- **Table** - Data table with headers and rows
+- **Hero** - Full-width hero section
+- **Social** - Social media icon links
+- **Raw HTML** - Custom HTML injection
 
 ---
 
@@ -171,7 +208,7 @@ See [docs/guides/development.md](docs/guides/development.md)
 **Core**
 - TypeScript (strict mode)
 - Zod (schema validation)
-- Zustand (state management)
+- MobX State Tree (state management)
 - Immer (immutable updates)
 - MJML (email compilation)
 
@@ -228,6 +265,6 @@ Contributions welcome! See [docs/guides/development.md](docs/guides/development.
 
 ---
 
-## Made for ReTurn Hypnosis
+## Made by MarlinJai
 
-Built with care to power beautiful email newsletters.
+Built with care to power beautiful email campaigns.

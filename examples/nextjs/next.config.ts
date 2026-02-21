@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
     "@marlinjai/email-editor-core",
     "@marlinjai/email-editor-ui",
     "@marlinjai/email-editor-blocks",
+    "@marlinjai/email-templates",
+    "@marlinjai/email-contacts",
+    "@marlinjai/email-campaigns",
+    "@marlinjai/email-analytics",
+    "@marlinjai/email-teams",
   ],
   serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
 };

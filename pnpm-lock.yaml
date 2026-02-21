@@ -26,6 +26,15 @@ importers:
 
   examples/nextjs:
     dependencies:
+      '@marlinjai/email-analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
+      '@marlinjai/email-campaigns':
+        specifier: workspace:*
+        version: link:../../packages/campaigns
+      '@marlinjai/email-contacts':
+        specifier: workspace:*
+        version: link:../../packages/contacts
       '@marlinjai/email-editor':
         specifier: workspace:*
         version: link:../../packages/editor
@@ -38,6 +47,12 @@ importers:
       '@marlinjai/email-editor-ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@marlinjai/email-teams':
+        specifier: workspace:*
+        version: link:../../packages/teams
+      '@marlinjai/email-templates':
+        specifier: workspace:*
+        version: link:../../packages/templates
       next:
         specifier: ^16.1.6
         version: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

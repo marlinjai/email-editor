@@ -35,14 +35,14 @@ export default function LandingPage() {
             GitHub
           </a>
           <Link
-            href="/editor"
+            href="/dashboard"
             className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
             style={{
               background: 'var(--accent)',
               color: 'var(--background)',
             }}
           >
-            Open Editor
+            Dashboard
           </Link>
         </div>
       </nav>
