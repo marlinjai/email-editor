@@ -65,7 +65,7 @@ import '@returnhypnosis/email-editor/styles.css';
 
 function App() {
   const [template, setTemplate] = useState(initialTemplate);
-  
+
   return (
     <EmailEditorReact
       value={template}
@@ -185,7 +185,6 @@ pnpm run test:watch
 
 Once installed, check out:
 
-1. **[Quick Start](/projects/email-editor/quickstart)** - Quick overview
-2. **[Integration](/projects/email-editor/integration)** - Integration patterns
-3. **[Development](/projects/email-editor/development)** - Development guide
-4. **[API Reference](/projects/email-editor/api)** - API reference
+1. **[Quick Start](./quickstart)** - Quick overview
+2. **[Integration](./integration)** - Integration patterns
+3. **[API Reference](./api)** - API reference

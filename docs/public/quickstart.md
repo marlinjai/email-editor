@@ -2,6 +2,7 @@
 title: Quick Start
 description: Get up and running with the email editor
 order: 2
+icon: rocket
 ---
 
 # Quick Start Guide
@@ -24,16 +25,16 @@ Open http://localhost:3000 to see the editor in action.
 
 ## What You Get
 
-✅ **Core Engine** - Framework-agnostic email template management  
-✅ **React UI** - Beautiful 3-panel editor interface  
-✅ **Standard Blocks** - Text, Image, Button, Divider, Spacer  
-✅ **Branded Blocks** - ReTurn Header & Footer (locked)  
-✅ **MJML Compilation** - Server-side rendering to email-safe HTML  
-✅ **Undo/Redo** - Full history management with Immer  
-✅ **Drag & Drop** - Intuitive block placement with dnd-kit  
-✅ **Device Preview** - Desktop and mobile views  
-✅ **Theming** - Customizable colors and fonts  
-✅ **Type Safe** - Full TypeScript support
+- **Core Engine** - Framework-agnostic email template management
+- **React UI** - Beautiful 3-panel editor interface
+- **Standard Blocks** - Text, Image, Button, Divider, Spacer
+- **Branded Blocks** - ReTurn Header & Footer (locked)
+- **MJML Compilation** - Server-side rendering to email-safe HTML
+- **Undo/Redo** - Full history management with Immer
+- **Drag & Drop** - Intuitive block placement with dnd-kit
+- **Device Preview** - Desktop and mobile views
+- **Theming** - Customizable colors and fonts
+- **Type Safe** - Full TypeScript support
 
 ## Next Steps
 
@@ -44,9 +45,8 @@ Open http://localhost:3000 to see the editor in action.
    ```
 
 2. **Read the Docs**
-   - [Installation](/projects/email-editor/installation)
-   - [API Reference](/projects/email-editor/api)
-   - [Development Guide](/projects/email-editor/development)
+   - [Installation](./installation)
+   - [API Reference](./api)
 
 3. **Integrate into Your App**
    ```bash
@@ -146,18 +146,16 @@ const theme = {
 
 ## Troubleshooting
 
-**Build errors?**  
+**Build errors?**
 Run `npm install` from the monorepo root.
 
-**Import errors?**  
+**Import errors?**
 Run `npm run build` to compile all packages.
 
-**Styles not loading?**  
+**Styles not loading?**
 Import `@returnhypnosis/email-editor/styles.css` in your app.
 
 ## Support
 
-- [Full Documentation](/projects/email-editor/installation)
-- [Example App](../examples/nextjs)
-- Issues? Check [Development Guide](/projects/email-editor/development)
-
+- [Full Documentation](./installation)
+- [Example App](../../examples/nextjs)

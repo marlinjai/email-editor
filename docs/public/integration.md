@@ -136,7 +136,7 @@ export async function POST(request) {
   const template = await request.json();
   const compiler = createMJMLCompiler();
   const { html, mjml } = compiler.compile(template);
-  
+
   return Response.json({ html, mjml });
 }
 ```
@@ -165,7 +165,6 @@ const editor = createEditor({
 
 ## Next Steps
 
-- See the [Next.js example](../examples/nextjs) for a complete integration
-- Read the [API Reference](/projects/email-editor/api) for detailed documentation
-- Check the [Architecture](/projects/email-editor/architecture) for design decisions
-
+- See the [Next.js example](../../examples/nextjs) for a complete integration
+- Read the [API Reference](./api) for detailed documentation
+- Check the [Architecture](./architecture) for design decisions

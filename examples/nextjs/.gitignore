@@ -8,6 +8,10 @@ out
 # Build
 dist
 
+# OpenNext / Cloudflare
+.open-next
+.wrangler
+
 # Saved templates
 saved-templates/
 
@@ -20,4 +24,3 @@ npm-debug.log*
 
 # Local env
 .env*.local
-

@@ -1,7 +1,8 @@
 ---
-title: Development
+title: Internal Development
 description: Development workflow, testing, and contributing guide
-order: 6
+order: 0
+icon: lock
 ---
 
 # Development Guide
@@ -88,7 +89,7 @@ import { useEditorStore } from '@returnhypnosis/email-editor-core';
 function BlockList() {
   const template = useEditorStore((s) => s.document.template);
   const deleteBlock = useEditorStore((s) => s.document.deleteBlock);
-  
+
   return (
     <ul>
       {template.sections.map(section => (
@@ -116,7 +117,7 @@ function MyToolbar() {
     canUndo,
     canRedo,
   } = useEditorActions();
-  
+
   return (
     <div>
       <button onClick={() => addTextBlock(columnId)}>Add Text</button>
@@ -355,4 +356,4 @@ const template = store.document.template;
 
 ---
 
-**Last updated:** 2026-01-04
+**Last updated:** 2026-02-21

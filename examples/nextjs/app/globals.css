@@ -1,51 +1,53 @@
-/* examples/nextjs/app/globals.css */
+@import "tailwindcss";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    @apply border-brand-border;
-  }
-  
-  html,
-  body {
-    height: 100%;
-    @apply font-sans text-brand-text;
-  }
+:root {
+  --background: #0c0c0e;
+  --foreground: #e8e6e3;
+  --surface: #16161a;
+  --surface-elevated: #1e1e23;
+  --border: #2a2a30;
+  --border-subtle: #1f1f25;
+  --muted: #72717a;
+  --accent: #6366f1;
+  --accent-muted: rgba(99, 102, 241, 0.12);
+  --accent-hover: #818cf8;
+  --danger: #e5534b;
+  --danger-muted: rgba(229, 83, 75, 0.12);
 }
 
-@layer components {
-  /* Editor layout */
-  .email-editor {
-    @apply w-full h-screen flex flex-col bg-gray-50;
-  }
-
-  /* Button styles */
-  .btn {
-    @apply px-4 py-2 rounded font-medium transition-colors;
-  }
-
-  .btn-primary {
-    @apply bg-brand-primary text-white hover:bg-opacity-90;
-  }
-
-  .btn-secondary {
-    @apply bg-white border border-brand-border hover:bg-gray-50;
-  }
-
-  /* Input styles */
-  .input {
-    @apply w-full px-3 py-2 border border-brand-border rounded focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-opacity-50;
-  }
-
-  /* Panel styles */
-  .panel {
-    @apply bg-white border-r border-brand-border overflow-y-auto;
-  }
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* Subtle noise texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Subtle radial glow behind the main content */
+body::after {
+  content: '';
+  position: fixed;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 600px;
+  background: radial-gradient(ellipse, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}

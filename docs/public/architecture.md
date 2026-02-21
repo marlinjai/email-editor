@@ -439,9 +439,9 @@ graph BT
 ```
 
 **Legend:**
-- 🟢 Green = Framework agnostic
-- 🟡 Orange = React-specific
-- 🔵 Blue = Convenience wrapper
+- Green = Framework agnostic
+- Orange = React-specific
+- Blue = Convenience wrapper
 
 ---
 
