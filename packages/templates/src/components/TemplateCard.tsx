@@ -3,10 +3,15 @@ import type { Template, TemplateStatus } from '../types';
 
 export interface TemplateCardProps {
   template: Template;
+  locked?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canApprove?: boolean;
   onEdit?: (template: Template) => void;
   onDuplicate?: (template: Template) => void;
   onArchive?: (template: Template) => void;
   onDelete?: (template: Template) => void;
+  onRequestApproval?: (template: Template) => void;
 }
 
 const STATUS_LABELS: Record<TemplateStatus, string> = {
@@ -23,12 +28,22 @@ const STATUS_COLORS: Record<TemplateStatus, string> = {
 
 export function TemplateCard({
   template,
+  locked = false,
+  canEdit = true,
+  canDelete = true,
+  canApprove = false,
   onEdit,
   onDuplicate,
   onArchive,
   onDelete,
+  onRequestApproval,
 }: TemplateCardProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+
+  const handleCardClick = () => {
+    if (locked && !canApprove) return;
+    onEdit?.(template);
+  };
 
   return (
     <div
@@ -36,12 +51,15 @@ export function TemplateCard({
         border: '1px solid #e2e8f0',
         borderRadius: 8,
         overflow: 'hidden',
-        cursor: 'pointer',
+        cursor: locked ? 'default' : 'pointer',
         transition: 'box-shadow 0.15s',
+        opacity: locked && !canApprove ? 0.8 : 1,
       }}
-      onClick={() => onEdit?.(template)}
+      onClick={handleCardClick}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+        if (!locked) {
+          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+        }
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
@@ -57,6 +75,7 @@ export function TemplateCard({
           justifyContent: 'center',
           color: '#94a3b8',
           fontSize: 14,
+          position: 'relative',
         }}
       >
         {template.thumbnailUrl ? (
@@ -68,12 +87,39 @@ export function TemplateCard({
         ) : (
           'No preview'
         )}
+        {locked && (
+          <span
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              background: '#7c3aed',
+              color: 'white',
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          >
+            Approved
+          </span>
+        )}
       </div>
 
       {/* Info */}
       <div style={{ padding: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{template.name}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{template.name}</h3>
+            {locked && (
+              <span
+                style={{ fontSize: 14 }}
+                title="This template is locked (approved)"
+              >
+                &#128274;
+              </span>
+            )}
+          </div>
           <div style={{ position: 'relative' }}>
             <button
               onClick={(e) => {
@@ -102,22 +148,35 @@ export function TemplateCard({
                   borderRadius: 6,
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   zIndex: 10,
-                  minWidth: 120,
+                  minWidth: 140,
                 }}
               >
-                <button
-                  style={menuItemStyle}
-                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit?.(template); }}
-                >
-                  Edit
-                </button>
-                <button
-                  style={menuItemStyle}
-                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDuplicate?.(template); }}
-                >
-                  Duplicate
-                </button>
-                {template.status !== 'archived' && (
+                {canEdit && !locked && (
+                  <button
+                    style={menuItemStyle}
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit?.(template); }}
+                  >
+                    Edit
+                  </button>
+                )}
+                {locked && (
+                  <button
+                    style={{ ...menuItemStyle, color: '#94a3b8', cursor: 'default' }}
+                    onClick={(e) => e.stopPropagation()}
+                    disabled
+                  >
+                    Edit (locked)
+                  </button>
+                )}
+                {onDuplicate && (
+                  <button
+                    style={menuItemStyle}
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDuplicate(template); }}
+                  >
+                    Duplicate
+                  </button>
+                )}
+                {canEdit && !locked && template.status !== 'archived' && (
                   <button
                     style={menuItemStyle}
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onArchive?.(template); }}
@@ -125,12 +184,22 @@ export function TemplateCard({
                     Archive
                   </button>
                 )}
-                <button
-                  style={{ ...menuItemStyle, color: '#ef4444' }}
-                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete?.(template); }}
-                >
-                  Delete
-                </button>
+                {canEdit && !locked && onRequestApproval && (
+                  <button
+                    style={{ ...menuItemStyle, color: '#7c3aed' }}
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRequestApproval(template); }}
+                  >
+                    Request Approval
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    style={{ ...menuItemStyle, color: '#ef4444' }}
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete?.(template); }}
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             )}
           </div>

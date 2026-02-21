@@ -36,3 +36,4 @@ export { ApprovalQueue, type ApprovalQueueProps } from './components/ApprovalQue
 export { AuditLogViewer, type AuditLogViewerProps } from './components/AuditLogViewer';
 export { BrandKitEditor, type BrandKitEditorProps } from './components/BrandKitEditor';
 export { WorkspaceSettings, type WorkspaceSettingsProps } from './components/WorkspaceSettings';
+export { WorkspaceSwitcher, type WorkspaceSwitcherProps, type Workspace } from './components/WorkspaceSwitcher';

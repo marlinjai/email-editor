@@ -1,8 +1,19 @@
 import React, { useState, useCallback } from 'react';
 import type { Contact, ContactStatus, ContactStorageAdapter, ContactListOptions } from '../types';
+import type { WorkspaceRole } from '@marlinjai/email-teams';
+import { PERMISSIONS } from '@marlinjai/email-teams';
+
+function hasPermission(role: WorkspaceRole, permission: string): boolean {
+  const perms = PERMISSIONS[role];
+  if (perms.includes('*')) return true;
+  if (perms.includes(permission)) return true;
+  if (permission === 'contact.view' && perms.includes('contact.manage')) return true;
+  return false;
+}
 
 export interface ContactListProps {
   adapter: ContactStorageAdapter;
+  userRole?: WorkspaceRole;
   onSelectContact?: (contact: Contact) => void;
   onDeleteContacts?: (ids: string[]) => void;
   onTagContacts?: (ids: string[], tags: string[]) => void;
@@ -11,6 +22,7 @@ export interface ContactListProps {
 
 export function ContactList({
   adapter,
+  userRole,
   onSelectContact,
   onDeleteContacts,
   onTagContacts,
@@ -23,6 +35,8 @@ export function ContactList({
   const [statusFilter, setStatusFilter] = useState<ContactStatus | ''>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+
+  const canManage = !userRole || hasPermission(userRole, 'contact.manage');
 
   const loadContacts = useCallback(async () => {
     setLoading(true);
@@ -110,8 +124,8 @@ export function ContactList({
         </select>
       </div>
 
-      {/* Bulk actions */}
-      {selectedIds.size > 0 && (
+      {/* Bulk actions — only shown for users with manage permission */}
+      {canManage && selectedIds.size > 0 && (
         <div className="ec-contact-list__bulk-actions">
           <span>{selectedIds.size} selected</span>
           {onDeleteContacts && (
@@ -134,13 +148,15 @@ export function ContactList({
       <table className="ec-contact-list__table">
         <thead>
           <tr>
-            <th>
-              <input
-                type="checkbox"
-                checked={contacts.length > 0 && selectedIds.size === contacts.length}
-                onChange={toggleSelectAll}
-              />
-            </th>
+            {canManage && (
+              <th>
+                <input
+                  type="checkbox"
+                  checked={contacts.length > 0 && selectedIds.size === contacts.length}
+                  onChange={toggleSelectAll}
+                />
+              </th>
+            )}
             <th>Email</th>
             <th>Name</th>
             <th>Status</th>
@@ -150,13 +166,13 @@ export function ContactList({
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={5} className="ec-contact-list__loading">
+              <td colSpan={canManage ? 5 : 4} className="ec-contact-list__loading">
                 Loading...
               </td>
             </tr>
           ) : contacts.length === 0 ? (
             <tr>
-              <td colSpan={5} className="ec-contact-list__empty">
+              <td colSpan={canManage ? 5 : 4} className="ec-contact-list__empty">
                 No contacts found
               </td>
             </tr>
@@ -167,13 +183,15 @@ export function ContactList({
                 className="ec-contact-list__row"
                 onClick={() => onSelectContact?.(contact)}
               >
-                <td onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(contact.id)}
-                    onChange={() => toggleSelect(contact.id)}
-                  />
-                </td>
+                {canManage && (
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(contact.id)}
+                      onChange={() => toggleSelect(contact.id)}
+                    />
+                  </td>
+                )}
                 <td>{contact.email}</td>
                 <td>
                   {[contact.firstName, contact.lastName].filter(Boolean).join(' ') || '-'}
