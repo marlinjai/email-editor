@@ -131,6 +131,40 @@ importers:
         specifier: ^1.0.4
         version: 1.6.1(@types/node@20.19.27)(lightningcss@1.31.1)(terser@5.16.9)
 
+  packages/contacts:
+    dependencies:
+      '@marlinjai/data-brain-sdk':
+        specifier: ^0.2.0
+        version: 0.2.0
+      nanoid:
+        specifier: ^5.0.4
+        version: 5.1.6
+      react:
+        specifier: ^18.2.0 || ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^18.2.0 || ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
+    devDependencies:
+      '@types/react':
+        specifier: ^18.2.45
+        version: 18.3.27
+      '@types/react-dom':
+        specifier: ^18.2.18
+        version: 18.3.7(@types/react@18.3.27)
+      tsup:
+        specifier: ^8.0.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.0.4
+        version: 1.6.1(@types/node@20.19.27)(lightningcss@1.31.1)(terser@5.16.9)
+
   packages/core:
     dependencies:
       immer:
@@ -185,6 +219,108 @@ importers:
       react-dom:
         specifier: ^18.2.0 || ^19.0.0
         version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/react':
+        specifier: ^18.2.45
+        version: 18.3.27
+      '@types/react-dom':
+        specifier: ^18.2.18
+        version: 18.3.7(@types/react@18.3.27)
+      tsup:
+        specifier: ^8.0.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.0.4
+        version: 1.6.1(@types/node@20.19.27)(lightningcss@1.31.1)(terser@5.16.9)
+
+  packages/shared:
+    dependencies:
+      '@marlinjai/data-brain-sdk':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@marlinjai/storage-brain-sdk':
+        specifier: ^0.5.0
+        version: 0.5.0
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.4
+    devDependencies:
+      '@types/react':
+        specifier: ^18.2.45
+        version: 18.3.27
+      tsup:
+        specifier: ^8.0.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.0.4
+        version: 1.6.1(@types/node@20.19.27)(lightningcss@1.31.1)(terser@5.16.9)
+
+  packages/teams:
+    dependencies:
+      '@marlinjai/data-brain-sdk':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@marlinjai/storage-brain-sdk':
+        specifier: ^0.5.0
+        version: 0.5.0
+      nanoid:
+        specifier: ^5.0.4
+        version: 5.1.6
+      react:
+        specifier: ^18.2.0 || ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^18.2.0 || ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
+    devDependencies:
+      '@types/react':
+        specifier: ^18.2.45
+        version: 18.3.27
+      '@types/react-dom':
+        specifier: ^18.2.18
+        version: 18.3.7(@types/react@18.3.27)
+      tsup:
+        specifier: ^8.0.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.0.4
+        version: 1.6.1(@types/node@20.19.27)(lightningcss@1.31.1)(terser@5.16.9)
+
+  packages/templates:
+    dependencies:
+      '@marlinjai/data-brain-sdk':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@marlinjai/email-editor-core':
+        specifier: workspace:*
+        version: link:../core
+      '@marlinjai/storage-brain-sdk':
+        specifier: ^0.5.0
+        version: 0.5.0
+      nanoid:
+        specifier: ^5.0.4
+        version: 5.1.6
+      react:
+        specifier: ^18.2.0 || ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^18.2.0 || ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
     devDependencies:
       '@types/react':
         specifier: ^18.2.45
@@ -1686,6 +1822,15 @@ packages:
     peerDependenciesMeta:
       puppeteer:
         optional: true
+
+  '@marlinjai/data-brain-sdk@0.2.0':
+    resolution: {integrity: sha512-woU98JmLNNMZN+a0QDGZnbhO0Jbcuv5Kxm0u9igfGwock/mBo3Ww9+uK745aCvSVteEkDlQMECKOnI7vR8JWNg==}
+
+  '@marlinjai/data-table-core@0.1.0':
+    resolution: {integrity: sha512-mJoxLdP5N3WqG+TaQno2A+x8fWqDxyEosbwF0ap8944p7Qz4lqfCvgpQaKye56t4jd+rU0Vok04P53hss9+txw==}
+
+  '@marlinjai/storage-brain-sdk@0.5.0':
+    resolution: {integrity: sha512-dLQAadnkOrRcBfwyrugatLqr2cvbbx5pDfyBQTpnAjWme28I2NR5sPnBGpAdml97Aptxp5S+fr3MFKuqtOHQGg==}
 
   '@mdx-js/mdx@3.1.1':
     resolution: {integrity: sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ==}
@@ -7472,6 +7617,14 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  '@marlinjai/data-brain-sdk@0.2.0':
+    dependencies:
+      '@marlinjai/data-table-core': 0.1.0
+
+  '@marlinjai/data-table-core@0.1.0': {}
+
+  '@marlinjai/storage-brain-sdk@0.5.0': {}
 
   '@mdx-js/mdx@3.1.1':
     dependencies:
