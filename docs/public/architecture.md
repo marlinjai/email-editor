@@ -8,35 +8,61 @@ order: 1
 
 ## Overview
 
-The email editor is built as a **layered monorepo** with clear separation of concerns. Each package has a specific responsibility and can be used independently or combined.
+The email editor is built as a **layered monorepo** with 12 packages organized into two layers: the **Editor Layer** (visual builder) and the **Platform Layer** (email marketing SaaS). Each package has a specific responsibility and can be used independently or combined.
 
 ```mermaid
 graph TB
     subgraph "Consumer Layer"
-        APP[Your App]
+        APP[Your App / SaaS Dashboard]
     end
 
     subgraph "Convenience Layer"
         EDITOR["@marlinjai/email-editor<br/>(High-level API)"]
     end
 
-    subgraph "Implementation Layer"
+    subgraph "Editor Layer"
         UI["@marlinjai/email-editor-ui<br/>(React Components)"]
-        BLOCKS["@marlinjai/email-editor-blocks<br/>(Block Definitions)"]
+        BLOCKS["@marlinjai/email-editor-blocks<br/>(14 Block Types + 35 Prebuilts)"]
     end
 
     subgraph "Foundation Layer"
         CORE["@marlinjai/email-editor-core<br/>(Framework-Agnostic Engine)"]
     end
 
+    subgraph "Platform Layer"
+        TEMPLATES["@marlinjai/email-templates<br/>(CRUD, Versioning, Dashboard)"]
+        CONTACTS["@marlinjai/email-contacts<br/>(CSV Import, Segments, Merge Fields)"]
+        CAMPAIGNS["@marlinjai/email-campaigns<br/>(Scheduling, A/B Testing, Tracking)"]
+        ANALYTICS["@marlinjai/email-analytics<br/>(Heatmaps, Engagement Scoring)"]
+        TEAMS["@marlinjai/email-teams<br/>(Workspaces, Roles, Brand Kit)"]
+        AUTOMATION["@marlinjai/email-automation<br/>(Trigger Sequences, Conditions)"]
+        RESEND["@marlinjai/email-send-adapter-resend<br/>(Resend Provider)"]
+    end
+
+    subgraph "Shared Infrastructure"
+        SHARED["@email-editor/shared<br/>(Data Brain Client, Auth, Workspace Context)"]
+    end
+
     APP --> EDITOR
+    APP --> TEMPLATES
+    APP --> CONTACTS
+    APP --> CAMPAIGNS
     EDITOR --> UI
     EDITOR --> BLOCKS
     UI --> CORE
     BLOCKS --> CORE
+    CAMPAIGNS --> RESEND
+    TEMPLATES --> SHARED
+    CONTACTS --> SHARED
+    CAMPAIGNS --> SHARED
+    ANALYTICS --> SHARED
+    TEAMS --> SHARED
+    AUTOMATION --> SHARED
 ```
 
-## Package Responsibilities
+---
+
+## Editor Layer (4 Packages)
 
 ### 1. Core Package (`@marlinjai/email-editor-core`)
 
@@ -62,7 +88,8 @@ graph LR
         end
 
         subgraph "Server Only"
-            MJML[MJML Exporter]
+            MJML[MJMLCompiler]
+            EXPORTER[MJMLExporter]
         end
 
         ROOT --> TEMPLATE
@@ -81,11 +108,12 @@ graph LR
 | `TemplateModel`, `SectionModel`, etc. | MST models | Type-safe state management |
 | `BlockType`, `BlockRegistry` | Block definitions | Register custom blocks |
 | `EmailTemplate`, `Section`, `Block` | TypeScript types | Type your templates |
-| `MJMLExporter` (from `/server`) | MJML compiler | Server-side HTML generation |
+| `MJMLCompiler`, `createMJMLCompiler` (from `/server`) | MJML compiler | Server-side HTML generation |
+| `MJMLExporter`, `createMJMLExporter` (from `/server`) | MST-aware exporter | Store-integrated export |
 
 **Entry Points:**
 - `@marlinjai/email-editor-core` - Client-safe (no MJML)
-- `@marlinjai/email-editor-core/server` - Server-only (includes MJML)
+- `@marlinjai/email-editor-core/server` - Server-only (includes MJML compiler + exporter)
 
 ---
 
@@ -119,7 +147,7 @@ graph TB
             IMAGE[ImageBlock]
             BUTTON[ButtonBlock]
             DIVIDER[DividerBlock]
-            MORE[...]
+            MORE[+ 10 more]
         end
 
         subgraph "Inspector"
@@ -156,6 +184,7 @@ graph TB
 | `StoreProvider`, `useStore` | React context for MST store |
 | `EmailRenderer` | Preview renderer component |
 | `PropertyInspector` | Property editing panel |
+| `DragOverlayContent` | Drag overlay for dnd-kit |
 | Form fields | Reusable input components |
 
 ---
@@ -166,36 +195,31 @@ graph TB
 
 **Key Characteristic:** Defines what blocks are available and their default configurations.
 
-```mermaid
-graph LR
-    subgraph "@marlinjai/email-editor-blocks"
-        subgraph "Block Definitions"
-            TEXT_DEF[Text Block]
-            IMAGE_DEF[Image Block]
-            BUTTON_DEF[Button Block]
-            SOCIAL_DEF[Social Block]
-            MORE_DEF[...]
-        end
+**14 Block Types:**
 
-        subgraph "Prebuilt Templates"
-            HERO_TPL[Hero Section]
-            FEATURE_TPL[Feature Grid]
-            CTA_TPL[Call to Action]
-        end
-
-        subgraph "Factories"
-            BLOCK_REG[createStandardBlockRegistry]
-            PREBUILT_REG[createStandardPrebuiltRegistry]
-        end
-    end
-```
+| Block | Type | Category | Description |
+|-------|------|----------|-------------|
+| Text | `text` | text | Rich text content via TipTap |
+| Image | `image` | media | Images with optional links |
+| Button | `button` | media | Call-to-action buttons |
+| Divider | `divider` | layout | Horizontal lines |
+| Spacer | `spacer` | layout | Vertical spacing |
+| Social | `social` | media | Social media icon links |
+| Hero | `hero` | media | Background image with overlay |
+| Accordion | `accordion` | layout | Collapsible content sections |
+| Raw HTML | `raw` | layout | Custom HTML injection |
+| Navbar | `navbar` | layout | Navigation links |
+| Carousel | `carousel` | media | Image slideshows |
+| Table | `table` | layout | Tabular data |
+| Header | `header` | brand | Branded header (locked) |
+| Footer | `footer` | brand | Branded footer (locked) |
 
 **Exports:**
 
 | Export | Description |
 |--------|-------------|
-| `createStandardBlockRegistry()` | Factory for standard blocks |
-| `createStandardPrebuiltRegistry()` | Factory for prebuilt sections |
+| `createStandardBlockRegistry()` | Factory for all 14 standard blocks |
+| `createStandardPrebuiltRegistry()` | Factory for 35 prebuilt section templates |
 | Block definitions | Individual block configs |
 
 ---
@@ -206,26 +230,6 @@ graph LR
 
 **Key Characteristic:** Combines all packages into simple APIs.
 
-```mermaid
-graph TB
-    subgraph "@marlinjai/email-editor"
-        subgraph "Vanilla JS API"
-            CREATE[createEditor]
-        end
-
-        subgraph "React API"
-            REACT_COMP[EmailEditorReact]
-        end
-
-        subgraph "Re-exports"
-            TYPES[Types]
-        end
-    end
-
-    CREATE --> |uses| CORE_INT[core + ui + blocks]
-    REACT_COMP --> |uses| CORE_INT
-```
-
 **Exports:**
 
 | Export | Entry Point | Description |
@@ -233,6 +237,44 @@ graph TB
 | `createEditor()` | `@marlinjai/email-editor` | Vanilla JS factory |
 | `EmailEditorReact` | `@marlinjai/email-editor/react` | React component |
 | Types | Both | Re-exported for convenience |
+
+---
+
+## Platform Layer (8 Packages)
+
+The platform layer extends the editor into a full email marketing SaaS. All packages use **Data Brain** for storage via adapter classes, and share infrastructure through `@email-editor/shared`.
+
+### 5. Templates (`@marlinjai/email-templates`)
+
+Template CRUD with version history. Includes `TemplateManager`, `WorkspaceScopedTemplateManager`, and React components (`TemplateDashboard`, `TemplateCard`, `TemplateVersionHistory`, `CreateTemplateDialog`).
+
+### 6. Contacts (`@marlinjai/email-contacts`)
+
+Contact management with CSV import, segmentation rules, merge field resolution, and RFC 8058 unsubscribe handling. Includes `WorkspaceScopedContactManager` and utilities for segment evaluation.
+
+### 7. Campaigns (`@marlinjai/email-campaigns`)
+
+Campaign lifecycle: create, schedule, A/B test, send, and track. Includes `CampaignManager`, tracking pixel injection, link rewriting, audience splitting, and winner determination.
+
+### 8. Send Adapter - Resend (`@marlinjai/email-send-adapter-resend`)
+
+Implementation of the `SendAdapter` interface for the Resend email provider. Handles single and batch sending with per-recipient error isolation.
+
+### 9. Analytics (`@marlinjai/email-analytics`)
+
+Campaign tracking with open/click/bounce events. Includes `AnalyticsTracker`, engagement scoring, click heatmap generation, campaign comparison, and CSV export.
+
+### 10. Teams (`@marlinjai/email-teams`)
+
+Multi-user workspaces with role-based permissions (`PERMISSIONS` constant), approval workflows, audit logging, and brand kit management. Includes React components for all management UIs.
+
+### 11. Automation (`@marlinjai/email-automation`)
+
+Trigger-based email sequences with step types: `send_email`, `wait`, `condition` (branching), and `split` (variants). Trigger types: `event`, `schedule`, `manual`. Includes `AutomationEngine` and React `SequenceBuilder`.
+
+### 12. Shared (`@email-editor/shared`)
+
+Cross-package infrastructure: Data Brain and Storage Brain client factories, React context providers (`PlatformProvider`, `WorkspaceProvider`, `AuthProvider`), pagination hook, and database schema bootstrapper.
 
 ---
 
@@ -271,7 +313,7 @@ sequenceDiagram
 The previous architecture compiled MJML on every property change:
 
 ```
-Property change → MJML compile (100-300ms) → iframe.write() → Visual update
+Property change -> MJML compile (100-300ms) -> iframe.write() -> Visual update
 ```
 
 This caused noticeable lag when editing.
@@ -281,9 +323,9 @@ This caused noticeable lag when editing.
 The new architecture separates editing from compilation:
 
 ```
-Property change → MST action → MobX observer re-render (<16ms) → Visual update
+Property change -> MST action -> MobX observer re-render (<16ms) -> Visual update
 
-Export button → MJML compile (once) → HTML output
+Export button -> MJML compile (once) -> HTML output
 ```
 
 ---
@@ -344,23 +386,22 @@ export async function POST(request: Request) {
 }
 ```
 
-### Pattern 4: Vue/Svelte Implementation
+### Pattern 4: Full SaaS Dashboard
 
-The core is framework-agnostic. You could build a Vue UI:
+Combine editor with platform packages:
 
-```ts
-// Hypothetical Vue implementation
-import { createRootStore } from '@marlinjai/email-editor-core';
+```tsx
+import { PlatformProvider } from '@email-editor/shared';
+import { TemplateDashboard } from '@marlinjai/email-templates';
+import { WorkspaceSwitcher } from '@marlinjai/email-teams';
 
-// Create store (same as React)
-const store = createRootStore({ template });
-
-// Use with Vue reactivity
-const template = computed(() => store.template);
-
-// Call MST actions
-function changeColor(blockId: string, color: string) {
-  store.template.findBlockById(blockId)?.updateStyle('color', color);
+function Dashboard() {
+  return (
+    <PlatformProvider dataBrain={config} storageBrain={config}>
+      <WorkspaceSwitcher />
+      <TemplateDashboard />
+    </PlatformProvider>
+  );
 }
 ```
 
@@ -380,37 +421,106 @@ packages/
 │       │   │   └── TemplateModel.ts
 │       │   ├── EditorUIStore.ts   # UI state (selection, panels)
 │       │   ├── RootStore.ts       # Main store
-│       │   └── MJMLExporter.ts    # Server-only compiler
-│       ├── schema/                # TypeScript types
+│       │   └── MJMLExporter.ts    # Server-only exporter
+│       ├── compiler/              # MJMLCompiler (server-only)
+│       ├── schema/                # TypeScript types + Zod validation
 │       ├── registry/              # Block registry
 │       ├── index.ts               # Client entry
 │       └── server.ts              # Server entry (MJML)
 │
 ├── ui/                            # React implementation
 │   └── src/
-│       ├── store/                 # React bindings
-│       │   └── StoreContext.tsx   # Provider + hooks
+│       ├── store/                 # React bindings (StoreContext)
 │       ├── renderer/              # Preview components
-│       │   ├── EmailRenderer.tsx
-│       │   ├── SectionRenderer.tsx
-│       │   ├── ColumnRenderer.tsx
-│       │   ├── BlockRenderer.tsx
-│       │   └── blocks/            # Block renderers
 │       ├── inspector/             # Property panels
 │       ├── sidebar/               # Left sidebar
 │       └── EmailEditor.tsx        # Main component
 │
 ├── blocks/                        # Block definitions
 │   └── src/
-│       ├── definitions/           # Block configs
-│       ├── prebuilt/              # Prebuilt templates
-│       └── index.ts               # Registry factories
+│       ├── text/                  # Text block
+│       ├── image/                 # Image block
+│       ├── button/                # Button block
+│       ├── divider/               # Divider block
+│       ├── spacer/                # Spacer block
+│       ├── social/                # Social block
+│       ├── hero/                  # Hero block
+│       ├── accordion/             # Accordion block
+│       ├── raw/                   # Raw HTML block
+│       ├── navbar/                # Navbar block
+│       ├── carousel/              # Carousel block
+│       ├── table/                 # Table block
+│       ├── branded/               # Header & Footer blocks
+│       ├── prebuilt/              # 35 prebuilt templates
+│       └── registry.ts            # createStandardBlockRegistry()
 │
-└── editor/                        # High-level wrapper
+├── editor/                        # High-level wrapper
+│   └── src/
+│       ├── createEditor.ts        # Vanilla JS API
+│       ├── react.tsx              # React wrapper
+│       └── types.ts               # Public types
+│
+├── templates/                     # Template management
+│   └── src/
+│       ├── manager.ts             # TemplateManager
+│       ├── data-brain-adapter.ts  # Data Brain adapter
+│       ├── workspace-scoped.ts    # Workspace-scoped manager
+│       ├── schema.ts              # Table definitions
+│       └── components/            # React dashboard UI
+│
+├── contacts/                      # Contact management
+│   └── src/
+│       ├── adapter.ts             # Data Brain adapter
+│       ├── csv-importer.ts        # CSV import utilities
+│       ├── merge-fields.ts        # Merge field resolution
+│       ├── segment-evaluator.ts   # Segment rule evaluation
+│       ├── unsubscribe.ts         # Unsubscribe handling
+│       └── workspace-scoped.ts    # Workspace-scoped manager
+│
+├── campaigns/                     # Campaign management
+│   └── src/
+│       ├── manager.ts             # CampaignManager
+│       ├── adapter.ts             # Data Brain adapter
+│       ├── tracking.ts            # Pixel injection, link rewriting
+│       ├── scheduler.ts           # Schedule queries
+│       └── ab-testing.ts          # A/B test utilities
+│
+├── send-adapter-resend/           # Resend provider
+│   └── src/
+│       └── index.ts               # ResendSendAdapter
+│
+├── analytics/                     # Analytics & tracking
+│   └── src/
+│       ├── tracker.ts             # AnalyticsTracker
+│       ├── adapter.ts             # Data Brain adapter
+│       ├── endpoints.ts           # Open/click tracking handlers
+│       ├── engagement.ts          # Engagement scoring
+│       ├── heatmap.ts             # Click heatmap generation
+│       ├── comparison.ts          # Campaign comparison
+│       └── export.ts              # CSV export
+│
+├── teams/                         # Teams & workspaces
+│   └── src/
+│       ├── workspace-manager.ts   # WorkspaceManager
+│       ├── approval.ts            # ApprovalManager
+│       ├── audit-log.ts           # AuditLogger
+│       ├── brand-kit.ts           # BrandKitManager
+│       └── components/            # React management UIs
+│
+├── automation/                    # Automation sequences
+│   └── src/
+│       ├── engine.ts              # AutomationEngine
+│       ├── adapter.ts             # Data Brain adapter
+│       ├── condition-evaluator.ts # Condition evaluation
+│       └── components/            # SequenceBuilder UI
+│
+└── shared/                        # Cross-package infrastructure
     └── src/
-        ├── createEditor.ts        # Vanilla JS API
-        ├── react.tsx              # React wrapper
-        └── types.ts               # Public types
+        ├── clients/               # Data Brain, Storage Brain factories
+        ├── context/               # PlatformProvider, WorkspaceProvider, AuthProvider
+        ├── hooks/                 # usePaginatedQuery
+        ├── schema/                # Database bootstrapper
+        └── types.ts               # Shared types
 ```
 
 ---
@@ -423,6 +533,14 @@ graph BT
     BLOCKS["blocks<br/>(React for TipTap)"]
     UI["ui<br/>(React)"]
     EDITOR["editor<br/>(React)"]
+    SHARED["shared<br/>(React)"]
+    TEMPLATES["templates"]
+    CONTACTS["contacts"]
+    CAMPAIGNS["campaigns"]
+    RESEND["send-adapter-resend"]
+    ANALYTICS["analytics"]
+    TEAMS["teams"]
+    AUTOMATION["automation"]
     EXAMPLE["examples/nextjs"]
 
     BLOCKS --> CORE
@@ -432,16 +550,33 @@ graph BT
     EDITOR --> BLOCKS
     EXAMPLE --> EDITOR
 
+    TEMPLATES --> SHARED
+    CONTACTS --> SHARED
+    CAMPAIGNS --> SHARED
+    ANALYTICS --> SHARED
+    TEAMS --> SHARED
+    AUTOMATION --> SHARED
+    RESEND --> CAMPAIGNS
+
     style CORE fill:#90EE90
     style BLOCKS fill:#FFE4B5
     style UI fill:#FFE4B5
     style EDITOR fill:#ADD8E6
+    style SHARED fill:#E8D5F5
+    style TEMPLATES fill:#E8D5F5
+    style CONTACTS fill:#E8D5F5
+    style CAMPAIGNS fill:#E8D5F5
+    style RESEND fill:#E8D5F5
+    style ANALYTICS fill:#E8D5F5
+    style TEAMS fill:#E8D5F5
+    style AUTOMATION fill:#E8D5F5
 ```
 
 **Legend:**
 - Green = Framework agnostic
-- Orange = React-specific
+- Orange = React-specific (editor)
 - Blue = Convenience wrapper
+- Purple = Platform layer
 
 ---
 
@@ -456,3 +591,9 @@ graph BT
 4. **Blocks as Separate Package**: Block definitions are decoupled from rendering. You can use standard blocks or define custom ones.
 
 5. **Two Entry Points for Core**: Client-safe entry excludes MJML (large dependency). Server entry includes it for compilation.
+
+6. **Data Brain for Storage**: All platform packages use the adapter pattern with Data Brain as the primary storage backend, making them database-agnostic.
+
+7. **Shared Infrastructure**: Cross-cutting concerns (auth, workspace context, client factories) live in `@email-editor/shared` to avoid duplication across platform packages.
+
+8. **Workspace Scoping**: Platform managers support workspace-scoped operations for multi-tenant SaaS deployment.

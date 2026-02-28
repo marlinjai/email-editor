@@ -1,29 +1,78 @@
 ---
 title: Email Editor
-description: Visual email template builder with MST state and MJML export
+description: Visual drag-and-drop email template builder with full platform
 order: 0
 ---
 
 # Email Editor
 
-A visual drag-and-drop email template builder built on MobX State Tree with MJML export.
+A visual drag-and-drop email template builder built on MobX State Tree with MJML export, plus a full-featured email marketing platform.
+
+## Platform Overview
+
+The Email Editor is a **pnpm monorepo** with 12 packages organized into two layers:
+
+### Editor Layer (4 packages)
+
+| Package | Description |
+|---------|-------------|
+| `@marlinjai/email-editor-core` | Framework-agnostic engine: MST state, schema, block registry, MJML compiler |
+| `@marlinjai/email-editor-ui` | React components: 3-panel editor, renderer, inspector, sidebar |
+| `@marlinjai/email-editor-blocks` | 14 block types + 35 prebuilt section templates |
+| `@marlinjai/email-editor` | High-level API: `createEditor()` and `EmailEditorReact` |
+
+### Platform Layer (8 packages)
+
+| Package | Description |
+|---------|-------------|
+| `@marlinjai/email-templates` | Template CRUD, versioning, dashboard UI |
+| `@marlinjai/email-contacts` | Contacts, CSV import, segments, merge fields, unsubscribe |
+| `@marlinjai/email-campaigns` | Campaign wizard, scheduling, A/B testing, send orchestration |
+| `@marlinjai/email-send-adapter-resend` | Resend email provider adapter |
+| `@marlinjai/email-analytics` | Open/click/bounce tracking, heatmaps, engagement scoring |
+| `@marlinjai/email-teams` | Multi-user workspaces, roles, approval workflows, brand kit |
+| `@marlinjai/email-automation` | Trigger-based sequences, conditional logic, webhooks |
+| `@email-editor/shared` | Cross-package infrastructure: Data Brain client, auth, workspace context |
+
+## Block Types
+
+The editor ships with **14 block types** across four categories:
+
+| Category | Blocks |
+|----------|--------|
+| **Text** | Text (rich text via TipTap) |
+| **Media** | Image, Button, Hero, Carousel, Social |
+| **Layout** | Divider, Spacer, Accordion, Navbar, Table, Raw HTML |
+| **Brand** | Branded Header, Branded Footer (locked) |
+
+Plus **35 prebuilt section templates** (hero sections, feature grids, CTAs, footers, etc.).
+
+## SaaS Dashboard
+
+The platform packages combine to form a complete SaaS email marketing dashboard with:
+
+- Template management with version history
+- Contact lists with CSV import and segmentation
+- Campaign creation with A/B testing and scheduling
+- Real-time analytics with click heatmaps and engagement scoring
+- Team workspaces with role-based access and approval workflows
+- Automation sequences with conditional branching
 
 ## Features
 
-- **Core Engine** — Framework-agnostic email template management
-- **React UI** — 3-panel editor interface
-- **Standard Blocks** — Text, Image, Button, Divider, Spacer
-- **MJML Compilation** — Server-side rendering to email-safe HTML
-- **Undo/Redo** — Full history management
-- **Drag & Drop** — Intuitive block placement
-- **Device Preview** — Desktop and mobile views
-- **Theming** — Customizable colors and fonts
-- **Type Safe** — Full TypeScript support
+- **MobX State Tree** -- Fine-grained reactivity for instant editing (<16ms updates)
+- **MJML Compilation** -- Server-side rendering to email-safe HTML
+- **Undo/Redo** -- Full history management via MST snapshots
+- **Drag & Drop** -- Intuitive block placement with dnd-kit
+- **Device Preview** -- Desktop and mobile views
+- **Theming** -- Customizable colors and fonts
+- **Type Safe** -- Full TypeScript support with Zod validation
+- **Data Brain Integration** -- All platform adapters use Data Brain for storage
 
 ## Quick Start
 
 ```bash
-npm install @marlinjai/email-editor
+pnpm install @marlinjai/email-editor
 ```
 
 ```tsx
@@ -38,8 +87,8 @@ function App() {
 
 ## Documentation
 
-- [Architecture](./architecture) — Package layering, data flow, design decisions
-- [Quick Start](./quickstart) — Installation and setup
-- [Installation](./installation) — Detailed installation instructions
-- [Integration](./integration) — React and vanilla JS integration patterns
-- [API Reference](./api) — Full API documentation
+- [Architecture](./architecture) -- Package layering, data flow, design decisions
+- [Quick Start](./quickstart) -- Installation and setup
+- [Installation](./installation) -- Detailed installation and platform packages
+- [Integration](./integration) -- React, vanilla JS, and platform integration patterns
+- [API Reference](./api) -- Full API documentation

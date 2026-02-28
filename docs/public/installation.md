@@ -40,11 +40,21 @@ This will install all dependencies for all packages.
 pnpm run build
 ```
 
-This builds:
-- `packages/core` - Schema, compiler, Zustand store
+This builds the **editor layer** (4 packages):
+- `packages/core` - Schema, MST store, MJML compiler
 - `packages/ui` - React components
-- `packages/blocks` - Block definitions
+- `packages/blocks` - 14 block definitions + 35 prebuilt templates
 - `packages/editor` - Public API
+
+And the **platform layer** (8 packages):
+- `packages/templates` - Template CRUD, versioning, dashboard
+- `packages/contacts` - Contacts, CSV import, segments, merge fields
+- `packages/campaigns` - Campaign wizard, scheduling, A/B testing
+- `packages/send-adapter-resend` - Resend email provider adapter
+- `packages/analytics` - Tracking, heatmaps, engagement scoring
+- `packages/teams` - Workspaces, roles, approvals, brand kit
+- `packages/automation` - Trigger sequences, conditional logic
+- `packages/shared` - Cross-package infrastructure
 
 ### 3. Run Example App
 
@@ -83,9 +93,38 @@ function App() {
   value={template}
   onChange={setTemplate}
   apiKey={process.env.EMAIL_EDITOR_API_KEY}
-  compileEndpoint="https://api.returnhypnosis.com/compile"
+  compileEndpoint="/api/compile"
 />
 ```
+
+## Installing Platform Packages
+
+The platform packages are installed individually as needed:
+
+```bash
+# Template management
+pnpm install @marlinjai/email-templates
+
+# Contact management
+pnpm install @marlinjai/email-contacts
+
+# Campaign management
+pnpm install @marlinjai/email-campaigns
+
+# Send adapter (Resend provider)
+pnpm install @marlinjai/email-send-adapter-resend
+
+# Analytics & tracking
+pnpm install @marlinjai/email-analytics
+
+# Teams & workspaces
+pnpm install @marlinjai/email-teams
+
+# Automation sequences
+pnpm install @marlinjai/email-automation
+```
+
+All platform packages use **Data Brain** as their storage backend via adapter classes. See the [Integration](./integration) guide for setup examples.
 
 ## Alternative: Use npm with Local Packages
 
@@ -93,25 +132,25 @@ If you prefer npm without workspaces:
 
 1. Build each package individually:
    ```bash
-   cd packages/core && npm install && npm run build
-   cd ../ui && npm install && npm run build
-   cd ../blocks && npm install && npm run build
-   cd ../editor && npm install && npm run build
+   cd packages/core && pnpm install && pnpm run build
+   cd ../ui && pnpm install && pnpm run build
+   cd ../blocks && pnpm install && pnpm run build
+   cd ../editor && pnpm install && pnpm run build
    ```
 
 2. Link packages locally:
    ```bash
-   cd packages/core && npm link
-   cd ../ui && npm link @marlinjai/email-editor-core && npm link
-   cd ../blocks && npm link @marlinjai/email-editor-core && npm link
-   cd ../editor && npm link @marlinjai/email-editor-core @marlinjai/email-editor-ui @marlinjai/email-editor-blocks && npm link
+   cd packages/core && pnpm link --global
+   cd ../ui && pnpm link --global @marlinjai/email-editor-core && pnpm link --global
+   cd ../blocks && pnpm link --global @marlinjai/email-editor-core && pnpm link --global
+   cd ../editor && pnpm link --global @marlinjai/email-editor-core @marlinjai/email-editor-ui @marlinjai/email-editor-blocks && pnpm link --global
    ```
 
 3. Run example:
    ```bash
    cd examples/nextjs
-   npm link @marlinjai/email-editor
-   npm run dev
+   pnpm link --global @marlinjai/email-editor
+   pnpm run dev
    ```
 
 ## Troubleshooting
@@ -138,15 +177,15 @@ Change the port in `examples/nextjs`:
 PORT=3001 pnpm run dev
 ```
 
-### Zustand store not initializing
+### MST store not initializing
 
 Ensure you're importing from the correct package:
 ```tsx
-// Correct
-import { useEditorStore } from '@marlinjai/email-editor-core';
+// Correct - import store from core
+import { createRootStore } from '@marlinjai/email-editor-core';
 
-// Wrong
-import { useEditorStore } from '@marlinjai/email-editor-ui';
+// Correct - use the high-level React wrapper
+import { EmailEditorReact } from '@marlinjai/email-editor/react';
 ```
 
 ## Development Workflow

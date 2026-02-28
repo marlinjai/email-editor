@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@marlinjai/clearify':
-        specifier: ^1.7.3
-        version: 1.7.3(@types/node@20.19.35)(@types/react@19.2.14)(react-dom@19.2.4)(react@19.2.4)(rollup@4.59.0)
+        specifier: ^1.8.0
+        version: 1.8.0(@types/node@20.19.35)(@types/react@19.2.14)(react-dom@19.2.4)(react@19.2.4)(rollup@4.59.0)
       '@types/node':
         specifier: ^20.10.0
         version: 20.19.35
@@ -3048,8 +3048,8 @@ packages:
       '@jridgewell/sourcemap-codec': 1.5.5
     dev: true
 
-  /@marlinjai/clearify@1.7.3(@types/node@20.19.35)(@types/react@19.2.14)(react-dom@19.2.4)(react@19.2.4)(rollup@4.59.0):
-    resolution: {integrity: sha512-CabrfRSVF2px6wlCZpM+nYR5BWzlJrYDXqxrSY1qpNjKJdtKrMAXQwIgveeAq1kcobToksF8Ra3+og7TIFw6hw==}
+  /@marlinjai/clearify@1.8.0(@types/node@20.19.35)(@types/react@19.2.14)(react-dom@19.2.4)(react@19.2.4)(rollup@4.59.0):
+    resolution: {integrity: sha512-uGDlr0HNyTcI+zmY6t414qeTKQzNbjQCjeWaYDt4oUFMVv+kp3ioocp2D9Td6jFl17gX4f9Y8RlRjOkYxkgOAw==}
     hasBin: true
     peerDependencies:
       puppeteer: '>=22.0.0'

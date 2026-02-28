@@ -1,6 +1,6 @@
 ---
 title: Integration
-description: React and vanilla JS integration patterns
+description: React, vanilla JS, and platform integration patterns
 order: 4
 ---
 
@@ -9,7 +9,7 @@ order: 4
 ## Installation
 
 ```bash
-npm install @marlinjai/email-editor
+pnpm install @marlinjai/email-editor
 ```
 
 ## Quick Start
@@ -78,17 +78,16 @@ interface EmailTemplate {
 }
 ```
 
-### Adding Blocks
+### Available Blocks
 
-Drag blocks from the left toolbar onto the canvas. Available blocks:
+Drag blocks from the left toolbar onto the canvas. The editor ships with **14 block types**:
 
-- **Text** - Rich text with formatting
-- **Image** - Images with optional links
-- **Button** - Call-to-action buttons
-- **Divider** - Horizontal lines
-- **Spacer** - Vertical spacing
-- **ReTurn Header** - Branded header (locked)
-- **ReTurn Footer** - Branded footer (locked)
+| Category | Blocks |
+|----------|--------|
+| **Text** | Text (rich text via TipTap) |
+| **Media** | Image, Button, Hero, Carousel, Social |
+| **Layout** | Divider, Spacer, Accordion, Navbar, Table, Raw HTML |
+| **Brand** | Branded Header, Branded Footer (locked) |
 
 ### Editing Properties
 
@@ -130,7 +129,7 @@ For production use, compile MJML on the server:
 
 ```typescript
 // API route (Next.js example)
-import { createMJMLCompiler } from '@marlinjai/email-editor-core';
+import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
 
 export async function POST(request) {
   const template = await request.json();
@@ -161,6 +160,145 @@ const editor = createEditor({
   container: document.getElementById('editor'),
   blocks: [customBlock],
 });
+```
+
+## Platform Integration
+
+The platform packages extend the editor into a full email marketing solution. All platform adapters use **Data Brain** for storage.
+
+### Template Management
+
+```typescript
+import { TemplateManager, DataBrainTemplateAdapter } from '@marlinjai/email-templates';
+
+const adapter = new DataBrainTemplateAdapter({
+  client: dataBrainClient,
+  workspaceId: 'ws_123',
+});
+
+const manager = new TemplateManager({ adapter });
+
+// Create a template
+const template = await manager.create({
+  name: 'Welcome Email',
+  content: editorTemplate,
+});
+
+// List templates with versioning
+const templates = await manager.list({ status: 'published' });
+```
+
+### Contact Management
+
+```typescript
+import { WorkspaceScopedContactManager, importCSV } from '@marlinjai/email-contacts';
+
+const contactManager = new WorkspaceScopedContactManager({
+  adapter: contactAdapter,
+  workspaceId: 'ws_123',
+});
+
+// Import contacts from CSV
+const result = await importCSV(csvString, {
+  mapping: { email: 'Email', firstName: 'First Name' },
+  adapter: contactAdapter,
+});
+
+// Evaluate segments
+import { evaluateSegmentGroup } from '@marlinjai/email-contacts';
+const matches = evaluateSegmentGroup(contacts, segmentRules);
+```
+
+### Campaign Sending
+
+```typescript
+import { CampaignManager } from '@marlinjai/email-campaigns';
+import { ResendSendAdapter } from '@marlinjai/email-send-adapter-resend';
+
+const sendAdapter = new ResendSendAdapter({
+  apiKey: process.env.RESEND_API_KEY,
+});
+
+const campaignManager = new CampaignManager({
+  adapter: campaignAdapter,
+  sendAdapter,
+});
+
+// Schedule a campaign
+await campaignManager.schedule({
+  campaignId: 'camp_123',
+  scheduledAt: new Date('2026-03-15T10:00:00Z'),
+});
+```
+
+### Analytics & Tracking
+
+```typescript
+import { AnalyticsTracker, handleOpenTrack, handleClickTrack } from '@marlinjai/email-analytics';
+import { injectTrackingPixel, rewriteLinksForTracking } from '@marlinjai/email-campaigns';
+
+// Inject tracking into compiled HTML
+const trackedHtml = injectTrackingPixel(html, { campaignId, contactId });
+const linkedHtml = rewriteLinksForTracking(trackedHtml, { campaignId, contactId });
+
+// Handle tracking endpoints
+app.get('/track/open', (req) => handleOpenTrack(req));
+app.get('/track/click', (req) => handleClickTrack(req));
+
+// Generate heatmaps
+import { generateHeatmapData } from '@marlinjai/email-analytics';
+const heatmap = generateHeatmapData(clickEvents);
+```
+
+### Teams & Workspaces
+
+```typescript
+import { WorkspaceManager, ApprovalManager, BrandKitManager } from '@marlinjai/email-teams';
+
+const workspaceManager = new WorkspaceManager({ adapter: teamsAdapter });
+
+// Brand kit for consistent styling
+const brandKit = await brandKitManager.get('ws_123');
+// => { colors: [...], fonts: [...], logos: [...] }
+
+// Approval workflows
+const approval = await approvalManager.submit({
+  resourceType: 'campaign',
+  resourceId: 'camp_123',
+  requestedBy: 'user_456',
+});
+```
+
+### Automation Sequences
+
+```typescript
+import { AutomationEngine, DataBrainAutomationAdapter } from '@marlinjai/email-automation';
+
+const engine = new AutomationEngine({
+  adapter: automationAdapter,
+  sendAdapter,
+});
+
+// Steps include: send_email, wait, condition, split
+// Triggers include: event, schedule, manual
+```
+
+### Shared Infrastructure
+
+```typescript
+import { PlatformProvider, useDataBrain, useStorageBrain } from '@email-editor/shared';
+
+// Wrap your app with platform context
+function App() {
+  return (
+    <PlatformProvider
+      dataBrain={{ baseUrl: '...', apiKey: '...' }}
+      storageBrain={{ baseUrl: '...', apiKey: '...' }}
+    >
+      <Dashboard />
+    </PlatformProvider>
+  );
+}
 ```
 
 ## Next Steps

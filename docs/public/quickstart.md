@@ -11,37 +11,48 @@ icon: rocket
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Build all packages
-npm run build
+pnpm run build
 
 # Start example app
 cd examples/nextjs
-npm run dev
+pnpm run dev
 ```
 
 Open http://localhost:3000 to see the editor in action.
 
 ## What You Get
 
-- **Core Engine** - Framework-agnostic email template management
-- **React UI** - Beautiful 3-panel editor interface
-- **Standard Blocks** - Text, Image, Button, Divider, Spacer
-- **Branded Blocks** - ReTurn Header & Footer (locked)
+### Editor Layer
+
+- **Core Engine** - Framework-agnostic email template management with MobX State Tree
+- **React UI** - 3-panel editor interface (sidebar, canvas, inspector)
+- **14 Block Types** - Text, Image, Button, Divider, Spacer, Social, Hero, Accordion, Raw HTML, Navbar, Carousel, Table, Branded Header, Branded Footer
+- **35 Prebuilt Templates** - Hero sections, feature grids, CTAs, footers, and more
 - **MJML Compilation** - Server-side rendering to email-safe HTML
-- **Undo/Redo** - Full history management with Immer
+- **Undo/Redo** - Full history management via MST snapshots
 - **Drag & Drop** - Intuitive block placement with dnd-kit
 - **Device Preview** - Desktop and mobile views
 - **Theming** - Customizable colors and fonts
-- **Type Safe** - Full TypeScript support
+- **Type Safe** - Full TypeScript support with Zod validation
+
+### Platform Layer
+
+- **Templates** - CRUD, versioning, dashboard UI
+- **Contacts** - CSV import, segmentation, merge fields, unsubscribe handling
+- **Campaigns** - Wizard, scheduling, A/B testing, send orchestration
+- **Analytics** - Open/click/bounce tracking, heatmaps, engagement scoring
+- **Teams** - Workspaces, roles, approval workflows, brand kit
+- **Automation** - Trigger-based sequences, conditional logic, webhooks
 
 ## Next Steps
 
 1. **Try the Example**
    ```bash
    cd examples/nextjs
-   npm run dev
+   pnpm run dev
    ```
 
 2. **Read the Docs**
@@ -50,7 +61,7 @@ Open http://localhost:3000 to see the editor in action.
 
 3. **Integrate into Your App**
    ```bash
-   npm install @marlinjai/email-editor
+   pnpm install @marlinjai/email-editor
    ```
 
    ```tsx
@@ -68,23 +79,32 @@ Open http://localhost:3000 to see the editor in action.
 ```
 email-editor/
 ├── packages/
-│   ├── core/          # JSON schema, MJML compiler, state management
-│   ├── ui/            # React components (Canvas, Toolbar, Inspector)
-│   ├── blocks/        # Standard block library
-│   └── editor/        # Public API (createEditor, EmailEditorReact)
+│   ├── core/                    # JSON schema, MJML compiler, MST state
+│   ├── ui/                      # React components (Canvas, Toolbar, Inspector)
+│   ├── blocks/                  # 14 block types + 35 prebuilt templates
+│   ├── editor/                  # Public API (createEditor, EmailEditorReact)
+│   ├── templates/               # Template CRUD, versioning, dashboard
+│   ├── contacts/                # Contacts, CSV import, segments
+│   ├── campaigns/               # Campaign wizard, scheduling, A/B testing
+│   ├── send-adapter-resend/     # Resend email provider adapter
+│   ├── analytics/               # Tracking, heatmaps, engagement scoring
+│   ├── teams/                   # Workspaces, roles, approvals, brand kit
+│   ├── automation/              # Trigger sequences, conditional logic
+│   └── shared/                  # Cross-package infrastructure
 ├── examples/
-│   └── nextjs/        # Working Next.js integration
-└── docs/              # Documentation
+│   └── nextjs/                  # Working Next.js integration
+└── docs/                        # Documentation
 ```
 
 ## Key Features
 
 ### 1. Clean Architecture
 
-- **Core** is framework-agnostic
-- **UI** is pure React components
+- **Core** is framework-agnostic (no React dependency)
+- **UI** is pure React components with MobX observer bindings
 - **Blocks** are pluggable and extensible
 - **Editor** is the public-facing API
+- **Platform** packages handle everything beyond editing
 
 ### 2. Type-Safe Schema
 
@@ -94,9 +114,9 @@ All templates are validated with Zod schemas. Invalid data is caught early.
 
 Templates compile to MJML, then to email-safe HTML that works across all clients.
 
-### 4. Immutable State
+### 4. MobX State Tree
 
-All state updates use Immer for clean, bug-free undo/redo.
+All state uses MST for fine-grained reactivity, type-safe actions, and snapshot-based undo/redo.
 
 ### 5. Customizable
 
@@ -147,10 +167,10 @@ const theme = {
 ## Troubleshooting
 
 **Build errors?**
-Run `npm install` from the monorepo root.
+Run `pnpm install` from the monorepo root.
 
 **Import errors?**
-Run `npm run build` to compile all packages.
+Run `pnpm run build` to compile all packages.
 
 **Styles not loading?**
 Import `@marlinjai/email-editor/styles.css` in your app.
