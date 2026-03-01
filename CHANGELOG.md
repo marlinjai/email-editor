@@ -87,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard routes: Overview, Templates, Contacts, Campaigns, Analytics, Automations, Settings
 - Mock data adapters for each route demonstrating component integration
 - Link to visual email editor from dashboard sidebar
+- Unified "Refined Midnight" visual identity across all surfaces
 
 #### Shared Infrastructure (`@email-editor/shared`)
 - Data Brain and Storage Brain client factories
@@ -100,6 +101,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clearify dependency switched from local link to `@marlinjai/clearify@^1.6.6`
 - Documentation reorganized into `docs/public/` and `docs/internal/` sections
 - Mermaid diagrams enabled via client-side strategy
+- Sidebar files migrated from hardcoded gray/blue to token-based color classes
+- Example app upgraded to Next.js 16.1.6 and React 19
+- pnpm updated to 9.15.0, removed redundant npm workspaces config
+
+### Fixed
+- Dashboard build errors resolved with correct type shapes
 
 ## [0.0.1] - 2026-02-10
 
@@ -109,6 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UI package: 3-panel editor (sidebar, canvas, inspector), drag-and-drop via dnd-kit
 - Blocks package: 14 block types (8 with visual renderers), 35 prebuilt section templates
 - Editor package: high-level API (`createEditor()`) and React wrapper (`EmailEditorReact`)
+- API monetization and template registry support
 - Next.js example app with server-side MJML compilation
 - Rich text editing via TipTap
 - Undo/redo with Immer patches

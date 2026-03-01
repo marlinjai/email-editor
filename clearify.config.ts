@@ -4,6 +4,8 @@ export default defineConfig({
   name: 'Email Editor',
   siteUrl: 'https://docs.email-editor.lumitra.co',
   hubProject: {
+    hubUrl: 'https://docs.lumitra.co',
+    hubName: 'ERP Suite',
     description: 'Visual drag-and-drop email template builder with full platform',
     status: 'active',
     icon: '✉️',
