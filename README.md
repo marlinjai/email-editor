@@ -35,7 +35,7 @@ Replace GrapesJS and Unlayer with a fully controllable, customizable email edito
 
 ```bash
 # Install
-npm install @marlinjai/email-editor
+pnpm add @marlinjai/email-editor
 ```
 
 ```tsx

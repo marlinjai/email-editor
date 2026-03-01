@@ -8,6 +8,7 @@ export default defineConfig({
     status: 'active',
     icon: '✉️',
     tags: ['app', 'editor', 'email'],
+    group: 'Libraries',
   },
   sections: [
     { label: 'Documentation', docsDir: './docs/public' },
