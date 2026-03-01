@@ -2,7 +2,7 @@
 title: Roadmap
 description: Development roadmap for the email editor platform
 order: 2
-icon: milestone
+icon: "🏁"
 ---
 
 # Roadmap

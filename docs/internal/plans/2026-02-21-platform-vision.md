@@ -2,7 +2,7 @@
 title: Email Editor Platform Vision
 description: High-level product direction for evolving the email editor into a full platform
 order: 1
-icon: map
+icon: "🗺️"
 ---
 
 # Email Editor Platform Vision

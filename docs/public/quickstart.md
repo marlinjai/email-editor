@@ -2,7 +2,7 @@
 title: Quick Start
 description: Get up and running with the email editor
 order: 2
-icon: rocket
+icon: "🚀"
 ---
 
 # Quick Start Guide

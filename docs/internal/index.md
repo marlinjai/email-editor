@@ -2,7 +2,7 @@
 title: Internal Development
 description: Development workflow, testing, and contributing guide
 order: 0
-icon: lock
+icon: "🔒"
 ---
 
 # Development Guide
