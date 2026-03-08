@@ -1,8 +1,13 @@
 ---
-title: Roadmap
+title: Email Editor Roadmap
 description: Development roadmap for the email editor platform
 order: 2
 icon: "🏁"
+summary: Development roadmap for the email editor platform, tracking Phase 0 foundation through future platform phases including API, templates, and SaaS features.
+category: roadmap
+tags: [email-editor, roadmap, phases, platform]
+projects: [email-editor]
+status: active
 ---
 
 # Roadmap
