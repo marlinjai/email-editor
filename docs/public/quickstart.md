@@ -3,6 +3,11 @@ title: Quick Start
 description: Get up and running with the email editor
 order: 2
 icon: "🚀"
+summary: Quick start guide for getting up and running with the email editor, covering installation, setup, and creating your first email template.
+category: documentation
+tags: [email-editor, quickstart, getting-started]
+projects: [email-editor]
+status: active
 ---
 
 # Quick Start Guide

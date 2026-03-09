@@ -1,3 +1,12 @@
+---
+title: Email Editor
+summary: README for the Email Editor, a standalone pluggable email editor built with MJML, React, and MobX State Tree. Includes a full SaaS platform with template management, contacts, campaigns, analytics, teams, and automation packages.
+category: documentation
+tags: [email-editor, mjml, react, saas, drag-and-drop]
+status: active
+date: 2026-02-10
+---
+
 # @marlinjai/email-editor
 
 **A standalone, pluggable email editor built with MJML, React, and TypeScript.**

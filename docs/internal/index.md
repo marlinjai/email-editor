@@ -3,6 +3,11 @@ title: Internal Development
 description: Development workflow, testing, and contributing guide
 order: 0
 icon: "🔒"
+summary: Internal development guide for the email editor covering setup, development workflow, testing, and contributing guidelines.
+category: internal
+tags: [email-editor, development, contributing, internal]
+projects: [email-editor]
+status: active
 ---
 
 # Development Guide

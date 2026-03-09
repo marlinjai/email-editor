@@ -1,3 +1,12 @@
+---
+title: Email Editor Changelog
+summary: Version history for the Email Editor platform, tracking the evolution from initial MJML editor (v0.0.1) through six platform phases adding template management, contacts, campaigns, analytics, teams, and automation.
+category: changelog
+tags: [email-editor, changelog, releases, mjml, saas]
+status: active
+date: 2026-02-10
+---
+
 # Changelog
 
 All notable changes to this project will be documented in this file.

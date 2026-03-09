@@ -2,6 +2,11 @@
 title: API Reference
 description: Complete API documentation for the email editor
 order: 5
+summary: Complete API documentation for the email editor, covering the Editor layer, MobX State Tree models, block types, and MJML export functions.
+category: documentation
+tags: [email-editor, api-reference, mobx, mjml]
+projects: [email-editor]
+status: active
 ---
 
 # API Reference

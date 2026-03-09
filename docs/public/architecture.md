@@ -2,6 +2,11 @@
 title: Architecture
 description: Package layering, data flow, and design decisions for the email editor
 order: 1
+summary: Architecture documentation covering package layering (core, ui, blocks, editor), MobX State Tree data flow, and design decisions for the email editor.
+category: documentation
+tags: [email-editor, architecture, mobx-state-tree, monorepo]
+projects: [email-editor]
+status: active
 ---
 
 # Email Editor Architecture

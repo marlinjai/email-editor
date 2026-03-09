@@ -2,6 +2,11 @@
 title: Integration
 description: React, vanilla JS, and platform integration patterns
 order: 4
+summary: Integration patterns for using @marlinjai/email-editor in React applications, vanilla JS, and platform contexts with code examples.
+category: documentation
+tags: [email-editor, integration, react, patterns]
+projects: [email-editor]
+status: active
 ---
 
 # Getting Started with @marlinjai/email-editor

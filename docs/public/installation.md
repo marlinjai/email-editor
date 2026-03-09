@@ -2,6 +2,11 @@
 title: Installation
 description: Detailed installation instructions for the email editor monorepo
 order: 3
+summary: Detailed installation instructions for the email editor pnpm monorepo, covering prerequisites, package setup, and build configuration.
+category: documentation
+tags: [email-editor, installation, pnpm, setup]
+projects: [email-editor]
+status: active
 ---
 
 # Installation Instructions
