@@ -1,10 +1,10 @@
 ---
 title: Phase 0 Completion — Implementation Plan
 summary: Implementation plan to complete the email-editor foundation by renaming packages to @marlinjai/ scope, implementing 6 missing block renderers, and adding Vitest test coverage across the monorepo.
-category: plan
+type: plan
 tags: [email-editor, implementation, block-renderers, testing, monorepo]
 projects: [email-editor]
-status: active
+status: draft
 date: 2026-02-21
 ---
 

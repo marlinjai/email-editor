@@ -1,9 +1,8 @@
 ---
 title: Email Editor Next.js Example
 summary: Example Next.js application demonstrating integration of the @marlinjai/email-editor React component with server-side MJML compilation via API route and custom theme configuration.
-category: documentation
+type: readme
 tags: [email-editor, nextjs, example, integration]
-status: active
 date: 2026-02-10
 ---
 

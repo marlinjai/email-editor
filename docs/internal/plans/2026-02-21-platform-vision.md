@@ -4,10 +4,10 @@ description: High-level product direction for evolving the email editor into a f
 order: 1
 icon: "🗺️"
 summary: High-level product direction for evolving the email editor from a standalone component into a full platform with API, templates marketplace, and SaaS capabilities.
-category: plan
+type: plan
 tags: [email-editor, vision, platform, product-direction]
 projects: [email-editor]
-status: active
+status: draft
 date: 2026-02-21
 ---
 

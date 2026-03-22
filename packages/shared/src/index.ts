@@ -8,7 +8,6 @@ export {
   PlatformProvider,
   usePlatform,
   useDatabaseAdapter,
-  useDataBrain,
   useStorageBrain,
   type PlatformProviderProps,
 } from './context/platform';

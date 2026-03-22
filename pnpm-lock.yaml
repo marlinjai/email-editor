@@ -429,9 +429,9 @@ importers:
 
   packages/teams:
     dependencies:
-      '@marlinjai/data-brain-sdk':
-        specifier: ^0.2.0
-        version: 0.2.0
+      '@marlinjai/data-table-core':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@marlinjai/storage-brain-sdk':
         specifier: ^0.5.0
         version: 0.5.0
@@ -1900,12 +1900,6 @@ packages:
     peerDependenciesMeta:
       puppeteer:
         optional: true
-
-  '@marlinjai/data-brain-sdk@0.2.0':
-    resolution: {integrity: sha512-woU98JmLNNMZN+a0QDGZnbhO0Jbcuv5Kxm0u9igfGwock/mBo3Ww9+uK745aCvSVteEkDlQMECKOnI7vR8JWNg==}
-
-  '@marlinjai/data-table-core@0.1.1':
-    resolution: {integrity: sha512-P2msh6+XTHAIcTG1bwAG776a7FQwHklNsc1v/QsoAxLHHuZ9gx7w6/SJHqLzodpzLD9YWbT+dpi1Xqc78J0yUQ==}
 
   '@marlinjai/data-table-core@0.3.0':
     resolution: {integrity: sha512-BMa7qGoDf0AukqorHPVEOc1i2KAa63PcNuklSA+LP9jXabLbY/dIlHLuuNIChhRgq7sA6RIrbYyQktHj9O3ZGQ==}
@@ -7880,12 +7874,6 @@ snapshots:
       - terser
       - tsx
       - yaml
-
-  '@marlinjai/data-brain-sdk@0.2.0':
-    dependencies:
-      '@marlinjai/data-table-core': 0.1.1
-
-  '@marlinjai/data-table-core@0.1.1': {}
 
   '@marlinjai/data-table-core@0.3.0': {}
 

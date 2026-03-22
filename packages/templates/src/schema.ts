@@ -40,10 +40,10 @@ export const TEMPLATE_TABLES: Record<string, TableSchemaDef> = {
 };
 
 /**
- * Bootstrap the required tables in Data Brain.
+ * Bootstrap the required tables via a DatabaseAdapter.
  * Idempotent — checks if tables already exist before creating.
  */
-export async function bootstrapTemplateTables(dataBrain: {
+export async function bootstrapTemplateTables(adapter: {
   listTables(workspaceId: string): Promise<Array<{ id: string; name: string }>>;
   createTable(input: { name: string; description?: string }): Promise<{ id: string }>;
   createColumn(input: {
@@ -53,20 +53,20 @@ export async function bootstrapTemplateTables(dataBrain: {
     required?: boolean;
   }): Promise<unknown>;
 }): Promise<{ templatesTableId: string; versionsTableId: string }> {
-  const existing = await dataBrain.listTables('default');
+  const existing = await adapter.listTables('default');
   const existingByName = new Map(existing.map((t) => [t.name, t.id]));
 
   let templatesTableId = existingByName.get(TEMPLATE_TABLES.templates.name);
   let versionsTableId = existingByName.get(TEMPLATE_TABLES.template_versions.name);
 
   if (!templatesTableId) {
-    const table = await dataBrain.createTable({
+    const table = await adapter.createTable({
       name: TEMPLATE_TABLES.templates.name,
       description: 'Email templates',
     });
     templatesTableId = table.id;
     for (const col of TEMPLATE_TABLES.templates.columns) {
-      await dataBrain.createColumn({
+      await adapter.createColumn({
         tableId: templatesTableId,
         name: col.name,
         type: col.type,
@@ -76,13 +76,13 @@ export async function bootstrapTemplateTables(dataBrain: {
   }
 
   if (!versionsTableId) {
-    const table = await dataBrain.createTable({
+    const table = await adapter.createTable({
       name: TEMPLATE_TABLES.template_versions.name,
       description: 'Email template version history',
     });
     versionsTableId = table.id;
     for (const col of TEMPLATE_TABLES.template_versions.columns) {
-      await dataBrain.createColumn({
+      await adapter.createColumn({
         tableId: versionsTableId,
         name: col.name,
         type: col.type,

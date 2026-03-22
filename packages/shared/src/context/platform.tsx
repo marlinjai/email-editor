@@ -66,11 +66,6 @@ export function useDatabaseAdapter(): DatabaseAdapter {
   return usePlatform().databaseAdapter;
 }
 
-/** @deprecated Use useDatabaseAdapter() instead */
-export function useDataBrain(): DatabaseAdapter {
-  return useDatabaseAdapter();
-}
-
 export function useStorageBrain(): StorageBrain {
   return usePlatform().storageBrain;
 }

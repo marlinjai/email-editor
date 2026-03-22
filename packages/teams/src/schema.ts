@@ -72,7 +72,7 @@ export const TEAMS_TABLES: Record<string, TableSchemaDef> = {
   },
 };
 
-export async function bootstrapTeamsTables(dataBrain: {
+export async function bootstrapTeamsTables(adapter: {
   listTables(workspaceId: string): Promise<Array<{ id: string; name: string }>>;
   createTable(input: { name: string; description?: string }): Promise<{ id: string }>;
   createColumn(input: {
@@ -87,7 +87,7 @@ export async function bootstrapTeamsTables(dataBrain: {
   auditLogTableId: string;
   brandKitsTableId: string;
 }> {
-  const existing = await dataBrain.listTables('default');
+  const existing = await adapter.listTables('default');
   const existingByName = new Map(existing.map((t) => [t.name, t.id]));
 
   const results: Record<string, string> = {};
@@ -95,13 +95,13 @@ export async function bootstrapTeamsTables(dataBrain: {
   for (const [key, schema] of Object.entries(TEAMS_TABLES)) {
     let tableId = existingByName.get(schema.name);
     if (!tableId) {
-      const table = await dataBrain.createTable({
+      const table = await adapter.createTable({
         name: schema.name,
         description: `Email teams: ${schema.name}`,
       });
       tableId = table.id;
       for (const col of schema.columns) {
-        await dataBrain.createColumn({
+        await adapter.createColumn({
           tableId,
           name: col.name,
           type: col.type,

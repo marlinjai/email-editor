@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DataBrainTemplateAdapter } from '../data-brain-adapter';
+import { DatabaseTemplateAdapter } from '../database-adapter';
 
 function createMockClient() {
   return {
@@ -22,14 +22,14 @@ function makeRow(id: string, cells: Record<string, unknown>) {
   };
 }
 
-describe('DataBrainTemplateAdapter', () => {
+describe('DatabaseTemplateAdapter', () => {
   let client: ReturnType<typeof createMockClient>;
-  let adapter: DataBrainTemplateAdapter;
+  let adapter: DatabaseTemplateAdapter;
 
   beforeEach(() => {
     client = createMockClient();
-    adapter = new DataBrainTemplateAdapter({
-      client: client as any,
+    adapter = new DatabaseTemplateAdapter({
+      adapter: client as any,
       templatesTableId: 'tbl-templates',
       versionsTableId: 'tbl-versions',
     });
