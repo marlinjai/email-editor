@@ -21,9 +21,9 @@ export type {
 export { CampaignManager } from './manager';
 export type { CampaignManagerConfig } from './manager';
 
-// Data Brain adapter
-export { DataBrainCampaignAdapter } from './adapter';
-export type { DataBrainCampaignAdapterConfig } from './adapter';
+// Database adapter
+export { DatabaseCampaignAdapter } from './adapter';
+export type { DatabaseCampaignAdapterConfig } from './adapter';
 
 // Tracking
 export { injectTrackingPixel, rewriteLinksForTracking } from './tracking';

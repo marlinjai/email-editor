@@ -1,5 +1,4 @@
 // Client factories
-export { createDataBrainClient, type DataBrainConfig } from './clients/data-brain';
 export { createStorageBrainClient, type StorageBrainConfig } from './clients/storage-brain';
 
 // Context providers
@@ -8,6 +7,7 @@ export { AuthProvider, useAuth, type AuthProviderProps } from './context/auth';
 export {
   PlatformProvider,
   usePlatform,
+  useDatabaseAdapter,
   useDataBrain,
   useStorageBrain,
   type PlatformProviderProps,

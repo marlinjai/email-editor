@@ -1,4 +1,4 @@
-import type { DataBrain, Row, CellValue } from '@marlinjai/data-brain-sdk';
+import type { DatabaseAdapter, Row, CellValue } from '@marlinjai/data-table-core';
 import type {
   Campaign,
   CampaignListOptions,
@@ -9,8 +9,8 @@ import type {
   CampaignStatus,
 } from './types';
 
-export interface DataBrainCampaignAdapterConfig {
-  client: DataBrain;
+export interface DatabaseCampaignAdapterConfig {
+  adapter: DatabaseAdapter;
   campaignsTableId: string;
   recipientsTableId: string;
 }
@@ -59,19 +59,19 @@ function rowToRecipient(row: Row): CampaignRecipient {
   };
 }
 
-export class DataBrainCampaignAdapter implements CampaignStorageAdapter {
-  private client: DataBrain;
+export class DatabaseCampaignAdapter implements CampaignStorageAdapter {
+  private adapter: DatabaseAdapter;
   private campaignsTableId: string;
   private recipientsTableId: string;
 
-  constructor(config: DataBrainCampaignAdapterConfig) {
-    this.client = config.client;
+  constructor(config: DatabaseCampaignAdapterConfig) {
+    this.adapter = config.adapter;
     this.campaignsTableId = config.campaignsTableId;
     this.recipientsTableId = config.recipientsTableId;
   }
 
   async createCampaign(input: CreateCampaignInput): Promise<Campaign> {
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.campaignsTableId,
       cells: {
         name: input.name,
@@ -90,7 +90,7 @@ export class DataBrainCampaignAdapter implements CampaignStorageAdapter {
   }
 
   async getCampaign(id: string): Promise<Campaign | null> {
-    const row = await this.client.getRow(id);
+    const row = await this.adapter.getRow(id);
     if (!row) return null;
     return rowToCampaign(row);
   }
@@ -109,7 +109,7 @@ export class DataBrainCampaignAdapter implements CampaignStorageAdapter {
       filters.push({ columnId: 'name', operator: 'contains', value: options.search });
     }
 
-    const result = await this.client.getRows(this.campaignsTableId, {
+    const result = await this.adapter.getRows(this.campaignsTableId, {
       limit: pageSize,
       offset,
       filters: filters as never,
@@ -147,16 +147,16 @@ export class DataBrainCampaignAdapter implements CampaignStorageAdapter {
     if (input.totalRecipients !== undefined) cells.total_recipients = input.totalRecipients;
     if (input.sendProvider !== undefined) cells.send_provider = input.sendProvider;
 
-    const row = await this.client.updateRow(id, cells);
+    const row = await this.adapter.updateRow(id, cells);
     return rowToCampaign(row);
   }
 
   async deleteCampaign(id: string): Promise<void> {
-    await this.client.deleteRow(id);
+    await this.adapter.deleteRow(id);
   }
 
   async createRecipient(campaignId: string, contactId: string, email: string): Promise<CampaignRecipient> {
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.recipientsTableId,
       cells: {
         campaign_id: campaignId,
@@ -184,7 +184,7 @@ export class DataBrainCampaignAdapter implements CampaignStorageAdapter {
       filters.push({ columnId: 'status', operator: 'eq', value: options.status });
     }
 
-    const result = await this.client.getRows(this.recipientsTableId, {
+    const result = await this.adapter.getRows(this.recipientsTableId, {
       limit: pageSize,
       offset,
       filters: filters as never,
@@ -204,7 +204,7 @@ export class DataBrainCampaignAdapter implements CampaignStorageAdapter {
     const cells: Record<string, CellValue> = { status };
     if (providerMessageId) cells.provider_message_id = providerMessageId;
     if (status === 'sent') cells.sent_at = new Date().toISOString();
-    await this.client.updateRow(recipientId, cells);
+    await this.adapter.updateRow(recipientId, cells);
   }
 
   async bulkCreateRecipients(

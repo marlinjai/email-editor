@@ -1,4 +1,4 @@
-import type { DataBrain, Row, CellValue } from '@marlinjai/data-brain-sdk';
+import type { DatabaseAdapter, Row, CellValue } from '@marlinjai/data-table-core';
 import type {
   Contact,
   ContactListOptions,
@@ -12,15 +12,15 @@ import type {
 import { evaluateRules } from './segment-evaluator';
 
 /**
- * Configuration for the Data Brain contact adapter.
+ * Configuration for the Database contact adapter.
  */
-export interface DataBrainContactAdapterConfig {
-  client: DataBrain;
-  /** Table ID for the contacts table in Data Brain */
+export interface DatabaseContactAdapterConfig {
+  adapter: DatabaseAdapter;
+  /** Table ID for the contacts table */
   contactsTableId: string;
-  /** Table ID for the segments table in Data Brain */
+  /** Table ID for the segments table */
   segmentsTableId: string;
-  /** Table ID for the unsubscribes table in Data Brain */
+  /** Table ID for the unsubscribes table */
   unsubscribesTableId: string;
 }
 
@@ -77,23 +77,23 @@ function rowToSegment(row: Row): Segment {
 }
 
 /**
- * Data Brain-backed implementation of ContactStorageAdapter.
+ * DatabaseAdapter-backed implementation of ContactStorageAdapter.
  */
-export class DataBrainContactAdapter implements ContactStorageAdapter {
-  private client: DataBrain;
+export class DatabaseContactAdapter implements ContactStorageAdapter {
+  private adapter: DatabaseAdapter;
   private contactsTableId: string;
   private segmentsTableId: string;
   private unsubscribesTableId: string;
 
-  constructor(config: DataBrainContactAdapterConfig) {
-    this.client = config.client;
+  constructor(config: DatabaseContactAdapterConfig) {
+    this.adapter = config.adapter;
     this.contactsTableId = config.contactsTableId;
     this.segmentsTableId = config.segmentsTableId;
     this.unsubscribesTableId = config.unsubscribesTableId;
   }
 
   async createContact(input: CreateContactInput): Promise<Contact> {
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.contactsTableId,
       cells: {
         email: input.email,
@@ -108,13 +108,13 @@ export class DataBrainContactAdapter implements ContactStorageAdapter {
   }
 
   async getContact(id: string): Promise<Contact | null> {
-    const row = await this.client.getRow(id);
+    const row = await this.adapter.getRow(id);
     if (!row) return null;
     return rowToContact(row);
   }
 
   async getContactByEmail(email: string): Promise<Contact | null> {
-    const result = await this.client.getRows(this.contactsTableId, {
+    const result = await this.adapter.getRows(this.contactsTableId, {
       filters: [{ columnId: 'email', operator: 'eq' as never, value: email as never }],
       limit: 1,
     });
@@ -136,7 +136,7 @@ export class DataBrainContactAdapter implements ContactStorageAdapter {
       filters.push({ columnId: 'email', operator: 'contains', value: options.search });
     }
 
-    const result = await this.client.getRows(this.contactsTableId, {
+    const result = await this.adapter.getRows(this.contactsTableId, {
       limit: pageSize,
       offset,
       filters: filters as never,
@@ -157,12 +157,12 @@ export class DataBrainContactAdapter implements ContactStorageAdapter {
     if (input.tags !== undefined) cells.tags = input.tags;
     if (input.customFields !== undefined) cells.custom_fields = JSON.stringify(input.customFields);
 
-    const row = await this.client.updateRow(id, cells);
+    const row = await this.adapter.updateRow(id, cells);
     return rowToContact(row);
   }
 
   async deleteContact(id: string): Promise<void> {
-    await this.client.deleteRow(id);
+    await this.adapter.deleteRow(id);
   }
 
   async bulkCreateContacts(contacts: CreateContactInput[]): Promise<{ created: number; updated: number }> {
@@ -192,7 +192,7 @@ export class DataBrainContactAdapter implements ContactStorageAdapter {
     const allContacts = await this.listContacts({ pageSize: 1000 });
     const matchCount = allContacts.data.filter((c) => evaluateRules(c, rules)).length;
 
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.segmentsTableId,
       cells: {
         name,
@@ -206,12 +206,12 @@ export class DataBrainContactAdapter implements ContactStorageAdapter {
   }
 
   async listSegments(): Promise<Segment[]> {
-    const result = await this.client.getRows(this.segmentsTableId, { limit: 100 });
+    const result = await this.adapter.getRows(this.segmentsTableId, { limit: 100 });
     return result.items.map((r) => rowToSegment(r));
   }
 
   async getSegmentContacts(segmentId: string, options?: ContactListOptions): Promise<{ data: Contact[]; total: number }> {
-    const segmentRow = await this.client.getRow(segmentId);
+    const segmentRow = await this.adapter.getRow(segmentId);
     if (!segmentRow) {
       return { data: [], total: 0 };
     }
@@ -231,11 +231,11 @@ export class DataBrainContactAdapter implements ContactStorageAdapter {
   }
 
   async deleteSegment(id: string): Promise<void> {
-    await this.client.deleteRow(id);
+    await this.adapter.deleteRow(id);
   }
 
   async recordUnsubscribe(contactId: string, reason?: string, method: Unsubscribe['method'] = 'manual'): Promise<void> {
-    await this.client.createRow({
+    await this.adapter.createRow({
       tableId: this.unsubscribesTableId,
       cells: {
         contact_id: contactId,

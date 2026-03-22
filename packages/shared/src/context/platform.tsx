@@ -1,21 +1,20 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { DataBrain } from '@marlinjai/data-brain-sdk';
+import type { DatabaseAdapter } from '@marlinjai/data-table-core';
 import { StorageBrain } from '@marlinjai/storage-brain-sdk';
-import { createDataBrainClient, type DataBrainConfig } from '../clients/data-brain';
 import { createStorageBrainClient, type StorageBrainConfig } from '../clients/storage-brain';
 import { WorkspaceProvider } from './workspace';
 import { AuthProvider } from './auth';
 import type { User, WorkspaceRole } from '../types';
 
 interface PlatformContextValue {
-  dataBrain: DataBrain;
+  databaseAdapter: DatabaseAdapter;
   storageBrain: StorageBrain;
 }
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
 
 export interface PlatformProviderProps {
-  dataBrain: DataBrainConfig;
+  databaseAdapter: DatabaseAdapter;
   storageBrain: StorageBrainConfig;
   workspaceId: string;
   user: User;
@@ -24,7 +23,7 @@ export interface PlatformProviderProps {
 }
 
 export function PlatformProvider({
-  dataBrain: dataBrainConfig,
+  databaseAdapter,
   storageBrain: storageBrainConfig,
   workspaceId,
   user,
@@ -32,15 +31,13 @@ export function PlatformProvider({
   children,
 }: PlatformProviderProps) {
   const clients = useMemo(() => {
-    const dbConfig = { ...dataBrainConfig, workspaceId };
     const sbConfig = { ...storageBrainConfig, workspaceId };
     return {
-      dataBrain: createDataBrainClient(dbConfig),
+      databaseAdapter,
       storageBrain: createStorageBrainClient(sbConfig),
     };
   }, [
-    dataBrainConfig.baseUrl,
-    dataBrainConfig.apiKey,
+    databaseAdapter,
     storageBrainConfig.apiKey,
     storageBrainConfig.baseUrl,
     workspaceId,
@@ -65,8 +62,13 @@ export function usePlatform(): PlatformContextValue {
   return ctx;
 }
 
-export function useDataBrain(): DataBrain {
-  return usePlatform().dataBrain;
+export function useDatabaseAdapter(): DatabaseAdapter {
+  return usePlatform().databaseAdapter;
+}
+
+/** @deprecated Use useDatabaseAdapter() instead */
+export function useDataBrain(): DatabaseAdapter {
+  return useDatabaseAdapter();
 }
 
 export function useStorageBrain(): StorageBrain {

@@ -1,4 +1,4 @@
-import type { DataBrain, Table, Column, ColumnType } from '@marlinjai/data-brain-sdk';
+import type { DatabaseAdapter, Table, Column, ColumnType } from '@marlinjai/data-table-core';
 
 export interface TableDefinition {
   name: string;
@@ -11,7 +11,7 @@ export interface TableDefinition {
 }
 
 export async function bootstrapTables(
-  client: DataBrain,
+  client: DatabaseAdapter,
   workspaceId: string,
   tables: TableDefinition[]
 ): Promise<Map<string, Table>> {

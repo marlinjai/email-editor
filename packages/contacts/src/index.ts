@@ -16,8 +16,8 @@ export type {
 } from './types';
 
 // Adapter
-export { DataBrainContactAdapter } from './adapter';
-export type { DataBrainContactAdapterConfig } from './adapter';
+export { DatabaseContactAdapter } from './adapter';
+export type { DatabaseContactAdapterConfig } from './adapter';
 
 // CSV Importer
 export {
