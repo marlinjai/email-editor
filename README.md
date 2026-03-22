@@ -76,7 +76,7 @@ See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 ### Platform
 | Package | Description |
 |---------|-------------|
-| `@marlinjai/email-templates` | Template management with versioning and Data Brain storage |
+| `@marlinjai/email-templates` | Template management with versioning and DatabaseAdapter storage |
 | `@marlinjai/email-contacts` | Contact lists, segments, CSV import, unsubscribe management |
 | `@marlinjai/email-campaigns` | Campaign builder with scheduling and A/B testing |
 | `@marlinjai/email-send-adapter-resend` | Resend email sending adapter |
