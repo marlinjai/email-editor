@@ -1,4 +1,4 @@
-import type { DataBrain } from '@marlinjai/data-brain-sdk';
+import type { DatabaseAdapter } from '@marlinjai/data-table-core';
 import type { TemplateStorageAdapter } from './adapter';
 import type {
   Template,
@@ -8,8 +8,8 @@ import type {
   TemplateListOptions,
 } from './types';
 
-interface DataBrainAdapterConfig {
-  client: DataBrain;
+interface DatabaseAdapterConfig {
+  adapter: DatabaseAdapter;
   templatesTableId: string;
   versionsTableId: string;
 }
@@ -55,19 +55,19 @@ function rowToVersion(row: {
   };
 }
 
-export class DataBrainTemplateAdapter implements TemplateStorageAdapter {
-  private readonly client: DataBrain;
+export class DatabaseTemplateAdapter implements TemplateStorageAdapter {
+  private readonly adapter: DatabaseAdapter;
   private readonly templatesTableId: string;
   private readonly versionsTableId: string;
 
-  constructor(config: DataBrainAdapterConfig) {
-    this.client = config.client;
+  constructor(config: DatabaseAdapterConfig) {
+    this.adapter = config.adapter;
     this.templatesTableId = config.templatesTableId;
     this.versionsTableId = config.versionsTableId;
   }
 
   async createTemplate(input: CreateTemplateInput): Promise<Template> {
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.templatesTableId,
       cells: {
         name: input.name,
@@ -84,7 +84,7 @@ export class DataBrainTemplateAdapter implements TemplateStorageAdapter {
   }
 
   async getTemplate(id: string): Promise<Template | null> {
-    const row = await this.client.getRow(id);
+    const row = await this.adapter.getRow(id);
     if (!row) return null;
     return rowToTemplate(row);
   }
@@ -108,7 +108,7 @@ export class DataBrainTemplateAdapter implements TemplateStorageAdapter {
       filters.push({ columnId: 'name', operator: 'contains', value: options.search });
     }
 
-    const result = await this.client.getRows(this.templatesTableId, {
+    const result = await this.adapter.getRows(this.templatesTableId, {
       limit: pageSize,
       offset,
       filters: filters.length > 0 ? filters : undefined,
@@ -135,12 +135,12 @@ export class DataBrainTemplateAdapter implements TemplateStorageAdapter {
       cells.version = existing.version + 1;
     }
 
-    const row = await this.client.updateRow(id, cells as Record<string, string | number | boolean | null | string[] | Date>);
+    const row = await this.adapter.updateRow(id, cells as Record<string, string | number | boolean | null | string[] | Date>);
     return rowToTemplate(row);
   }
 
   async deleteTemplate(id: string): Promise<void> {
-    await this.client.deleteRow(id);
+    await this.adapter.deleteRow(id);
   }
 
   async duplicateTemplate(id: string, newName: string): Promise<Template> {
@@ -170,7 +170,7 @@ export class DataBrainTemplateAdapter implements TemplateStorageAdapter {
       ? Math.max(...versions.map((v) => v.versionNumber)) + 1
       : 1;
 
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.versionsTableId,
       cells: {
         template_id: templateId,
@@ -184,7 +184,7 @@ export class DataBrainTemplateAdapter implements TemplateStorageAdapter {
   }
 
   async listVersions(templateId: string): Promise<TemplateVersion[]> {
-    const result = await this.client.getRows(this.versionsTableId, {
+    const result = await this.adapter.getRows(this.versionsTableId, {
       filters: [{ columnId: 'template_id', operator: 'equals' as const, value: templateId as string }],
       sorts: [{ columnId: 'version_number', direction: 'desc' as const }],
       limit: 100,
@@ -194,7 +194,7 @@ export class DataBrainTemplateAdapter implements TemplateStorageAdapter {
   }
 
   async restoreVersion(templateId: string, versionId: string): Promise<Template> {
-    const versionRow = await this.client.getRow(versionId);
+    const versionRow = await this.adapter.getRow(versionId);
     if (!versionRow) throw new Error(`Version ${versionId} not found`);
 
     const version = rowToVersion(versionRow);

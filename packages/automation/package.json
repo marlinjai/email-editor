@@ -23,7 +23,7 @@
   "dependencies": {
     "@marlinjai/email-campaigns": "workspace:*",
     "@marlinjai/email-contacts": "workspace:*",
-    "@marlinjai/data-brain-sdk": "^0.2.0",
+    "@marlinjai/data-table-core": "^0.3.0",
     "nanoid": "^5.0.4",
     "zod": "^3.22.4"
   },

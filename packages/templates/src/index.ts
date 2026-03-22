@@ -11,8 +11,8 @@ export type {
 // Adapter interface
 export type { TemplateStorageAdapter } from './adapter';
 
-// Data Brain adapter implementation
-export { DataBrainTemplateAdapter } from './data-brain-adapter';
+// Database adapter implementation
+export { DatabaseTemplateAdapter } from './database-adapter';
 
 // Manager
 export { TemplateManager } from './manager';

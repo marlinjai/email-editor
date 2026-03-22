@@ -1,4 +1,4 @@
-import type { DataBrain, Row, CellValue } from '@marlinjai/data-brain-sdk';
+import type { DatabaseAdapter, Row, CellValue } from '@marlinjai/data-table-core';
 import type {
   AnalyticsStorageAdapter,
   CampaignStats,
@@ -11,8 +11,8 @@ import type {
 } from './types';
 import { buildContactEngagement } from './engagement';
 
-export interface DataBrainAnalyticsAdapterConfig {
-  client: DataBrain;
+export interface DatabaseAnalyticsAdapterConfig {
+  adapter: DatabaseAdapter;
   eventsTableId: string;
   statsTableId: string;
 }
@@ -53,19 +53,19 @@ function rowToStats(row: Row): CampaignStats {
   };
 }
 
-export class DataBrainAnalyticsAdapter implements AnalyticsStorageAdapter {
-  private client: DataBrain;
+export class DatabaseAnalyticsAdapter implements AnalyticsStorageAdapter {
+  private adapter: DatabaseAdapter;
   private eventsTableId: string;
   private statsTableId: string;
 
-  constructor(config: DataBrainAnalyticsAdapterConfig) {
-    this.client = config.client;
+  constructor(config: DatabaseAnalyticsAdapterConfig) {
+    this.adapter = config.adapter;
     this.eventsTableId = config.eventsTableId;
     this.statsTableId = config.statsTableId;
   }
 
   async recordEvent(input: RecordEventInput): Promise<TrackingEvent> {
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.eventsTableId,
       cells: {
         campaign_id: input.campaignId,
@@ -97,7 +97,7 @@ export class DataBrainAnalyticsAdapter implements AnalyticsStorageAdapter {
       filters.push({ columnId: 'type', operator: 'eq', value: options.type });
     }
 
-    const result = await this.client.getRows(this.eventsTableId, {
+    const result = await this.adapter.getRows(this.eventsTableId, {
       limit: pageSize,
       offset,
       filters: filters as never,
@@ -110,7 +110,7 @@ export class DataBrainAnalyticsAdapter implements AnalyticsStorageAdapter {
   }
 
   async getCampaignStats(campaignId: string): Promise<CampaignStats | null> {
-    const result = await this.client.getRows(this.statsTableId, {
+    const result = await this.adapter.getRows(this.statsTableId, {
       limit: 1,
       filters: [{ columnId: 'campaign_id', operator: 'eq', value: campaignId }] as never,
     });
@@ -142,15 +142,15 @@ export class DataBrainAnalyticsAdapter implements AnalyticsStorageAdapter {
 
     if (existing) {
       // Find the row ID to update: re-fetch to get the actual row
-      const result = await this.client.getRows(this.statsTableId, {
+      const result = await this.adapter.getRows(this.statsTableId, {
         limit: 1,
         filters: [{ columnId: 'campaign_id', operator: 'eq', value: stats.campaignId }] as never,
       });
       if (result.items[0]) {
-        await this.client.updateRow(result.items[0].id, cells);
+        await this.adapter.updateRow(result.items[0].id, cells);
       }
     } else {
-      await this.client.createRow({
+      await this.adapter.createRow({
         tableId: this.statsTableId,
         cells,
       });
@@ -158,7 +158,7 @@ export class DataBrainAnalyticsAdapter implements AnalyticsStorageAdapter {
   }
 
   async getContactEngagement(campaignId: string, contactId: string): Promise<ContactEngagement | null> {
-    const result = await this.client.getRows(this.eventsTableId, {
+    const result = await this.adapter.getRows(this.eventsTableId, {
       limit: 10000,
       filters: [
         { columnId: 'campaign_id', operator: 'eq', value: campaignId },
@@ -173,7 +173,7 @@ export class DataBrainAnalyticsAdapter implements AnalyticsStorageAdapter {
   }
 
   async listLinkClicks(campaignId: string): Promise<LinkClickStats[]> {
-    const result = await this.client.getRows(this.eventsTableId, {
+    const result = await this.adapter.getRows(this.eventsTableId, {
       limit: 10000,
       filters: [
         { columnId: 'campaign_id', operator: 'eq', value: campaignId },

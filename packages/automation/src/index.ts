@@ -46,9 +46,9 @@ export {
 export { AutomationEngine } from './engine';
 export type { AutomationEngineConfig } from './engine';
 
-// Data Brain adapter
-export { DataBrainAutomationAdapter } from './adapter';
-export type { DataBrainAutomationAdapterConfig } from './adapter';
+// Database adapter
+export { DatabaseAutomationAdapter } from './adapter';
+export type { DatabaseAutomationAdapterConfig } from './adapter';
 
 // Components
 export { SequenceBuilder, type SequenceBuilderProps } from './components/SequenceBuilder';

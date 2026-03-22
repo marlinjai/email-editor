@@ -16,9 +16,9 @@ export type {
 export { AnalyticsTracker, aggregateStats } from './tracker';
 export type { AnalyticsTrackerConfig } from './tracker';
 
-// Data Brain adapter
-export { DataBrainAnalyticsAdapter } from './adapter';
-export type { DataBrainAnalyticsAdapterConfig } from './adapter';
+// Database adapter
+export { DatabaseAnalyticsAdapter } from './adapter';
+export type { DatabaseAnalyticsAdapterConfig } from './adapter';
 
 // Endpoints
 export {

@@ -1,4 +1,4 @@
-import type { DataBrain, Row, CellValue } from '@marlinjai/data-brain-sdk';
+import type { DatabaseAdapter, Row, CellValue } from '@marlinjai/data-table-core';
 import type {
   Automation,
   AutomationStep,
@@ -18,8 +18,8 @@ import type {
   EnrollmentStatus,
 } from './types';
 
-export interface DataBrainAutomationAdapterConfig {
-  client: DataBrain;
+export interface DatabaseAutomationAdapterConfig {
+  adapter: DatabaseAdapter;
   automationsTableId: string;
   stepsTableId: string;
   enrollmentsTableId: string;
@@ -78,14 +78,14 @@ function rowToEnrollment(row: Row): Enrollment {
   };
 }
 
-export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
-  private client: DataBrain;
+export class DatabaseAutomationAdapter implements AutomationStorageAdapter {
+  private adapter: DatabaseAdapter;
   private automationsTableId: string;
   private stepsTableId: string;
   private enrollmentsTableId: string;
 
-  constructor(config: DataBrainAutomationAdapterConfig) {
-    this.client = config.client;
+  constructor(config: DatabaseAutomationAdapterConfig) {
+    this.adapter = config.adapter;
     this.automationsTableId = config.automationsTableId;
     this.stepsTableId = config.stepsTableId;
     this.enrollmentsTableId = config.enrollmentsTableId;
@@ -94,7 +94,7 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
   // ─── Automations ──────────────────────────────────────────
 
   async createAutomation(input: CreateAutomationInput): Promise<Automation> {
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.automationsTableId,
       cells: {
         name: input.name,
@@ -110,7 +110,7 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
   }
 
   async getAutomation(id: string): Promise<Automation | null> {
-    const row = await this.client.getRow(id);
+    const row = await this.adapter.getRow(id);
     if (!row) return null;
     return rowToAutomation(row);
   }
@@ -128,7 +128,7 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
       filters.push({ columnId: 'name', operator: 'contains', value: options.search });
     }
 
-    const result = await this.client.getRows(this.automationsTableId, {
+    const result = await this.adapter.getRows(this.automationsTableId, {
       limit: pageSize,
       offset,
       filters: filters as never,
@@ -150,18 +150,18 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
     if (input.totalEnrolled !== undefined) cells.total_enrolled = input.totalEnrolled;
     if (input.totalCompleted !== undefined) cells.total_completed = input.totalCompleted;
 
-    const row = await this.client.updateRow(id, cells);
+    const row = await this.adapter.updateRow(id, cells);
     return rowToAutomation(row);
   }
 
   async deleteAutomation(id: string): Promise<void> {
-    await this.client.deleteRow(id);
+    await this.adapter.deleteRow(id);
   }
 
   // ─── Steps ────────────────────────────────────────────────
 
   async createStep(input: CreateStepInput): Promise<AutomationStep> {
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.stepsTableId,
       cells: {
         automation_id: input.automationId,
@@ -174,13 +174,13 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
   }
 
   async getStep(id: string): Promise<AutomationStep | null> {
-    const row = await this.client.getRow(id);
+    const row = await this.adapter.getRow(id);
     if (!row) return null;
     return rowToStep(row);
   }
 
   async listSteps(automationId: string): Promise<AutomationStep[]> {
-    const result = await this.client.getRows(this.stepsTableId, {
+    const result = await this.adapter.getRows(this.stepsTableId, {
       limit: 200,
       offset: 0,
       filters: [{ columnId: 'automation_id', operator: 'eq', value: automationId }] as never,
@@ -194,18 +194,18 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
     if (input.config !== undefined) cells.config = JSON.stringify(input.config);
     if (input.nextStepId !== undefined) cells.next_step_id = input.nextStepId;
 
-    const row = await this.client.updateRow(id, cells);
+    const row = await this.adapter.updateRow(id, cells);
     return rowToStep(row);
   }
 
   async deleteStep(id: string): Promise<void> {
-    await this.client.deleteRow(id);
+    await this.adapter.deleteRow(id);
   }
 
   // ─── Enrollments ──────────────────────────────────────────
 
   async createEnrollment(input: CreateEnrollmentInput): Promise<Enrollment> {
-    const row = await this.client.createRow({
+    const row = await this.adapter.createRow({
       tableId: this.enrollmentsTableId,
       cells: {
         automation_id: input.automationId,
@@ -222,13 +222,13 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
   }
 
   async getEnrollment(id: string): Promise<Enrollment | null> {
-    const row = await this.client.getRow(id);
+    const row = await this.adapter.getRow(id);
     if (!row) return null;
     return rowToEnrollment(row);
   }
 
   async getEnrollmentByContact(automationId: string, contactId: string): Promise<Enrollment | null> {
-    const result = await this.client.getRows(this.enrollmentsTableId, {
+    const result = await this.adapter.getRows(this.enrollmentsTableId, {
       limit: 1,
       offset: 0,
       filters: [
@@ -255,7 +255,7 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
       filters.push({ columnId: 'status', operator: 'eq', value: options.status });
     }
 
-    const result = await this.client.getRows(this.enrollmentsTableId, {
+    const result = await this.adapter.getRows(this.enrollmentsTableId, {
       limit: pageSize,
       offset,
       filters: filters as never,
@@ -275,12 +275,12 @@ export class DataBrainAutomationAdapter implements AutomationStorageAdapter {
     if (input.nextActionAt !== undefined) cells.next_action_at = input.nextActionAt ?? '';
     if (input.metadata !== undefined) cells.metadata = JSON.stringify(input.metadata);
 
-    const row = await this.client.updateRow(id, cells);
+    const row = await this.adapter.updateRow(id, cells);
     return rowToEnrollment(row);
   }
 
   async getEnrollmentsDueForAction(before: string): Promise<Enrollment[]> {
-    const result = await this.client.getRows(this.enrollmentsTableId, {
+    const result = await this.adapter.getRows(this.enrollmentsTableId, {
       limit: 200,
       offset: 0,
       filters: [
