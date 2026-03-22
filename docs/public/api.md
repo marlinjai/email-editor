@@ -3,11 +3,12 @@ title: API Reference
 description: Complete API documentation for the email editor
 order: 5
 summary: Complete API documentation for the email editor, covering the Editor layer, MobX State Tree models, block types, and MJML export functions.
-category: documentation
+type: documentation
 tags: [email-editor, api-reference, mobx, mjml]
 projects: [email-editor]
-status: active
 ---
+
+> **Note (2026-03-22):** Data Brain has been archived. `DataBrainTemplateAdapter`, `DataBrainContactAdapter`, `DataBrainCampaignAdapter`, `DataBrainAnalyticsAdapter`, `DataBrainAutomationAdapter`, and the `createDataBrainClient` factory documented below are deprecated.
 
 # API Reference
 

@@ -3,11 +3,12 @@ title: Installation
 description: Detailed installation instructions for the email editor monorepo
 order: 3
 summary: Detailed installation instructions for the email editor pnpm monorepo, covering prerequisites, package setup, and build configuration.
-category: documentation
+type: documentation
 tags: [email-editor, installation, pnpm, setup]
 projects: [email-editor]
-status: active
 ---
+
+> **Note (2026-03-22):** Data Brain has been archived. References in this document to configuring platform packages with a Data Brain storage backend are deprecated.
 
 # Installation Instructions
 

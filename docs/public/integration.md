@@ -3,11 +3,12 @@ title: Integration
 description: React, vanilla JS, and platform integration patterns
 order: 4
 summary: Integration patterns for using @marlinjai/email-editor in React applications, vanilla JS, and platform contexts with code examples.
-category: documentation
+type: documentation
 tags: [email-editor, integration, react, patterns]
 projects: [email-editor]
-status: active
 ---
+
+> **Note (2026-03-22):** Data Brain has been archived. The platform integration examples below that use `DataBrainTemplateAdapter`, `DataBrainAutomationAdapter`, and `PlatformProvider` with a `dataBrain` config are deprecated. These adapters should not be used in new integrations.
 
 # Getting Started with @marlinjai/email-editor
 

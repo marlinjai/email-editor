@@ -3,11 +3,12 @@ title: Email Editor
 description: Visual drag-and-drop email template builder with full platform
 order: 0
 summary: Landing page for the Email Editor documentation, a visual drag-and-drop email template builder built on MobX State Tree with MJML export and full platform capabilities.
-category: documentation
+type: documentation
 tags: [email-editor, index, drag-and-drop, mjml]
 projects: [email-editor]
-status: active
 ---
+
+> **Note (2026-03-22):** Data Brain has been archived. Platform packages that previously used Data Brain for storage (via `DataBrain*Adapter` classes) are deprecated. The editor core layer is unaffected.
 
 # Email Editor
 

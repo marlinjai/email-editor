@@ -3,11 +3,12 @@ title: Architecture
 description: Package layering, data flow, and design decisions for the email editor
 order: 1
 summary: Architecture documentation covering package layering (core, ui, blocks, editor), MobX State Tree data flow, and design decisions for the email editor.
-category: documentation
+type: documentation
 tags: [email-editor, architecture, mobx-state-tree, monorepo]
 projects: [email-editor]
-status: active
 ---
+
+> **Note (2026-03-22):** Data Brain has been archived. References below to "Data Brain adapter" and `@email-editor/shared`'s Data Brain client describe the previous architecture. Platform adapter classes (DataBrainTemplateAdapter, DataBrainContactAdapter, etc.) are deprecated. Future storage integration should target adapter-d1 or adapter-prisma directly.
 
 # Email Editor Architecture
 
