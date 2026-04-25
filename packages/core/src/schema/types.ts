@@ -1,6 +1,10 @@
 // packages/core/src/schema/types.ts
 // Core type definitions for email templates
 
+import type { BackgroundGradient } from './gradient';
+
+export type { BackgroundGradient, GradientStop } from './gradient';
+
 /**
  * Spacing configuration for padding/margin
  */
@@ -285,6 +289,7 @@ export interface Column {
   blocks: Block[];
   hidden?: boolean;
   backgroundColor?: string;
+  backgroundGradient?: BackgroundGradient;
   verticalAlign?: 'top' | 'middle' | 'bottom';
   padding?: Spacing;
 }
@@ -300,6 +305,7 @@ export interface Section {
   backgroundPosition?: string;
   backgroundRepeat?: 'repeat' | 'no-repeat';
   backgroundSize?: string;
+  backgroundGradient?: BackgroundGradient;
   fullWidth?: boolean;
   isWrapper?: boolean;
   noStack?: boolean;
