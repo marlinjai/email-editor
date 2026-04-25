@@ -27,6 +27,7 @@ import type {
   CarouselImage,
   TableBlock,
 } from '../schema/types';
+import { buildGradientCSS } from '../schema/gradient';
 
 /**
  * Converts spacing object to MJML attribute string
@@ -78,8 +79,9 @@ export class MJMLCompiler {
    */
   private templateToMJML(template: EmailTemplate): string {
     const { metadata, sections } = template;
-    
-    const head = this.generateHead(metadata);
+
+    const gradientCSS = this.collectGradientStyles(sections);
+    const head = this.generateHead(metadata, gradientCSS);
     const body = sections.map((section) => this.sectionToMJML(section)).join('\n');
 
     return `
@@ -96,7 +98,7 @@ export class MJMLCompiler {
    * Generate MJML head section with all head components
    * Supports: mj-title, mj-preview, mj-font, mj-breakpoint, mj-style
    */
-  private generateHead(metadata: EmailTemplate['metadata']): string {
+  private generateHead(metadata: EmailTemplate['metadata'], gradientCSS?: string): string {
     const parts: string[] = ['<mj-head>'];
 
     // mj-title - Sets the document title
@@ -139,8 +141,38 @@ export class MJMLCompiler {
       parts.push(`<mj-style inline="inline">${metadata.inlineCSS}</mj-style>`);
     }
 
+    // Gradient CSS rules collected from sections and columns
+    if (gradientCSS) {
+      parts.push(`<mj-style>${gradientCSS}</mj-style>`);
+    }
+
     parts.push('</mj-head>');
     return parts.join('\n');
+  }
+
+  /**
+   * Collect background-image CSS rules for all sections and columns that have gradients.
+   * Returns a string of CSS rules to inject as a single mj-style block.
+   */
+  private collectGradientStyles(sections: Section[]): string {
+    const rules: string[] = [];
+    for (const section of sections) {
+      if (section.backgroundGradient) {
+        const css = buildGradientCSS(section.backgroundGradient);
+        if (css) {
+          rules.push(`.el-grad-${section.id} { background-image: ${css}; }`);
+        }
+      }
+      for (const column of section.columns) {
+        if (column.backgroundGradient) {
+          const css = buildGradientCSS(column.backgroundGradient);
+          if (css) {
+            rules.push(`.el-grad-${column.id} { background-image: ${css}; }`);
+          }
+        }
+      }
+    }
+    return rules.join('\n');
   }
 
   /**
@@ -153,22 +185,30 @@ export class MJMLCompiler {
     if (section.hidden) return '';
 
     const attrs: string[] = [];
+    const cssClasses: string[] = ['el-section', `el-${section.id}`];
 
-    if (section.backgroundColor) {
-      attrs.push(`background-color="${section.backgroundColor}"`);
+    if (section.backgroundGradient) {
+      // Outlook fallback: first stop color as solid background-color
+      attrs.push(`background-color="${section.backgroundGradient.stops[0].color}"`);
+      cssClasses.push(`el-grad-${section.id}`);
+    } else {
+      if (section.backgroundColor) {
+        attrs.push(`background-color="${section.backgroundColor}"`);
+      }
+      if (section.backgroundImage) {
+        attrs.push(`background-url="${section.backgroundImage}"`);
+      }
+      if (section.backgroundPosition) {
+        attrs.push(`background-position="${section.backgroundPosition}"`);
+      }
+      if (section.backgroundRepeat) {
+        attrs.push(`background-repeat="${section.backgroundRepeat}"`);
+      }
+      if (section.backgroundSize) {
+        attrs.push(`background-size="${section.backgroundSize}"`);
+      }
     }
-    if (section.backgroundImage) {
-      attrs.push(`background-url="${section.backgroundImage}"`);
-    }
-    if (section.backgroundPosition) {
-      attrs.push(`background-position="${section.backgroundPosition}"`);
-    }
-    if (section.backgroundRepeat) {
-      attrs.push(`background-repeat="${section.backgroundRepeat}"`);
-    }
-    if (section.backgroundSize) {
-      attrs.push(`background-size="${section.backgroundSize}"`);
-    }
+
     if (section.fullWidth) {
       attrs.push('full-width="full-width"');
     }
@@ -193,7 +233,7 @@ export class MJMLCompiler {
     // Use mj-group for non-stacking columns (prevents mobile stacking)
     if (section.noStack && section.columns.length > 1) {
       return `
-<mj-section ${attrs.join(' ')} css-class="el-section el-${section.id}">
+<mj-section ${attrs.join(' ')} css-class="${cssClasses.join(' ')}">
   <mj-group>
     ${columns}
   </mj-group>
@@ -202,7 +242,7 @@ export class MJMLCompiler {
     }
 
     return `
-<mj-section ${attrs.join(' ')} css-class="el-section el-${section.id}">
+<mj-section ${attrs.join(' ')} css-class="${cssClasses.join(' ')}">
   ${columns}
 </mj-section>
     `.trim();
@@ -215,14 +255,23 @@ export class MJMLCompiler {
     // Skip hidden columns
     if (column.hidden) return '';
 
-    const attrs: string[] = [`css-class="el-column el-${column.id}"`];
-    
+    const cssClasses: string[] = ['el-column', `el-${column.id}`];
+    const attrs: string[] = [];
+
     if (column.width) {
       attrs.push(`width="${column.width}%"`);
     }
-    if (column.backgroundColor) {
-      attrs.push(`background-color="${column.backgroundColor}"`);
+
+    if (column.backgroundGradient) {
+      // Outlook fallback: first stop color as solid background-color
+      attrs.push(`background-color="${column.backgroundGradient.stops[0].color}"`);
+      cssClasses.push(`el-grad-${column.id}`);
+    } else {
+      if (column.backgroundColor) {
+        attrs.push(`background-color="${column.backgroundColor}"`);
+      }
     }
+
     if (column.verticalAlign) {
       attrs.push(`vertical-align="${column.verticalAlign}"`);
     }
@@ -230,6 +279,8 @@ export class MJMLCompiler {
       const padding = spacingToString(column.padding);
       if (padding) attrs.push(`padding="${padding}"`);
     }
+
+    attrs.push(`css-class="${cssClasses.join(' ')}"`);
 
     const blocks = column.blocks.map((block) => this.blockToMJML(block)).join('\n');
 
