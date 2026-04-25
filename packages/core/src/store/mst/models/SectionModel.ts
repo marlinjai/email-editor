@@ -4,6 +4,8 @@ import { nanoid } from 'nanoid';
 import { ColumnModel, ColumnInstance, ColumnSnapshotIn, createColumn } from './ColumnModel';
 import { BlockInstance } from './BlockModel';
 import type { CSSProperties } from '../types';
+import type { BackgroundGradient } from '../../../schema/gradient';
+import { buildGradientCSS } from '../../../schema/gradient';
 
 /**
  * SectionModel - A section in the email template
@@ -22,6 +24,7 @@ export const SectionModel = types
     backgroundPosition: types.maybe(types.string),
     backgroundRepeat: types.maybe(types.enumeration(['repeat', 'no-repeat'])),
     backgroundSize: types.maybe(types.string),
+    backgroundGradient: types.maybe(types.frozen<BackgroundGradient>()),
 
     // Layout
     fullWidth: types.optional(types.boolean, false),
@@ -134,6 +137,7 @@ export const SectionModel = types
       backgroundPosition?: string;
       backgroundRepeat?: 'repeat' | 'no-repeat';
       backgroundSize?: string;
+      backgroundGradient?: BackgroundGradient;
       fullWidth?: boolean;
       isWrapper?: boolean;
       noStack?: boolean;
@@ -296,13 +300,17 @@ export const SectionModel = types
     get computedStyle(): CSSProperties {
       const style: CSSProperties = {};
 
-      if (self.backgroundColor) style.backgroundColor = self.backgroundColor;
-      if (self.backgroundImage) {
+      if (self.backgroundGradient) {
+        const css = buildGradientCSS(self.backgroundGradient);
+        if (css) style.backgroundImage = css;
+      } else if (self.backgroundImage) {
         style.backgroundImage = `url(${self.backgroundImage})`;
         if (self.backgroundPosition) style.backgroundPosition = self.backgroundPosition;
         if (self.backgroundRepeat) style.backgroundRepeat = self.backgroundRepeat;
         if (self.backgroundSize) style.backgroundSize = self.backgroundSize;
       }
+
+      if (self.backgroundColor) style.backgroundColor = self.backgroundColor;
       if (self.paddingTop) style.paddingTop = self.paddingTop;
       if (self.paddingRight) style.paddingRight = self.paddingRight;
       if (self.paddingBottom) style.paddingBottom = self.paddingBottom;
