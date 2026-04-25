@@ -3,16 +3,25 @@
 
 import React from 'react';
 import { observer } from 'mobx-react-lite';
+import clsx from 'clsx';
 import type { ColumnInstance } from '@marlinjai/email-editor-core';
 import {
   ColorField,
   SelectField,
   SpacingField,
   RangeField,
+  GradientField,
 } from '../fields';
 
 interface ColumnPropertiesProps {
   column: ColumnInstance;
+}
+
+type BackgroundMode = 'color' | 'gradient';
+
+function getBackgroundMode(column: ColumnInstance): BackgroundMode {
+  if (column.backgroundGradient) return 'gradient';
+  return 'color';
 }
 
 /**
@@ -21,6 +30,25 @@ interface ColumnPropertiesProps {
 export const ColumnProperties = observer(function ColumnProperties({
   column,
 }: ColumnPropertiesProps) {
+  const mode = getBackgroundMode(column);
+
+  const setMode = (next: BackgroundMode) => {
+    if (next === 'gradient') {
+      column.updateProperties({
+        backgroundGradient: {
+          type: 'linear',
+          angle: 135,
+          stops: [
+            { color: '#667eea', position: 0 },
+            { color: '#764ba2', position: 100 },
+          ],
+        },
+      });
+    } else {
+      column.updateProperties({ backgroundGradient: undefined });
+    }
+  };
+
   return (
     <div className="p-4 space-y-4">
       <h3 className="font-semibold text-sm">Column</h3>
@@ -34,12 +62,42 @@ export const ColumnProperties = observer(function ColumnProperties({
         unit="%"
       />
 
-      <ColorField
-        label="Background Color"
-        value={column.backgroundColor || ''}
-        onChange={(color) => column.updateProperties({ backgroundColor: color || undefined })}
-        allowEmpty
-      />
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Background</label>
+        <div className="flex gap-1 mb-2">
+          {(['color', 'gradient'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={clsx(
+                'flex-1 py-1 text-xs rounded border capitalize',
+                mode === m
+                  ? 'bg-blue-50 border-blue-500 text-blue-700'
+                  : 'border-gray-300 hover:bg-gray-50'
+              )}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'color' && (
+          <ColorField
+            label="Color"
+            value={column.backgroundColor || ''}
+            onChange={(color) => column.updateProperties({ backgroundColor: color || undefined })}
+            allowEmpty
+          />
+        )}
+
+        {mode === 'gradient' && (
+          <GradientField
+            value={column.backgroundGradient}
+            onChange={(gradient) => column.updateProperties({ backgroundGradient: gradient })}
+          />
+        )}
+      </div>
 
       <SelectField
         label="Vertical Align"
