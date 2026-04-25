@@ -2,6 +2,7 @@
 import React from 'react';
 import { observer } from 'mobx-react-lite';
 import clsx from 'clsx';
+import { buildGradientCSS } from '@marlinjai/email-editor-core';
 import type { SectionInstance } from '@marlinjai/email-editor-core';
 import { useStore } from '../store';
 import { ColumnRenderer } from './ColumnRenderer';
@@ -46,12 +47,20 @@ export const SectionRenderer = observer(({ section, sectionIndex }: SectionRende
     );
   }
 
+  const gradientCSS = section.backgroundGradient
+    ? buildGradientCSS(section.backgroundGradient)
+    : undefined;
+
   const sectionStyle: React.CSSProperties = {
     backgroundColor: section.backgroundColor || undefined,
-    backgroundImage: section.backgroundImage ? `url(${section.backgroundImage})` : undefined,
-    backgroundPosition: section.backgroundPosition || 'center',
-    backgroundRepeat: section.backgroundRepeat || 'no-repeat',
-    backgroundSize: section.backgroundSize || 'cover',
+    backgroundImage: gradientCSS
+      ? gradientCSS
+      : section.backgroundImage
+      ? `url(${section.backgroundImage})`
+      : undefined,
+    backgroundPosition: gradientCSS ? undefined : section.backgroundPosition || 'center',
+    backgroundRepeat: gradientCSS ? undefined : section.backgroundRepeat || 'no-repeat',
+    backgroundSize: gradientCSS ? undefined : section.backgroundSize || 'cover',
     paddingTop: section.paddingTop || '20px',
     paddingRight: section.paddingRight || '20px',
     paddingBottom: section.paddingBottom || '20px',
