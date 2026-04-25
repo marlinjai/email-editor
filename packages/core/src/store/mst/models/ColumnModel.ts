@@ -3,6 +3,8 @@ import { types, Instance, SnapshotIn, SnapshotOut, destroy, detach } from 'mobx-
 import { nanoid } from 'nanoid';
 import { BlockModel, BlockInstance, BlockSnapshotIn, BlockType } from './BlockModel';
 import type { CSSProperties } from '../types';
+import type { BackgroundGradient } from '../../../schema/gradient';
+import { buildGradientCSS } from '../../../schema/gradient';
 
 /**
  * ColumnModel - A column within a section
@@ -15,6 +17,7 @@ export const ColumnModel = types
     id: types.identifier,
     width: types.optional(types.number, 100), // percentage (e.g., 50 for 50%)
     backgroundColor: types.maybe(types.string),
+    backgroundGradient: types.maybe(types.frozen<BackgroundGradient>()),
     verticalAlign: types.maybe(types.enumeration(['top', 'middle', 'bottom'])),
     paddingTop: types.maybe(types.string),
     paddingRight: types.maybe(types.string),
@@ -81,6 +84,7 @@ export const ColumnModel = types
     updateProperties(updates: {
       width?: number;
       backgroundColor?: string;
+      backgroundGradient?: BackgroundGradient;
       verticalAlign?: 'top' | 'middle' | 'bottom';
       paddingTop?: string;
       paddingRight?: string;
@@ -192,6 +196,11 @@ export const ColumnModel = types
       const style: CSSProperties = {
         width: `${self.width}%`,
       };
+
+      if (self.backgroundGradient) {
+        const css = buildGradientCSS(self.backgroundGradient);
+        if (css) style.backgroundImage = css;
+      }
 
       if (self.backgroundColor) style.backgroundColor = self.backgroundColor;
       if (self.verticalAlign) style.verticalAlign = self.verticalAlign as CSSProperties['verticalAlign'];
