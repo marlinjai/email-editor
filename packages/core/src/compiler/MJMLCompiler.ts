@@ -185,11 +185,12 @@ export class MJMLCompiler {
     if (section.hidden) return '';
 
     const attrs: string[] = [];
-    const cssClasses: string[] = ['el-section', `el-${section.id}`];
+    const cssClasses: string[] = [section.isWrapper ? 'el-wrapper' : 'el-section', `el-${section.id}`];
 
     if (section.backgroundGradient) {
       // Outlook fallback: first stop color as solid background-color
-      attrs.push(`background-color="${section.backgroundGradient.stops[0].color}"`);
+      const fallbackColor = section.backgroundGradient.stops[0]?.color;
+      if (fallbackColor) attrs.push(`background-color="${fallbackColor}"`);
       cssClasses.push(`el-grad-${section.id}`);
     } else {
       if (section.backgroundColor) {
@@ -222,7 +223,7 @@ export class MJMLCompiler {
     // Use mj-wrapper for wrapper sections
     if (section.isWrapper) {
       return `
-<mj-wrapper ${attrs.join(' ')} css-class="el-wrapper el-${section.id}">
+<mj-wrapper ${attrs.join(' ')} css-class="${cssClasses.join(' ')}">
   <mj-section>
     ${columns}
   </mj-section>
@@ -264,7 +265,8 @@ export class MJMLCompiler {
 
     if (column.backgroundGradient) {
       // Outlook fallback: first stop color as solid background-color
-      attrs.push(`background-color="${column.backgroundGradient.stops[0].color}"`);
+      const fallbackColor = column.backgroundGradient.stops[0]?.color;
+      if (fallbackColor) attrs.push(`background-color="${fallbackColor}"`);
       cssClasses.push(`el-grad-${column.id}`);
     } else {
       if (column.backgroundColor) {
