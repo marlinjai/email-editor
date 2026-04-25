@@ -297,6 +297,7 @@ export interface Section {
   type: 'section';
   backgroundColor?: string;
   backgroundImage?: string;
+  backgroundGradient?: import('./gradient').BackgroundGradient;
   backgroundPosition?: string;
   backgroundRepeat?: 'repeat' | 'no-repeat';
   backgroundSize?: string;

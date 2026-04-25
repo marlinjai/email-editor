@@ -4,6 +4,8 @@ import { nanoid } from 'nanoid';
 import { ColumnModel, ColumnInstance, ColumnSnapshotIn, createColumn } from './ColumnModel';
 import { BlockInstance } from './BlockModel';
 import type { CSSProperties } from '../types';
+import type { BackgroundGradient } from '../../..';
+import { buildGradientCSS } from '../../..';
 
 /**
  * SectionModel - A section in the email template
@@ -19,6 +21,18 @@ export const SectionModel = types
     // Background
     backgroundColor: types.maybe(types.string),
     backgroundImage: types.maybe(types.string),
+    backgroundGradient: types.maybe(
+      types.model('BackgroundGradient', {
+        type: types.enumeration(['linear', 'radial']),
+        angle: types.number,
+        stops: types.array(
+          types.model('GradientStop', {
+            color: types.string,
+            position: types.number,
+          })
+        ),
+      })
+    ),
     backgroundPosition: types.maybe(types.string),
     backgroundRepeat: types.maybe(types.enumeration(['repeat', 'no-repeat'])),
     backgroundSize: types.maybe(types.string),
@@ -131,6 +145,7 @@ export const SectionModel = types
     updateProperties(updates: {
       backgroundColor?: string;
       backgroundImage?: string;
+      backgroundGradient?: BackgroundGradient;
       backgroundPosition?: string;
       backgroundRepeat?: 'repeat' | 'no-repeat';
       backgroundSize?: string;
@@ -297,12 +312,20 @@ export const SectionModel = types
       const style: CSSProperties = {};
 
       if (self.backgroundColor) style.backgroundColor = self.backgroundColor;
-      if (self.backgroundImage) {
+
+      const gradientCSS = self.backgroundGradient
+        ? buildGradientCSS(self.backgroundGradient as BackgroundGradient)
+        : undefined;
+
+      if (gradientCSS) {
+        style.backgroundImage = gradientCSS;
+      } else if (self.backgroundImage) {
         style.backgroundImage = `url(${self.backgroundImage})`;
         if (self.backgroundPosition) style.backgroundPosition = self.backgroundPosition;
         if (self.backgroundRepeat) style.backgroundRepeat = self.backgroundRepeat;
         if (self.backgroundSize) style.backgroundSize = self.backgroundSize;
       }
+
       if (self.paddingTop) style.paddingTop = self.paddingTop;
       if (self.paddingRight) style.paddingRight = self.paddingRight;
       if (self.paddingBottom) style.paddingBottom = self.paddingBottom;
