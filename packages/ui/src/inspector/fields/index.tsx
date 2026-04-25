@@ -4,6 +4,7 @@
 import React from 'react';
 import clsx from 'clsx';
 import { Bold, Italic, Link, Strikethrough, Underline } from 'lucide-react';
+import type { BackgroundGradient, GradientStop } from '@marlinjai/email-editor-core';
 
 /**
  * Normalize spacing values to ensure valid CSS units.
@@ -437,6 +438,130 @@ export function ButtonGroupField({
             {opt}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Gradient editor field
+ */
+export function GradientField({
+  value,
+  onChange,
+}: {
+  value: BackgroundGradient | undefined;
+  onChange: (gradient: BackgroundGradient | undefined) => void;
+}) {
+  const defaultGradient: BackgroundGradient = {
+    type: 'linear',
+    angle: 135,
+    stops: [
+      { color: '#667eea', position: 0 },
+      { color: '#764ba2', position: 100 },
+    ],
+  };
+
+  const gradient = value ?? defaultGradient;
+
+  const updateStop = (index: number, patch: Partial<GradientStop>) => {
+    const stops = gradient.stops.map((s, i) => (i === index ? { ...s, ...patch } : s));
+    onChange({ ...gradient, stops });
+  };
+
+  const addStop = () => {
+    const stops = [...gradient.stops, { color: '#ffffff', position: 50 }];
+    onChange({ ...gradient, stops });
+  };
+
+  const removeStop = (index: number) => {
+    if (gradient.stops.length <= 2) return;
+    const stops = gradient.stops.filter((_, i) => i !== index);
+    onChange({ ...gradient, stops });
+  };
+
+  const previewCSS =
+    gradient.type === 'radial'
+      ? `radial-gradient(circle, ${gradient.stops.map((s) => `${s.color} ${s.position}%`).join(', ')})`
+      : `linear-gradient(${gradient.angle}deg, ${gradient.stops.map((s) => `${s.color} ${s.position}%`).join(', ')})`;
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="w-full h-8 rounded border border-gray-300"
+        style={{ backgroundImage: previewCSS }}
+      />
+
+      <div className="flex gap-1">
+        {(['linear', 'radial'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onChange({ ...gradient, type: t })}
+            className={clsx(
+              'flex-1 py-1 text-xs rounded border capitalize',
+              gradient.type === t
+                ? 'bg-blue-50 border-blue-500 text-blue-700'
+                : 'border-gray-300 hover:bg-gray-50'
+            )}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {gradient.type === 'linear' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Angle: {gradient.angle}°
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={360}
+            value={gradient.angle}
+            onChange={(e) => onChange({ ...gradient, angle: parseInt(e.target.value) })}
+            className="w-full"
+          />
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <label className="block text-xs font-medium text-gray-600">Color Stops</label>
+        {gradient.stops.map((stop, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              type="color"
+              value={stop.color}
+              onChange={(e) => updateStop(i, { color: e.target.value })}
+              className="w-7 h-7 rounded border border-gray-300 cursor-pointer flex-shrink-0"
+            />
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={stop.position}
+              onChange={(e) => updateStop(i, { position: parseInt(e.target.value) || 0 })}
+              className="w-16 px-1.5 py-1 text-xs border border-gray-300 rounded"
+            />
+            <span className="text-xs text-gray-400">%</span>
+            <button
+              type="button"
+              onClick={() => removeStop(i)}
+              disabled={gradient.stops.length <= 2}
+              className="ml-auto text-xs text-gray-400 hover:text-red-500 disabled:opacity-30"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addStop}
+          className="w-full py-1 text-xs border border-dashed border-gray-300 rounded hover:bg-gray-50 text-gray-500"
+        >
+          + Add Stop
+        </button>
       </div>
     </div>
   );
