@@ -28,6 +28,7 @@ import {
   createRootStore,
   BlockType,
   createSection,
+  isLeafBlockType,
   type RootStoreInstance,
   type TemplateSnapshotIn,
   type TemplateSnapshotOut,
@@ -468,6 +469,31 @@ function handleDrop(
       const section = createSection();
       template.addSection(section);
       template.insertBlock(template.sections[0].columns[0].id, newBlock, 0);
+    } else if (dropId.startsWith('drop-subcolumn-')) {
+      // Format: drop-subcolumn-<subColumnId>-<index>
+      const m = dropId.match(/^drop-subcolumn-(.+)-(\d+)$/);
+      if (m) {
+        const [, subColumnId, indexStr] = m;
+        const index = parseInt(indexStr, 10);
+        if (!isLeafBlockType(blockType as any)) {
+          // Container blocks are not allowed inside sub-columns; bail silently.
+          return;
+        }
+        // Walk the template to find the sub-column instance.
+        let target: any = undefined;
+        for (const section of template.sections) {
+          for (const col of section.columns) {
+            const sc = (col.subColumns ?? []).find?.((s: any) => s.id === subColumnId);
+            if (sc) { target = sc; break; }
+          }
+          if (target) break;
+        }
+        if (target) {
+          target.addBlock(newBlock, index);
+          editorUI.selectBlock(newBlock.id);
+          return;
+        }
+      }
     } else if (dropId.startsWith('drop-column-')) {
       const columnId = dropId.replace('drop-column-', '').replace('-end', '');
       const column = template.findColumnById(columnId);
@@ -475,11 +501,15 @@ function handleDrop(
         template.insertBlock(columnId, newBlock, column.blocks.length);
       }
     } else if (editorUI.dropIntent) {
-      template.insertBlock(
-        editorUI.dropIntent.targetColumnId,
-        newBlock,
-        editorUI.dropIntent.targetIndex
-      );
+      // dropIntent may target a column or a sub-column; the sub-column path
+      // is handled above, so this fallback is the column path.
+      if (editorUI.dropIntent.targetColumnId) {
+        template.insertBlock(
+          editorUI.dropIntent.targetColumnId,
+          newBlock,
+          editorUI.dropIntent.targetIndex
+        );
+      }
     }
   }
 
