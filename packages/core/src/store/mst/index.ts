@@ -22,6 +22,13 @@ export {
   type ColumnSnapshotIn,
   type ColumnSnapshotOut,
 
+  // SubColumn
+  SubColumnModel,
+  createSubColumn,
+  type SubColumnInstance,
+  type SubColumnSnapshotIn,
+  type SubColumnSnapshotOut,
+
   // Section
   SectionModel,
   createSection,

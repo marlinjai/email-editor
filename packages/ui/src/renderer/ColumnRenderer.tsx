@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import type { ColumnInstance, SectionInstance } from '@marlinjai/email-editor-core';
 import { useStore } from '../store';
 import { BlockRenderer } from './BlockRenderer';
+import { SubColumnRenderer } from './SubColumnRenderer';
 
 interface ColumnRendererProps {
   column: ColumnInstance;
@@ -107,7 +108,27 @@ export const ColumnRenderer = observer(({ column, section, columnIndex }: Column
         </button>
       )}
 
-      {/* Column content */}
+      {/* Group-kind column: render sub-columns as a nested table */}
+      {column.kind === 'group' && (
+        <table
+          width="100%"
+          cellPadding={0}
+          cellSpacing={0}
+          role="presentation"
+          style={{ borderCollapse: 'collapse' }}
+        >
+          <tbody>
+            <tr>
+              {column.subColumns.map((sc, i) => (
+                <SubColumnRenderer key={sc.id} subColumn={sc} subColumnIndex={i} />
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* Leaf-kind column: blocks list (existing behavior) */}
+      {column.kind === 'leaf' && (
       <div className="column-content space-y-2">
         {column.blocks.map((block, index) => (
           <React.Fragment key={block.id}>
@@ -147,6 +168,7 @@ export const ColumnRenderer = observer(({ column, section, columnIndex }: Column
           </div>
         )}
       </div>
+      )}
     </td>
   );
 });
