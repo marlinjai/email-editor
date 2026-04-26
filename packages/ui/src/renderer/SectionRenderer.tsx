@@ -72,15 +72,13 @@ export const SectionRenderer = observer(({ section, sectionIndex }: SectionRende
     <div
       className={clsx(
         'email-section relative',
-        // Selection ring
-        isSelected && 'ring-2 ring-amber-500 ring-offset-2',
-        // Hover ring
-        isHovered && 'ring-1 ring-amber-300'
+        // Inset selection ring (avoids being clipped by EmailRenderer's overflow-hidden)
+        isSelected && 'ring-2 ring-inset ring-amber-500',
+        isHovered && 'ring-1 ring-inset ring-amber-300'
       )}
       data-section-id={section.id}
       style={sectionStyle}
       onClick={(e) => {
-        // Only select section if clicking the section background, not a child
         if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('email-section')) {
           e.stopPropagation();
           editorUI.selectSection(section.id);
@@ -95,22 +93,26 @@ export const SectionRenderer = observer(({ section, sectionIndex }: SectionRende
         editorUI.setHoverSection(undefined);
       }}
     >
-      {/* Section label (shown on selection/hover) */}
-      {(isSelected || isHovered) && (
-        <div
-          className={clsx(
-            'absolute -top-6 left-0 px-2 py-1 text-xs font-medium rounded-t z-10',
-            isSelected ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'
-          )}
-        >
-          {section.displayName}
-        </div>
-      )}
+      {/* Section handle: visible click target inside the section (outside is clipped by EmailRenderer's overflow-hidden) */}
+      <button
+        type="button"
+        className={clsx(
+          'section-handle absolute top-0 left-0 px-2 py-0.5 text-xs font-medium rounded-br z-10 cursor-pointer transition-opacity',
+          isSelected
+            ? 'bg-amber-500 text-white opacity-100'
+            : isHovered
+            ? 'bg-amber-100 text-amber-700 opacity-100'
+            : 'bg-amber-100 text-amber-700 opacity-0 hover:opacity-100'
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          editorUI.selectSection(section.id);
+        }}
+      >
+        {section.displayName}
+      </button>
 
-      {/* Section toolbar (shown on selection) */}
-      {isSelected && (
-        <SectionToolbar section={section} />
-      )}
+      {isSelected && <SectionToolbar section={section} />}
 
       {/* Table-based layout for email compatibility */}
       <table
@@ -167,16 +169,16 @@ const SectionToolbar = observer(({ section }: { section: SectionInstance }) => {
   };
 
   return (
-    <div className="absolute -top-6 right-0 flex gap-1">
+    <div className="absolute top-0 right-0 flex gap-1 z-10">
       <button
-        className="p-1 bg-amber-500 text-white text-xs rounded hover:bg-amber-600"
+        className="p-1 bg-amber-500 text-white text-xs rounded-bl hover:bg-amber-600"
         onClick={handleDuplicate}
         title="Duplicate section"
       >
         ⎘
       </button>
       <button
-        className="p-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+        className="p-1 bg-red-500 text-white text-xs rounded-bl hover:bg-red-600"
         onClick={handleDelete}
         title="Delete section"
       >

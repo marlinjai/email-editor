@@ -172,6 +172,12 @@ const EmailEditorContent = observer(function EmailEditorContent({
     editorUI.selectSection(section.id);
   }, [template, editorUI]);
 
+  const handleAddPrebuilt = useCallback((prebuilt: { section: any }) => {
+    const newSection = cloneSectionWithNewIds(prebuilt.section);
+    template.addSection(newSection);
+    editorUI.selectSection(newSection.id);
+  }, [template, editorUI]);
+
   const handleDeleteBlock = useCallback((blockId: string) => {
     template.deleteBlock(blockId);
     if (editorUI.selectedBlockId === blockId) {
@@ -206,6 +212,7 @@ const EmailEditorContent = observer(function EmailEditorContent({
             blockRegistry={blockRegistry}
             prebuiltRegistry={prebuiltRegistry}
             onAddSection={handleAddSection}
+            onAddPrebuilt={handleAddPrebuilt}
           />
 
           <div className="flex-1 overflow-auto bg-canvas-1 p-8">

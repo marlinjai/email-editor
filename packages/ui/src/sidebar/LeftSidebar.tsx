@@ -5,7 +5,11 @@ import React from 'react';
 import { observer } from 'mobx-react-lite';
 import { useStore } from '../store';
 import clsx from 'clsx';
-import type { BlockRegistryImpl, PrebuiltTemplateRegistry } from '@marlinjai/email-editor-core';
+import type {
+  BlockRegistryImpl,
+  PrebuiltTemplate,
+  PrebuiltTemplateRegistry,
+} from '@marlinjai/email-editor-core';
 import { ElementsPanel } from './ElementsPanel';
 import { LayoutPanel } from './LayoutPanel';
 import { LayersPanel } from './LayersPanel';
@@ -15,6 +19,7 @@ interface LeftSidebarProps {
   blockRegistry: BlockRegistryImpl;
   prebuiltRegistry?: PrebuiltTemplateRegistry;
   onAddSection: (columnCount: 1 | 2 | 3) => void;
+  onAddPrebuilt: (template: PrebuiltTemplate) => void;
 }
 
 const TABS = ['elements', 'layout', 'layers', 'settings'] as const;
@@ -23,6 +28,7 @@ export const LeftSidebar = observer(function LeftSidebar({
   blockRegistry,
   prebuiltRegistry,
   onAddSection,
+  onAddPrebuilt,
 }: LeftSidebarProps) {
   const { editorUI } = useStore();
 
@@ -55,6 +61,7 @@ export const LeftSidebar = observer(function LeftSidebar({
           <LayoutPanel
             templates={prebuiltRegistry?.getAll() || []}
             onAddSection={onAddSection}
+            onAddPrebuilt={onAddPrebuilt}
           />
         )}
         {editorUI.activeTab === 'layers' && <LayersPanel />}
