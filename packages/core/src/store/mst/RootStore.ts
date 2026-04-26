@@ -9,6 +9,9 @@ import {
   createTemplateWithDefaultSection,
 } from './models/TemplateModel';
 import { EditorUIStore, EditorUIInstance } from './EditorUIStore';
+import type { BlockInstance } from './models/BlockModel';
+import type { ColumnInstance } from './models/ColumnModel';
+import type { SectionInstance } from './models/SectionModel';
 
 /**
  * RootStore - The main store for the email editor
@@ -25,8 +28,10 @@ export const RootStore = types
     editorUI: EditorUIStore,
   })
   .volatile(() => ({
-    // History state for undo/redo
-    history: [] as SnapshotOut<typeof TemplateModel>[],
+    // History state for undo/redo. Typed as `unknown` to keep the inferred
+    // RootStore type small enough for TypeScript's serialization limit;
+    // history snapshots are roundtripped through MST validation anyway.
+    history: [] as unknown[],
     historyIndex: -1,
     maxHistory: 50,
     isUndoRedo: false,
@@ -156,9 +161,11 @@ export const RootStore = types
     },
 
     /**
-     * Get the currently selected block
+     * Get the currently selected block. Explicit return types here
+     * (and on the other selectors below) keep the inferred RootStore
+     * type small enough for TypeScript's serialization limit.
      */
-    get selectedBlock() {
+    get selectedBlock(): BlockInstance | undefined {
       if (!self.editorUI.selectedBlockId) return undefined;
       return self.template.findBlockById(self.editorUI.selectedBlockId);
     },
@@ -166,7 +173,7 @@ export const RootStore = types
     /**
      * Get the currently selected section
      */
-    get selectedSection() {
+    get selectedSection(): SectionInstance | undefined {
       if (!self.editorUI.selectedSectionId) return undefined;
       return self.template.getSectionById(self.editorUI.selectedSectionId);
     },
@@ -174,7 +181,7 @@ export const RootStore = types
     /**
      * Get the currently selected column
      */
-    get selectedColumn() {
+    get selectedColumn(): ColumnInstance | undefined {
       if (!self.editorUI.selectedColumnId) return undefined;
       return self.template.findColumnById(self.editorUI.selectedColumnId);
     },
