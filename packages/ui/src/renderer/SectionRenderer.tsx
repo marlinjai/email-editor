@@ -97,7 +97,7 @@ export const SectionRenderer = observer(({ section, sectionIndex }: SectionRende
       <button
         type="button"
         className={clsx(
-          'section-handle absolute top-0 left-0 px-2 py-0.5 text-xs font-medium rounded-br z-10 cursor-pointer transition-opacity',
+          'section-handle absolute top-0 left-0 px-2 py-0.5 text-xs font-medium rounded-br z-20 cursor-pointer transition-opacity',
           isSelected
             ? 'bg-amber-500 text-white opacity-100'
             : isHovered
@@ -169,7 +169,7 @@ const SectionToolbar = observer(({ section }: { section: SectionInstance }) => {
   };
 
   return (
-    <div className="absolute top-0 right-0 flex gap-1 z-10">
+    <div className="absolute top-0 right-0 flex gap-1 z-30">
       <button
         className="p-1 bg-amber-500 text-white text-xs rounded-bl hover:bg-amber-600"
         onClick={handleDuplicate}

@@ -85,6 +85,28 @@ export const ColumnRenderer = observer(({ column, section, columnIndex }: Column
         editorUI.setHoverColumn(undefined);
       }}
     >
+      {/* Column handle: discoverable click target since blocks usually fill the column */}
+      {!editorUI.isDragging && (
+        <button
+          type="button"
+          className={clsx(
+            'column-handle absolute top-0 left-1/2 -translate-x-1/2 z-10',
+            'px-2 py-0.5 text-[10px] font-medium rounded-b cursor-pointer transition-opacity',
+            isSelected
+              ? 'bg-blue-500 text-white opacity-100'
+              : isHovered
+              ? 'bg-blue-100 text-blue-700 opacity-100'
+              : 'bg-blue-100 text-blue-700 opacity-0 hover:opacity-100'
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            editorUI.selectColumn(column.id);
+          }}
+        >
+          Col {columnIndex + 1} · {column.width}%
+        </button>
+      )}
+
       {/* Column content */}
       <div className="column-content space-y-2">
         {column.blocks.map((block, index) => (
