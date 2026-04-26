@@ -1,5 +1,5 @@
 // packages/ui/src/sidebar/PrebuiltTemplateModal.tsx
-// Modal browser for the pre-built section templates with live mini-renders.
+// Editorial-style modal browser for the pre-built section templates.
 
 import React, { useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -50,59 +50,78 @@ export function PrebuiltTemplateModal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
+        <Dialog.Overlay
+          className={clsx(
+            'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',
+            'data-[state=open]:animate-in data-[state=open]:fade-in-0',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0'
+          )}
+        />
         <Dialog.Content
           className={clsx(
             'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50',
-            'w-[min(1100px,95vw)] h-[min(800px,90vh)]',
-            'bg-canvas-2 rounded-xl shadow-2xl flex flex-col overflow-hidden'
+            'w-[min(1280px,95vw)] h-[min(880px,92vh)]',
+            'bg-[#fafaf7] rounded-2xl shadow-2xl flex flex-col overflow-hidden',
+            'ring-1 ring-black/10',
+            'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95'
           )}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-border-light">
+          <header className="px-8 pt-7 pb-5 flex items-start justify-between gap-6">
             <div>
-              <Dialog.Title className="text-base font-semibold text-text-dark">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-amber-700/80 font-medium mb-1.5">
+                Template Library
+              </p>
+              <Dialog.Title className="font-serif text-[28px] leading-none text-neutral-900 mb-2">
                 Pre-built sections
               </Dialog.Title>
-              <Dialog.Description className="text-xs text-text-dark-muted">
-                Click a section to insert it at the end of your email.
+              <Dialog.Description className="text-sm text-neutral-500 max-w-md">
+                Click any layout to drop it at the end of your email. Each preview is a live render of the actual section.
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
               <button
-                className="p-1.5 rounded hover:bg-canvas-3 text-text-dark-muted hover:text-text-dark"
+                className={clsx(
+                  'shrink-0 p-2 rounded-full text-neutral-400',
+                  'hover:bg-black/5 hover:text-neutral-700 transition-colors'
+                )}
                 aria-label="Close"
               >
                 <X size={18} />
               </button>
             </Dialog.Close>
-          </div>
+          </header>
 
-          {/* Category filter */}
-          <div className="flex flex-wrap gap-1.5 px-5 py-3 border-b border-border-light">
-            <CategoryChip
-              label={`All (${templates.length})`}
-              active={activeCategory === ALL}
-              onClick={() => setActiveCategory(ALL)}
-            />
-            {categories.map(({ id, count }) => (
+          {/* Filter row */}
+          <div className="px-8 pb-5">
+            <div className="inline-flex items-center gap-1 p-1 rounded-full bg-black/[0.04] ring-1 ring-black/[0.04]">
               <CategoryChip
-                key={id}
-                label={`${id} (${count})`}
-                active={activeCategory === id}
-                onClick={() => setActiveCategory(id)}
+                label="All"
+                count={templates.length}
+                active={activeCategory === ALL}
+                onClick={() => setActiveCategory(ALL)}
               />
-            ))}
+              {categories.map(({ id, count }) => (
+                <CategoryChip
+                  key={id}
+                  label={id}
+                  count={count}
+                  active={activeCategory === id}
+                  onClick={() => setActiveCategory(id)}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Grid */}
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex-1 overflow-y-auto px-8 pb-8">
             {filtered.length === 0 ? (
-              <div className="text-center text-text-dark-muted text-sm py-12">
+              <div className="text-center text-neutral-500 text-sm py-16">
                 No templates in this category.
               </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtered.map((template) => (
                   <PrebuiltTemplateCard
                     key={template.id}
@@ -121,10 +140,12 @@ export function PrebuiltTemplateModal({
 
 function CategoryChip({
   label,
+  count,
   active,
   onClick,
 }: {
   label: string;
+  count: number;
   active: boolean;
   onClick: () => void;
 }) {
@@ -132,13 +153,22 @@ function CategoryChip({
     <button
       onClick={onClick}
       className={clsx(
-        'px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors',
+        'px-4 py-1.5 rounded-full text-xs font-medium capitalize transition-all',
+        'flex items-center gap-1.5',
         active
-          ? 'bg-accent text-white'
-          : 'bg-canvas-3 text-text-dark-muted hover:text-text-dark hover:bg-canvas-1'
+          ? 'bg-white text-neutral-900 shadow-sm ring-1 ring-black/[0.06]'
+          : 'text-neutral-500 hover:text-neutral-800'
       )}
     >
-      {label}
+      <span>{label}</span>
+      <span
+        className={clsx(
+          'text-[10px] tabular-nums',
+          active ? 'text-amber-700/80' : 'text-neutral-400'
+        )}
+      >
+        {count}
+      </span>
     </button>
   );
 }
