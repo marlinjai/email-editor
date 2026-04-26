@@ -3,4 +3,5 @@
 
 export * from './types';
 export * from './BlockRegistry';
+export * from './blockCategories';
 
