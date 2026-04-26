@@ -59,6 +59,49 @@ export const ColumnProperties = observer(function ColumnProperties({
           column.updateProperties({ [prop]: value });
         }}
       />
+
+      {column.kind === 'leaf' && (
+        <div className="pt-3 border-t border-border-light">
+          <label className="block text-xs font-semibold text-text-dark-muted uppercase mb-2">
+            Layout
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {[2, 3, 4].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => column.splitIntoSubColumns(n as 2 | 3 | 4)}
+                className="p-2 rounded border border-border-light hover:border-accent hover:bg-accent/5 text-xs text-text-dark"
+              >
+                Split {n}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-text-dark-muted leading-snug">
+            Split this column into 2-4 side-by-side sub-columns.
+            Existing blocks move to sub-column 1.
+          </p>
+        </div>
+      )}
+
+      {column.kind === 'group' && (
+        <div className="pt-3 border-t border-border-light">
+          <label className="block text-xs font-semibold text-text-dark-muted uppercase mb-2">
+            Layout
+          </label>
+          <p className="text-[11px] text-text-dark-muted">
+            This column has {column.subColumns.length} sub-columns.
+            Select one in the canvas to edit its properties, or click below to merge them back into a single column.
+          </p>
+          <button
+            type="button"
+            onClick={() => column.mergeSubColumns()}
+            className="mt-2 w-full p-2 text-xs text-text-dark border border-border-light rounded hover:border-accent hover:bg-accent/5"
+          >
+            Merge sub-columns into one
+          </button>
+        </div>
+      )}
     </div>
   );
 });
