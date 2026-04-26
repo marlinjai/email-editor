@@ -3,6 +3,7 @@
 // SERVER-SIDE ONLY - Do not import in client code
 
 import mjml2html from 'mjml';
+import { blockToRawHtml } from './blockToRawHtml';
 import type {
   EmailTemplate,
   Section,
@@ -47,10 +48,17 @@ function spacingToString(spacing?: Spacing): string {
  */
 export class MJMLCompiler {
   /**
+   * Set true while emitting a column with sub-columns. Causes generateHead
+   * to inject the responsive media query exactly once per template.
+   */
+  private needsSubColumnStyles = false;
+
+  /**
    * Compile email template to MJML and HTML
    */
   compile(template: EmailTemplate): CompileResult {
     try {
+      this.needsSubColumnStyles = false;
       const mjml = this.templateToMJML(template);
       const result = mjml2html(mjml, {
         validationLevel: 'soft',
@@ -78,9 +86,11 @@ export class MJMLCompiler {
    */
   private templateToMJML(template: EmailTemplate): string {
     const { metadata, sections } = template;
-    
-    const head = this.generateHead(metadata);
+
+    // Render body first so columnToMJML can flip the needsSubColumnStyles
+    // flag before we generate the head.
     const body = sections.map((section) => this.sectionToMJML(section)).join('\n');
+    const head = this.generateHead(metadata);
 
     return `
 <mjml>
@@ -137,6 +147,23 @@ export class MJMLCompiler {
     // mj-style inline - Inline CSS
     if (metadata.inlineCSS) {
       parts.push(`<mj-style inline="inline">${metadata.inlineCSS}</mj-style>`);
+    }
+
+    // Responsive media query for nested sub-columns. Only emitted when
+    // any column in the template uses sub-columns.
+    if (this.needsSubColumnStyles) {
+      parts.push(`<mj-style>
+@media only screen and (max-width:480px) {
+  table.ee-sub-cols td.ee-sub-col {
+    display: block !important;
+    width: 100% !important;
+    padding-bottom: 12px !important;
+  }
+  table.ee-sub-cols td.ee-sub-col:last-child {
+    padding-bottom: 0 !important;
+  }
+}
+</mj-style>`);
     }
 
     parts.push('</mj-head>');
@@ -215,6 +242,11 @@ export class MJMLCompiler {
     // Skip hidden columns
     if (column.hidden) return '';
 
+    // Group-kind: emit a sealed mj-raw nested table for the sub-columns.
+    if (column.subColumns && column.subColumns.length > 0) {
+      return this.subColumnsToMJML(column);
+    }
+
     const attrs: string[] = [`css-class="el-column el-${column.id}"`];
     
     if (column.width) {
@@ -236,6 +268,55 @@ export class MJMLCompiler {
     return `
 <mj-column ${attrs.join(' ')}>
   ${blocks}
+</mj-column>
+    `.trim();
+  }
+
+  /**
+   * Emit a group column as an mj-column wrapping a hand-built nested
+   * table inside an mj-raw island. The parent mj-section structure
+   * stays standard MJML; only the nested area escapes MJML's parser.
+   *
+   * The responsive media query (table.ee-sub-cols td.ee-sub-col) is
+   * injected once at document head via generateHead when the
+   * needsSubColumnStyles flag is set.
+   */
+  private subColumnsToMJML(column: Column): string {
+    this.needsSubColumnStyles = true;
+
+    const subs = column.subColumns ?? [];
+    // Normalize widths to sum to 100%.
+    const sumRaw = subs.reduce((a, s) => a + (s.width || 0), 0) || 100;
+    const widths = subs.map((s) => Math.round(((s.width || 0) / sumRaw) * 10000) / 100);
+
+    const cells = subs.map((sc, i) => {
+      const inner = (sc.blocks ?? []).map((b: any) => blockToRawHtml(b)).join('\n');
+      const valign = sc.verticalAlign ?? 'top';
+      const hasPadding = sc.paddingTop || sc.paddingRight || sc.paddingBottom || sc.paddingLeft;
+      const padding = hasPadding
+        ? `padding:${sc.paddingTop || '0'} ${sc.paddingRight || '0'} ${sc.paddingBottom || '0'} ${sc.paddingLeft || '0'};`
+        : 'padding:10px;';
+      const bg = sc.backgroundColor ? `background-color:${sc.backgroundColor};` : '';
+      return `<td class="ee-sub-col" width="${widths[i]}%" valign="${valign}" style="${padding}${bg}">${inner}</td>`;
+    }).join('');
+
+    // Reuse the standard column attribute path so width / bg / padding still apply on the parent column.
+    const colAttrs: string[] = [`css-class="el-column el-${column.id}"`];
+    if (column.width) colAttrs.push(`width="${column.width}%"`);
+    if (column.backgroundColor) colAttrs.push(`background-color="${column.backgroundColor}"`);
+    if (column.verticalAlign) colAttrs.push(`vertical-align="${column.verticalAlign}"`);
+    if (column.padding) {
+      const padding = spacingToString(column.padding);
+      if (padding) colAttrs.push(`padding="${padding}"`);
+    }
+
+    return `
+<mj-column ${colAttrs.join(' ')}>
+  <mj-raw>
+    <table role="presentation" class="ee-sub-cols" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+      <tr>${cells}</tr>
+    </table>
+  </mj-raw>
 </mj-column>
     `.trim();
   }
