@@ -399,6 +399,29 @@ function useKeyboardShortcuts(store: RootStoreInstance) {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const activeEl = document.activeElement;
         if (activeEl?.tagName !== 'INPUT' && activeEl?.tagName !== 'TEXTAREA') {
+          // Sub-column first: delete the sub-column or auto-merge back if count would drop to 1.
+          if (store.editorUI.selectedSubColumnId) {
+            e.preventDefault();
+            const targetId = store.editorUI.selectedSubColumnId;
+            let parent: any;
+            for (const section of store.template.sections) {
+              for (const col of section.columns) {
+                const has = (col.subColumns ?? []).some((s: any) => s.id === targetId);
+                if (has) { parent = col; break; }
+              }
+              if (parent) break;
+            }
+            if (parent) {
+              if (parent.subColumns.length === 2) {
+                parent.mergeSubColumns();
+              } else {
+                const idx = parent.subColumns.findIndex((s: any) => s.id === targetId);
+                if (idx >= 0) parent.subColumns.splice(idx, 1);
+              }
+              store.editorUI.selectColumn(parent.id);
+            }
+            return;
+          }
           if (store.editorUI.selectedBlockId) {
             e.preventDefault();
             store.template.deleteBlock(store.editorUI.selectedBlockId);
