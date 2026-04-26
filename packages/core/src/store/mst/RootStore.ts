@@ -12,6 +12,7 @@ import { EditorUIStore, EditorUIInstance } from './EditorUIStore';
 import type { BlockInstance } from './models/BlockModel';
 import type { ColumnInstance } from './models/ColumnModel';
 import type { SectionInstance } from './models/SectionModel';
+import type { SubColumnInstance } from './models/SubColumnModel';
 
 /**
  * RootStore - The main store for the email editor
@@ -184,6 +185,21 @@ export const RootStore = types
     get selectedColumn(): ColumnInstance | undefined {
       if (!self.editorUI.selectedColumnId) return undefined;
       return self.template.findColumnById(self.editorUI.selectedColumnId);
+    },
+
+    /**
+     * Get the currently selected sub-column (depth-2 nested).
+     */
+    get selectedSubColumn(): SubColumnInstance | undefined {
+      const id = self.editorUI.selectedSubColumnId;
+      if (!id) return undefined;
+      for (const section of self.template.sections) {
+        for (const column of section.columns) {
+          const sc = (column.subColumns ?? []).find((s: SubColumnInstance) => s.id === id);
+          if (sc) return sc;
+        }
+      }
+      return undefined;
     },
 
     /**
