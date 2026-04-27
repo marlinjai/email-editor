@@ -1,5 +1,13 @@
 # Roadmap
 
+## Recently shipped
+
+- Depth-2 nested columns (a column can split into 2-4 sub-columns) with a
+  full canvas UX: handle-on-hover, inspector panel, layers-panel nesting,
+  Backspace-to-delete with auto-merge, container-block palette filter.
+  Compiles to email-safe nested HTML for the 85-90% client tier
+  (Apple Mail + Gmail + modern Outlook).
+
 ## Phase 0 - Foundation (complete)
 
 - [x] Core editor with drag-and-drop blocks

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Canvas UX (depth-2 nested columns)
+- A column can be split into 2-4 sub-columns via the inspector or merged
+  back into a single column. Sub-columns hold leaf blocks only (text, image,
+  button, divider, spacer, social); container blocks are filtered out of
+  the palette while a sub-column is selected.
+- Sub-columns are first-class on the canvas: handle-on-hover at top-center,
+  inset blue selection ring, dedicated inspector panel, layers-panel nesting
+  one level deeper than columns.
+- Backspace deletes the selected sub-column. When the parent would be left
+  with a single sub-column, blocks auto-merge back into the parent column.
+- Compiles to a sealed `<mj-raw>` HTML island wrapping a hand-built nested
+  `<table>` inside the parent `<mj-column>`. The responsive media query
+  (sub-columns stack to full width on mobile) is injected once at document
+  head whenever any column in the template uses sub-columns. Targets the
+  85-90% client tier (Apple Mail + Gmail + modern Outlook); Classic Outlook
+  for Windows is out of scope (retiring October 2026).
+- Spec: `docs/superpowers/specs/2026-04-26-nested-columns-design.md`.
+  Tier rationale: `docs/internal/email-client-rendering-landscape.md`.
+
 #### Phase 0 - Foundation
 - Marketing landing page at `/` with indigo-themed design
 - Editor moved to `/editor` route
