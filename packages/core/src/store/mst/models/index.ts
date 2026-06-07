@@ -23,6 +23,14 @@ export {
 } from './ColumnModel';
 
 export {
+  SubColumnModel,
+  createSubColumn,
+  type SubColumnInstance,
+  type SubColumnSnapshotIn,
+  type SubColumnSnapshotOut,
+} from './SubColumnModel';
+
+export {
   SectionModel,
   createSection,
   type SectionInstance,

@@ -2,20 +2,22 @@
 // Layout panel with section structure options
 
 import React, { useState } from 'react';
-import { useDraggable } from '@dnd-kit/core';
-import { Columns, Square, Layout } from 'lucide-react';
+import { LayoutTemplate } from 'lucide-react';
 import clsx from 'clsx';
 import type { PrebuiltTemplate } from '@marlinjai/email-editor-core';
+import { PrebuiltTemplateModal } from './PrebuiltTemplateModal';
 
 interface LayoutPanelProps {
   templates: PrebuiltTemplate[];
   onAddSection: (columns: 1 | 2 | 3) => void;
+  onAddPrebuilt: (template: PrebuiltTemplate) => void;
 }
 
 type LayoutTab = 'sections' | 'prebuilt';
 
-export function LayoutPanel({ templates, onAddSection }: LayoutPanelProps) {
+export function LayoutPanel({ templates, onAddSection, onAddPrebuilt }: LayoutPanelProps) {
   const [activeTab, setActiveTab] = useState<LayoutTab>('sections');
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-full">
@@ -48,8 +50,20 @@ export function LayoutPanel({ templates, onAddSection }: LayoutPanelProps) {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto p-3">
         {activeTab === 'sections' && <SectionStructures onAddSection={onAddSection} />}
-        {activeTab === 'prebuilt' && <PrebuiltTemplates templates={templates} />}
+        {activeTab === 'prebuilt' && (
+          <PrebuiltLauncher
+            templateCount={templates.length}
+            onOpen={() => setModalOpen(true)}
+          />
+        )}
       </div>
+
+      <PrebuiltTemplateModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        templates={templates}
+        onSelect={onAddPrebuilt}
+      />
     </div>
   );
 }
@@ -98,10 +112,16 @@ function SectionButton({ columns, onClick }: { columns: 1 | 2 | 3; onClick: () =
   );
 }
 
-// === Pre-built Templates ===
+// === Pre-built Launcher ===
 
-function PrebuiltTemplates({ templates }: { templates: PrebuiltTemplate[] }) {
-  if (templates.length === 0) {
+function PrebuiltLauncher({
+  templateCount,
+  onOpen,
+}: {
+  templateCount: number;
+  onOpen: () => void;
+}) {
+  if (templateCount === 0) {
     return (
       <div className="text-center text-text-dark-muted text-sm py-8">
         No pre-built templates available
@@ -110,41 +130,25 @@ function PrebuiltTemplates({ templates }: { templates: PrebuiltTemplate[] }) {
   }
 
   return (
-    <div className="space-y-2">
-      <h4 className="text-xs font-semibold text-text-dark-muted uppercase mb-2">
-        Drag to Add
-      </h4>
-      {templates.map((template) => (
-        <PrebuiltTemplateItem key={template.id} template={template} />
-      ))}
-    </div>
-  );
-}
+    <div className="space-y-3">
+      <button
+        onClick={onOpen}
+        className={clsx(
+          'w-full flex flex-col items-center gap-2 p-6 rounded-lg',
+          'border border-dashed border-border-light hover:border-accent hover:bg-accent/5',
+          'text-text-dark transition-colors'
+        )}
+      >
+        <LayoutTemplate size={28} className="text-accent" />
+        <span className="text-sm font-semibold">Browse pre-built sections</span>
+        <span className="text-xs text-text-dark-muted">
+          {templateCount} ready-made layouts
+        </span>
+      </button>
 
-function PrebuiltTemplateItem({ template }: { template: PrebuiltTemplate }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `template-${template.id}`,
-    data: { templateId: template.id },
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      className={clsx(
-        'p-3 rounded-lg border border-border-light cursor-grab',
-        'hover:border-accent hover:bg-accent/5 transition-colors',
-        isDragging && 'opacity-50'
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <Layout size={16} className="text-text-dark-muted" />
-        <span className="text-sm font-medium text-text-dark">{template.name}</span>
-      </div>
-      {template.description && (
-        <p className="mt-1 text-xs text-text-dark-muted">{template.description}</p>
-      )}
+      <p className="text-xs text-text-dark-muted text-center">
+        Visual previews open in a full-size browser.
+      </p>
     </div>
   );
 }

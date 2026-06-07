@@ -292,6 +292,29 @@ export interface Column {
   backgroundGradient?: BackgroundGradient;
   verticalAlign?: 'top' | 'middle' | 'bottom';
   padding?: Spacing;
+  /**
+   * Optional sub-columns. When non-empty, `blocks` MUST be empty
+   * (a column is either a leaf with blocks, or a group with sub-columns).
+   * See `docs/superpowers/specs/2026-04-26-nested-columns-design.md`.
+   */
+  subColumns?: SubColumn[];
+}
+
+/**
+ * Sub-column inside a "group"-kind Column. Holds only leaf blocks
+ * (text, image, button, divider, spacer, social). Cannot itself contain
+ * sub-columns (no nesting beyond depth 2).
+ */
+export interface SubColumn {
+  id: string;
+  width: number; // Percentage of the parent column
+  blocks: Block[];
+  backgroundColor?: string;
+  verticalAlign?: 'top' | 'middle' | 'bottom';
+  paddingTop?: string;
+  paddingRight?: string;
+  paddingBottom?: string;
+  paddingLeft?: string;
 }
 
 /**
@@ -302,10 +325,10 @@ export interface Section {
   type: 'section';
   backgroundColor?: string;
   backgroundImage?: string;
+  backgroundGradient?: BackgroundGradient;
   backgroundPosition?: string;
   backgroundRepeat?: 'repeat' | 'no-repeat';
   backgroundSize?: string;
-  backgroundGradient?: BackgroundGradient;
   fullWidth?: boolean;
   isWrapper?: boolean;
   noStack?: boolean;

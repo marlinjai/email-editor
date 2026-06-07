@@ -31,7 +31,9 @@ export interface DragData {
  * Drop intent for visual feedback
  */
 export interface DropIntent {
-  targetColumnId: string;
+  /** Either targetColumnId or targetSubColumnId is set, not both. */
+  targetColumnId?: string;
+  targetSubColumnId?: string;
   targetIndex: number;
   position: 'before' | 'after' | 'inside';
 }
@@ -63,6 +65,7 @@ export const EditorUIStore = types
     selectedBlockId: types.maybe(types.string),
     selectedSectionId: types.maybe(types.string),
     selectedColumnId: types.maybe(types.string),
+    selectedSubColumnId: types.maybe(types.string),
 
     // === Panel State ===
     activeTab: types.optional(
@@ -84,6 +87,7 @@ export const EditorUIStore = types
     hoverBlockId: undefined as string | undefined,
     hoverSectionId: undefined as string | undefined,
     hoverColumnId: undefined as string | undefined,
+    hoverSubColumnId: undefined as string | undefined,
 
     // Drag state
     isDragging: false,
@@ -108,6 +112,7 @@ export const EditorUIStore = types
       self.selectedBlockId = blockId || undefined;
       self.selectedSectionId = undefined;
       self.selectedColumnId = undefined;
+      self.selectedSubColumnId = undefined;
     },
 
     /**
@@ -117,6 +122,7 @@ export const EditorUIStore = types
       self.selectedSectionId = sectionId || undefined;
       self.selectedBlockId = undefined;
       self.selectedColumnId = undefined;
+      self.selectedSubColumnId = undefined;
     },
 
     /**
@@ -126,6 +132,18 @@ export const EditorUIStore = types
       self.selectedColumnId = columnId || undefined;
       self.selectedBlockId = undefined;
       self.selectedSectionId = undefined;
+      self.selectedSubColumnId = undefined;
+    },
+
+    /**
+     * Select a sub-column (depth-2 nested column).
+     * Mutually exclusive with the other selection levels.
+     */
+    selectSubColumn(subColumnId: string | null) {
+      self.selectedSubColumnId = subColumnId || undefined;
+      self.selectedBlockId = undefined;
+      self.selectedSectionId = undefined;
+      self.selectedColumnId = undefined;
     },
 
     /**
@@ -135,6 +153,7 @@ export const EditorUIStore = types
       self.selectedBlockId = undefined;
       self.selectedSectionId = undefined;
       self.selectedColumnId = undefined;
+      self.selectedSubColumnId = undefined;
     },
 
     // === Hover Actions ===
@@ -161,12 +180,20 @@ export const EditorUIStore = types
     },
 
     /**
+     * Set hover sub-column (depth-2 nested)
+     */
+    setHoverSubColumn(subColumnId: string | undefined) {
+      self.hoverSubColumnId = subColumnId;
+    },
+
+    /**
      * Clear all hover states
      */
     clearHover() {
       self.hoverBlockId = undefined;
       self.hoverSectionId = undefined;
       self.hoverColumnId = undefined;
+      self.hoverSubColumnId = undefined;
     },
 
     // === Drag Actions ===

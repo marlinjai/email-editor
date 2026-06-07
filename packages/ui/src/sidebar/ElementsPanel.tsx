@@ -1,10 +1,13 @@
 // packages/ui/src/sidebar/ElementsPanel.tsx
 // Elements panel showing base MJML blocks
 
+import React from 'react';
+import { observer } from 'mobx-react-lite';
 import { useDraggable } from '@dnd-kit/core';
 import { Type, Image, Square, Minus, Space, Share2, List, Code } from 'lucide-react';
-import type { BlockDefinition } from '@marlinjai/email-editor-core';
+import { isLeafBlockType, type BlockDefinition, type BlockType } from '@marlinjai/email-editor-core';
 import clsx from 'clsx';
+import { useStore } from '../store';
 
 interface ElementsPanelProps {
   blocks: BlockDefinition[];
@@ -14,17 +17,31 @@ interface ElementsPanelProps {
  * Panel showing draggable base elements (MJML blocks)
  * Matches Mailjet's "Elements > Content" panel
  */
-export function ElementsPanel({ blocks }: ElementsPanelProps) {
+export const ElementsPanel = observer(function ElementsPanel({ blocks }: ElementsPanelProps) {
+  const { editorUI } = useStore();
+  // When a sub-column is the active context, container blocks are
+  // hidden because they would compound table nesting beyond the
+  // 85-90% client tier's safe rendering depth.
+  const isSubColumnContext = !!editorUI.selectedSubColumnId;
+
   // Filter out branded/locked blocks - show only base elements
-  const contentBlocks = blocks.filter(
+  let contentBlocks = blocks.filter(
     (b) => b.category !== 'brand' && b.type !== 'header' && b.type !== 'footer'
   );
+  if (isSubColumnContext) {
+    contentBlocks = contentBlocks.filter((b) => isLeafBlockType(b.type as BlockType));
+  }
 
   return (
     <div className="p-4">
       <h3 className="text-sm font-semibold text-text-dark-muted mb-3 uppercase tracking-wide">
         Content
       </h3>
+      {isSubColumnContext && (
+        <p className="text-[10px] text-amber-700/80 mb-2 leading-snug">
+          Container blocks (hero, carousel, footer…) are hidden inside sub-columns to keep the email render-safe.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-2">
         {contentBlocks.map((block) => (
           <ElementItem key={block.type} definition={block} />
@@ -32,7 +49,7 @@ export function ElementsPanel({ blocks }: ElementsPanelProps) {
       </div>
     </div>
   );
-}
+});
 
 /**
  * Single draggable element item

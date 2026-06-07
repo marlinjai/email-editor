@@ -254,14 +254,24 @@ const ColumnItem = observer(function ColumnItem({
   index: number;
 }) {
   const { editorUI } = useStore();
+  const isGroup = column.kind === 'group';
 
   return (
     <div className="ml-2">
-      <div className="px-2 py-1 text-xs text-text-dark-muted">
+      <div
+        className={clsx(
+          'px-2 py-1 text-xs cursor-pointer rounded',
+          editorUI.selectedColumnId === column.id
+            ? 'bg-blue-50 text-blue-800'
+            : 'text-text-dark-muted hover:bg-canvas-1',
+        )}
+        onClick={() => editorUI.selectColumn(column.id)}
+      >
         Column {index + 1} ({column.width}%)
+        {isGroup && <span className="ml-1 text-blue-600">· {column.subColumns.length} sub</span>}
       </div>
 
-      {column.blocks.map((block: any) => (
+      {!isGroup && column.blocks.map((block: any) => (
         <BlockItem
           key={block.id}
           block={block}
@@ -270,8 +280,85 @@ const ColumnItem = observer(function ColumnItem({
         />
       ))}
 
-      {column.blocks.length === 0 && (
+      {!isGroup && column.blocks.length === 0 && (
         <div className="px-4 py-1 text-xs text-text-dark-muted italic">
+          Empty
+        </div>
+      )}
+
+      {isGroup && (
+        <div className="ml-3">
+          {column.subColumns.map((sc: any, scIdx: number) => (
+            <SubColumnItem
+              key={sc.id}
+              subColumn={sc}
+              parentColumn={column}
+              index={scIdx}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+const SubColumnItem = observer(function SubColumnItem({
+  subColumn,
+  parentColumn,
+  index,
+}: {
+  subColumn: any;
+  parentColumn: any;
+  index: number;
+}) {
+  const { editorUI } = useStore();
+  const selected = editorUI.selectedSubColumnId === subColumn.id;
+
+  return (
+    <div>
+      <div
+        className={clsx(
+          'flex items-center gap-1 py-1 px-2 rounded cursor-pointer text-xs',
+          selected ? 'bg-blue-50 text-blue-800' : 'text-text-dark-muted hover:bg-canvas-1',
+        )}
+        onClick={() => editorUI.selectSubColumn(subColumn.id)}
+      >
+        <span className="text-blue-500">⤷</span>
+        <span className="flex-1 truncate">
+          Sub-column {index + 1} ({Math.round(subColumn.width)}%)
+        </span>
+        <button
+          className="opacity-50 hover:opacity-100 text-red-500 px-1"
+          title="Delete sub-column"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (parentColumn.subColumns.length === 2) {
+              // Removing one would leave a single sub-column; auto-merge.
+              parentColumn.mergeSubColumns();
+              editorUI.selectColumn(parentColumn.id);
+            } else {
+              const idx = parentColumn.subColumns.findIndex((s: any) => s.id === subColumn.id);
+              if (idx >= 0) parentColumn.subColumns.splice(idx, 1);
+              editorUI.selectColumn(parentColumn.id);
+            }
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {subColumn.blocks.map((block: any) => (
+        <div className="ml-4" key={block.id}>
+          <BlockItem
+            block={block}
+            isSelected={editorUI.selectedBlockId === block.id}
+            onSelect={() => editorUI.selectBlock(block.id)}
+          />
+        </div>
+      ))}
+
+      {subColumn.blocks.length === 0 && (
+        <div className="ml-4 px-4 py-1 text-[11px] text-text-dark-muted italic">
           Empty
         </div>
       )}

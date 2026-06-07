@@ -4,8 +4,8 @@ import { nanoid } from 'nanoid';
 import { ColumnModel, ColumnInstance, ColumnSnapshotIn, createColumn } from './ColumnModel';
 import { BlockInstance } from './BlockModel';
 import type { CSSProperties } from '../types';
-import type { BackgroundGradient } from '../../../schema/gradient';
-import { buildGradientCSS } from '../../../schema/gradient';
+import type { BackgroundGradient } from '../../..';
+import { buildGradientCSS } from '../../..';
 
 /**
  * SectionModel - A section in the email template
@@ -21,10 +21,21 @@ export const SectionModel = types
     // Background
     backgroundColor: types.maybe(types.string),
     backgroundImage: types.maybe(types.string),
+    backgroundGradient: types.maybe(
+      types.model('BackgroundGradient', {
+        type: types.enumeration(['linear', 'radial']),
+        angle: types.number,
+        stops: types.array(
+          types.model('GradientStop', {
+            color: types.string,
+            position: types.number,
+          })
+        ),
+      })
+    ),
     backgroundPosition: types.maybe(types.string),
     backgroundRepeat: types.maybe(types.enumeration(['repeat', 'no-repeat'])),
     backgroundSize: types.maybe(types.string),
-    backgroundGradient: types.maybe(types.frozen<BackgroundGradient>()),
 
     // Layout
     fullWidth: types.optional(types.boolean, false),
@@ -134,10 +145,10 @@ export const SectionModel = types
     updateProperties(updates: {
       backgroundColor?: string;
       backgroundImage?: string;
+      backgroundGradient?: BackgroundGradient;
       backgroundPosition?: string;
       backgroundRepeat?: 'repeat' | 'no-repeat';
       backgroundSize?: string;
-      backgroundGradient?: BackgroundGradient;
       fullWidth?: boolean;
       isWrapper?: boolean;
       noStack?: boolean;
@@ -300,9 +311,14 @@ export const SectionModel = types
     get computedStyle(): CSSProperties {
       const style: CSSProperties = {};
 
-      if (self.backgroundGradient) {
-        const css = buildGradientCSS(self.backgroundGradient);
-        if (css) style.backgroundImage = css;
+      if (self.backgroundColor) style.backgroundColor = self.backgroundColor;
+
+      const gradientCSS = self.backgroundGradient
+        ? buildGradientCSS(self.backgroundGradient as BackgroundGradient)
+        : undefined;
+
+      if (gradientCSS) {
+        style.backgroundImage = gradientCSS;
       } else if (self.backgroundImage) {
         style.backgroundImage = `url(${self.backgroundImage})`;
         if (self.backgroundPosition) style.backgroundPosition = self.backgroundPosition;
@@ -310,7 +326,6 @@ export const SectionModel = types
         if (self.backgroundSize) style.backgroundSize = self.backgroundSize;
       }
 
-      if (self.backgroundColor) style.backgroundColor = self.backgroundColor;
       if (self.paddingTop) style.paddingTop = self.paddingTop;
       if (self.paddingRight) style.paddingRight = self.paddingRight;
       if (self.paddingBottom) style.paddingBottom = self.paddingBottom;

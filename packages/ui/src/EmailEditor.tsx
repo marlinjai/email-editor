@@ -28,6 +28,7 @@ import {
   createRootStore,
   BlockType,
   createSection,
+  isLeafBlockType,
   type RootStoreInstance,
   type TemplateSnapshotIn,
   type TemplateSnapshotOut,
@@ -172,6 +173,12 @@ const EmailEditorContent = observer(function EmailEditorContent({
     editorUI.selectSection(section.id);
   }, [template, editorUI]);
 
+  const handleAddPrebuilt = useCallback((prebuilt: { section: any }) => {
+    const newSection = cloneSectionWithNewIds(prebuilt.section);
+    template.addSection(newSection);
+    editorUI.selectSection(newSection.id);
+  }, [template, editorUI]);
+
   const handleDeleteBlock = useCallback((blockId: string) => {
     template.deleteBlock(blockId);
     if (editorUI.selectedBlockId === blockId) {
@@ -206,6 +213,7 @@ const EmailEditorContent = observer(function EmailEditorContent({
             blockRegistry={blockRegistry}
             prebuiltRegistry={prebuiltRegistry}
             onAddSection={handleAddSection}
+            onAddPrebuilt={handleAddPrebuilt}
           />
 
           <div className="flex-1 overflow-auto bg-canvas-1 p-8">
@@ -391,6 +399,29 @@ function useKeyboardShortcuts(store: RootStoreInstance) {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const activeEl = document.activeElement;
         if (activeEl?.tagName !== 'INPUT' && activeEl?.tagName !== 'TEXTAREA') {
+          // Sub-column first: delete the sub-column or auto-merge back if count would drop to 1.
+          if (store.editorUI.selectedSubColumnId) {
+            e.preventDefault();
+            const targetId = store.editorUI.selectedSubColumnId;
+            let parent: any;
+            for (const section of store.template.sections) {
+              for (const col of section.columns) {
+                const has = (col.subColumns ?? []).some((s: any) => s.id === targetId);
+                if (has) { parent = col; break; }
+              }
+              if (parent) break;
+            }
+            if (parent) {
+              if (parent.subColumns.length === 2) {
+                parent.mergeSubColumns();
+              } else {
+                const idx = parent.subColumns.findIndex((s: any) => s.id === targetId);
+                if (idx >= 0) parent.subColumns.splice(idx, 1);
+              }
+              store.editorUI.selectColumn(parent.id);
+            }
+            return;
+          }
           if (store.editorUI.selectedBlockId) {
             e.preventDefault();
             store.template.deleteBlock(store.editorUI.selectedBlockId);
@@ -461,6 +492,31 @@ function handleDrop(
       const section = createSection();
       template.addSection(section);
       template.insertBlock(template.sections[0].columns[0].id, newBlock, 0);
+    } else if (dropId.startsWith('drop-subcolumn-')) {
+      // Format: drop-subcolumn-<subColumnId>-<index>
+      const m = dropId.match(/^drop-subcolumn-(.+)-(\d+)$/);
+      if (m) {
+        const [, subColumnId, indexStr] = m;
+        const index = parseInt(indexStr, 10);
+        if (!isLeafBlockType(blockType as any)) {
+          // Container blocks are not allowed inside sub-columns; bail silently.
+          return;
+        }
+        // Walk the template to find the sub-column instance.
+        let target: any = undefined;
+        for (const section of template.sections) {
+          for (const col of section.columns) {
+            const sc = (col.subColumns ?? []).find?.((s: any) => s.id === subColumnId);
+            if (sc) { target = sc; break; }
+          }
+          if (target) break;
+        }
+        if (target) {
+          target.addBlock(newBlock, index);
+          editorUI.selectBlock(newBlock.id);
+          return;
+        }
+      }
     } else if (dropId.startsWith('drop-column-')) {
       const columnId = dropId.replace('drop-column-', '').replace('-end', '');
       const column = template.findColumnById(columnId);
@@ -468,11 +524,15 @@ function handleDrop(
         template.insertBlock(columnId, newBlock, column.blocks.length);
       }
     } else if (editorUI.dropIntent) {
-      template.insertBlock(
-        editorUI.dropIntent.targetColumnId,
-        newBlock,
-        editorUI.dropIntent.targetIndex
-      );
+      // dropIntent may target a column or a sub-column; the sub-column path
+      // is handled above, so this fallback is the column path.
+      if (editorUI.dropIntent.targetColumnId) {
+        template.insertBlock(
+          editorUI.dropIntent.targetColumnId,
+          newBlock,
+          editorUI.dropIntent.targetIndex
+        );
+      }
     }
   }
 

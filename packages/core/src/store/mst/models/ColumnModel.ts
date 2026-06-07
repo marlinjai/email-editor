@@ -1,7 +1,8 @@
 // packages/core/src/store/mst/models/ColumnModel.ts
-import { types, Instance, SnapshotIn, SnapshotOut, destroy, detach } from 'mobx-state-tree';
+import { types, Instance, SnapshotIn, SnapshotOut, destroy, detach, isStateTreeNode } from 'mobx-state-tree';
 import { nanoid } from 'nanoid';
 import { BlockModel, BlockInstance, BlockSnapshotIn, BlockType } from './BlockModel';
+import { SubColumnModel, createSubColumn } from './SubColumnModel';
 import type { CSSProperties } from '../types';
 import type { BackgroundGradient } from '../../../schema/gradient';
 import { buildGradientCSS } from '../../../schema/gradient';
@@ -25,13 +26,38 @@ export const ColumnModel = types
     paddingLeft: types.maybe(types.string),
     hidden: types.optional(types.boolean, false),
     blocks: types.array(BlockModel),
+    /**
+     * Optional sub-columns for depth-2 nesting.
+     * Invariant: blocks XOR subColumns. Both can be empty, but never both populated.
+     *
+     * `types.late` is used to break TypeScript's deep inference, which otherwise
+     * makes the inferred RootStore type exceed the compiler's serialization limit.
+     */
+    subColumns: types.optional(types.array(types.late(() => SubColumnModel)), []),
+  })
+  .preProcessSnapshot((snapshot: any) => {
+    if (
+      snapshot &&
+      Array.isArray(snapshot.blocks) && snapshot.blocks.length > 0 &&
+      Array.isArray(snapshot.subColumns) && snapshot.subColumns.length > 0
+    ) {
+      throw new Error(
+        'Invalid Column snapshot: cannot have both blocks and subColumns populated',
+      );
+    }
+    return snapshot;
   })
   .actions(self => ({
     /**
      * Add a block to this column
      */
     addBlock(block: BlockSnapshotIn | BlockInstance, index?: number) {
-      const blockToAdd = BlockModel.is(block) ? detach(block) : BlockModel.create(block as BlockSnapshotIn);
+      if (self.subColumns.length > 0) {
+        throw new Error('Cannot add block to a group column; merge sub-columns first');
+      }
+      const blockToAdd = isStateTreeNode(block)
+        ? detach(block as BlockInstance)
+        : BlockModel.create(block as BlockSnapshotIn);
       if (index !== undefined && index >= 0 && index <= self.blocks.length) {
         self.blocks.splice(index, 0, blockToAdd);
       } else {
@@ -129,8 +155,59 @@ export const ColumnModel = types
       self.blocks.forEach(block => destroy(block));
       self.blocks.clear();
     },
+
+    /**
+     * Convert this leaf column into a group of N sub-columns (2-4).
+     * Existing blocks migrate into the first sub-column.
+     */
+    splitIntoSubColumns(count: 2 | 3 | 4) {
+      if (count < 2 || count > 4) {
+        throw new Error(`splitIntoSubColumns requires count in [2..4], got ${count}`);
+      }
+      // Detach existing blocks before clearing the array.
+      const firstBlocks = self.blocks.map(b => detach(b)) as BlockInstance[];
+      self.blocks.clear();
+      self.subColumns.clear();
+      // Distribute width evenly. Last column absorbs the rounding remainder.
+      const base = Math.floor((100 / count) * 100) / 100;
+      for (let i = 0; i < count; i++) {
+        const isLast = i === count - 1;
+        const w = isLast
+          ? Math.round((100 - base * (count - 1)) * 100) / 100
+          : base;
+        self.subColumns.push(
+          SubColumnModel.create(createSubColumn({
+            width: w,
+            blocks: i === 0 ? (firstBlocks as any) : [],
+          })),
+        );
+      }
+    },
+
+    /**
+     * Merge all sub-column blocks back into self.blocks (concatenated in order).
+     */
+    mergeSubColumns() {
+      const collected: BlockInstance[] = [];
+      for (const sc of self.subColumns) {
+        while (sc.blocks.length > 0) {
+          const b = detach(sc.blocks[0]) as BlockInstance;
+          collected.push(b);
+        }
+      }
+      self.subColumns.clear();
+      for (const b of collected) {
+        self.blocks.push(b as any);
+      }
+    },
   }))
   .views(self => ({
+    /**
+     * Whether this column is a leaf (holds blocks) or a group (holds sub-columns).
+     */
+    get kind(): 'leaf' | 'group' {
+      return self.subColumns.length > 0 ? 'group' : 'leaf';
+    },
     /**
      * Find a block by ID
      */

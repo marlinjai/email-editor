@@ -4,7 +4,7 @@
 import React from 'react';
 import { observer } from 'mobx-react-lite';
 import clsx from 'clsx';
-import type { SectionInstance } from '@marlinjai/email-editor-core';
+import type { SectionInstance, BackgroundGradient } from '@marlinjai/email-editor-core';
 import {
   TextField,
   ColorField,
@@ -89,7 +89,7 @@ export const SectionProperties = observer(function SectionProperties({
 
         {mode === 'gradient' && (
           <GradientField
-            value={section.backgroundGradient}
+            value={section.backgroundGradient as BackgroundGradient | undefined}
             onChange={(gradient) => section.updateProperties({ backgroundGradient: gradient })}
           />
         )}

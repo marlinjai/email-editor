@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import type { ColumnInstance, SectionInstance } from '@marlinjai/email-editor-core';
 import { useStore } from '../store';
 import { BlockRenderer } from './BlockRenderer';
+import { SubColumnRenderer } from './SubColumnRenderer';
 
 interface ColumnRendererProps {
   column: ColumnInstance;
@@ -85,7 +86,49 @@ export const ColumnRenderer = observer(({ column, section, columnIndex }: Column
         editorUI.setHoverColumn(undefined);
       }}
     >
-      {/* Column content */}
+      {/* Column handle: discoverable click target since blocks usually fill the column */}
+      {!editorUI.isDragging && (
+        <button
+          type="button"
+          className={clsx(
+            'column-handle absolute top-0 left-1/2 -translate-x-1/2 z-10',
+            'px-2 py-0.5 text-[10px] font-medium rounded-b cursor-pointer transition-opacity',
+            isSelected
+              ? 'bg-blue-500 text-white opacity-100'
+              : isHovered
+              ? 'bg-blue-100 text-blue-700 opacity-100'
+              : 'bg-blue-100 text-blue-700 opacity-0 hover:opacity-100'
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            editorUI.selectColumn(column.id);
+          }}
+        >
+          Col {columnIndex + 1} · {column.width}%
+        </button>
+      )}
+
+      {/* Group-kind column: render sub-columns as a nested table */}
+      {column.kind === 'group' && (
+        <table
+          width="100%"
+          cellPadding={0}
+          cellSpacing={0}
+          role="presentation"
+          style={{ borderCollapse: 'collapse' }}
+        >
+          <tbody>
+            <tr>
+              {column.subColumns.map((sc, i) => (
+                <SubColumnRenderer key={sc.id} subColumn={sc} subColumnIndex={i} />
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* Leaf-kind column: blocks list (existing behavior) */}
+      {column.kind === 'leaf' && (
       <div className="column-content space-y-2">
         {column.blocks.map((block, index) => (
           <React.Fragment key={block.id}>
@@ -125,6 +168,7 @@ export const ColumnRenderer = observer(({ column, section, columnIndex }: Column
           </div>
         )}
       </div>
+      )}
     </td>
   );
 });
