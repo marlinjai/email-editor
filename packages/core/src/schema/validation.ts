@@ -2,6 +2,7 @@
 // Zod schemas for runtime validation
 
 import { z } from 'zod';
+import type { BackgroundGradient } from './gradient';
 
 /**
  * Spacing schema
@@ -12,6 +13,23 @@ export const SpacingSchema = z.object({
   bottom: z.string().optional(),
   left: z.string().optional(),
 });
+
+/**
+ * Gradient stop schema
+ */
+export const GradientStopSchema = z.object({
+  color: z.string().min(1),
+  position: z.number().min(0).max(100),
+});
+
+/**
+ * Background gradient schema
+ */
+export const BackgroundGradientSchema = z.object({
+  type: z.enum(['linear', 'radial']),
+  angle: z.number().min(0).max(360),
+  stops: z.array(GradientStopSchema).min(1),
+}) satisfies z.ZodType<BackgroundGradient>;
 
 /**
  * Custom font schema
@@ -293,6 +311,7 @@ export const ColumnSchema = z.object({
   id: z.string(),
   width: z.number().min(0).max(100).optional(),
   backgroundColor: z.string().optional(),
+  backgroundGradient: BackgroundGradientSchema.optional(),
   padding: SpacingSchema.optional(),
   verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(), // Vertical content alignment
   hidden: z.boolean().optional(),
@@ -310,6 +329,7 @@ export const SectionSchema = z.object({
   backgroundPosition: z.string().optional(),
   backgroundRepeat: z.enum(['repeat', 'no-repeat']).optional(),
   backgroundSize: z.string().optional(),
+  backgroundGradient: BackgroundGradientSchema.optional(),
   padding: SpacingSchema.optional(),
   noStack: z.boolean().optional(),
   fullWidth: z.boolean().optional(),

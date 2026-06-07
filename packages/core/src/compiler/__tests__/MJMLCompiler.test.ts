@@ -431,6 +431,78 @@ describe('MJMLCompiler', () => {
     });
   });
 
+  describe('gradient support', () => {
+    it('injects a linear gradient as mj-style and css-class on section', () => {
+      const template: EmailTemplate = {
+        version: '1.0',
+        metadata: {},
+        sections: [
+          {
+            id: 'sec-grad',
+            type: 'section',
+            backgroundGradient: {
+              type: 'linear',
+              angle: 135,
+              stops: [
+                { color: '#ff0000', position: 0 },
+                { color: '#0000ff', position: 100 },
+              ],
+            },
+            columns: [{ id: 'col-1', blocks: [] }],
+          },
+        ],
+      };
+      const compiler = new MJMLCompiler();
+      const result = compiler.compile(template);
+      expect(result.mjml).toContain('linear-gradient(135deg, #ff0000 0%, #0000ff 100%)');
+      expect(result.mjml).toContain('el-grad-sec-grad');
+      expect(result.mjml).toContain('<mj-style>');
+    });
+
+    it('uses first stop color as background-color fallback for Outlook', () => {
+      const template: EmailTemplate = {
+        version: '1.0',
+        metadata: {},
+        sections: [
+          {
+            id: 'sec-grad',
+            type: 'section',
+            backgroundGradient: {
+              type: 'linear',
+              angle: 90,
+              stops: [
+                { color: '#abcdef', position: 0 },
+                { color: '#fedcba', position: 100 },
+              ],
+            },
+            columns: [{ id: 'col-1', blocks: [] }],
+          },
+        ],
+      };
+      const compiler = new MJMLCompiler();
+      const result = compiler.compile(template);
+      expect(result.mjml).toContain('background-color="#abcdef"');
+    });
+
+    it('does not inject mj-style when no gradients exist', () => {
+      const template: EmailTemplate = {
+        version: '1.0',
+        metadata: {},
+        sections: [
+          {
+            id: 'sec-1',
+            type: 'section',
+            backgroundColor: '#ffffff',
+            columns: [{ id: 'col-1', blocks: [] }],
+          },
+        ],
+      };
+      const compiler = new MJMLCompiler();
+      const result = compiler.compile(template);
+      expect(result.mjml).not.toContain('el-grad-');
+    });
+  });
+
   describe('section features', () => {
     it('supports full-width sections', () => {
       const result = compiler.compile({

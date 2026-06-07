@@ -763,3 +763,54 @@ describe('validateTemplate', () => {
     expect(result.success).toBe(false);
   });
 });
+
+// --- SectionSchema gradient ---
+
+describe('SectionSchema gradient', () => {
+  it('accepts a section with a linear backgroundGradient', () => {
+    const result = SectionSchema.safeParse({
+      id: 's1',
+      type: 'section',
+      backgroundGradient: {
+        type: 'linear',
+        angle: 90,
+        stops: [
+          { color: '#ff0000', position: 0 },
+          { color: '#0000ff', position: 100 },
+        ],
+      },
+      columns: [{ id: 'c1', blocks: [] }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a gradient stop with missing color', () => {
+    const result = SectionSchema.safeParse({
+      id: 's1',
+      type: 'section',
+      backgroundGradient: {
+        type: 'linear',
+        angle: 90,
+        stops: [{ position: 0 }],
+      },
+      columns: [{ id: 'c1', blocks: [] }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a column with a radial backgroundGradient', () => {
+    const result = ColumnSchema.safeParse({
+      id: 'c1',
+      backgroundGradient: {
+        type: 'radial',
+        angle: 0,
+        stops: [
+          { color: '#fff', position: 0 },
+          { color: '#000', position: 100 },
+        ],
+      },
+      blocks: [],
+    });
+    expect(result.success).toBe(true);
+  });
+});
