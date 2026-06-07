@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-campaigns",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Campaign management, scheduling, A/B testing, tracking, and send orchestration for email campaigns",
   "main": "./dist/index.js",

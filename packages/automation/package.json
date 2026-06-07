@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-automation",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Trigger-based email sequences and workflow automation for email campaigns",
   "main": "./dist/index.js",

@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-templates",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Template management for email editor with CRUD, versioning, and dashboard UI",
   "main": "./dist/index.js",

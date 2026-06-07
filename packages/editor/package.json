@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-editor",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Email editor with MJML compilation",
   "main": "./dist/index.js",

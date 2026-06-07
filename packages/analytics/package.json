@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-analytics",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Campaign tracking, reporting, engagement scoring, and visualization for email campaigns",
   "main": "./dist/index.js",
