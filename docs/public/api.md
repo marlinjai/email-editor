@@ -8,7 +8,7 @@ tags: [email-editor, api-reference, mobx, mjml]
 projects: [email-editor]
 ---
 
-> **Note (2026-03-22):** Data Brain has been archived. `DataBrainTemplateAdapter`, `DataBrainContactAdapter`, `DataBrainCampaignAdapter`, `DataBrainAnalyticsAdapter`, `DataBrainAutomationAdapter`, and the `createDataBrainClient` factory documented below are deprecated.
+> **Note (2026-03-22):** Data Brain has been archived. Platform adapters now consume the `DatabaseAdapter` interface from `@marlinjai/data-table-core`. Use `@marlinjai/data-table-adapter-d1` (Cloudflare D1) or `@marlinjai/data-table-adapter-prisma` (PostgreSQL) as the concrete adapter. The legacy `DataBrain*Adapter` classes and the `createDataBrainClient` factory are deprecated.
 
 # API Reference
 
@@ -449,7 +449,7 @@ interface EditorTheme {
 |--------|-------------|
 | `TemplateManager` | Template CRUD with versioning |
 | `WorkspaceScopedTemplateManager` | Workspace-scoped template manager |
-| `DataBrainTemplateAdapter` | Data Brain storage adapter |
+| `createTemplateAdapter` | Factory that wraps a `DatabaseAdapter` from `@marlinjai/data-table-core` |
 | `TemplateDashboard` | React dashboard component |
 | `TemplateCard` | React template card component |
 | `TemplateVersionHistory` | React version history component |
@@ -459,7 +459,7 @@ interface EditorTheme {
 
 | Export | Description |
 |--------|-------------|
-| `DataBrainContactAdapter` | Data Brain storage adapter |
+| `createContactAdapter` | Factory that wraps a `DatabaseAdapter` from `@marlinjai/data-table-core` |
 | `WorkspaceScopedContactManager` | Workspace-scoped contact manager |
 | `parseCSV`, `importCSV` | CSV import utilities |
 | `resolveMergeFields`, `extractMergeFields` | Merge field processing |
@@ -472,7 +472,7 @@ interface EditorTheme {
 | Export | Description |
 |--------|-------------|
 | `CampaignManager` | Campaign CRUD, scheduling, sending |
-| `DataBrainCampaignAdapter` | Data Brain storage adapter |
+| `createCampaignAdapter` | Factory that wraps a `DatabaseAdapter` from `@marlinjai/data-table-core` |
 | `injectTrackingPixel` | Open tracking pixel injection |
 | `rewriteLinksForTracking` | Click tracking link rewriting |
 | `splitAudience`, `determineWinner` | A/B testing utilities |
@@ -489,7 +489,7 @@ interface EditorTheme {
 | Export | Description |
 |--------|-------------|
 | `AnalyticsTracker` | Event recording and stats aggregation |
-| `DataBrainAnalyticsAdapter` | Data Brain storage adapter |
+| `createAnalyticsAdapter` | Factory that wraps a `DatabaseAdapter` from `@marlinjai/data-table-core` |
 | `handleOpenTrack`, `handleClickTrack` | Tracking endpoint handlers |
 | `calculateEngagementScore`, `categorizeEngagement` | Engagement scoring |
 | `generateHeatmapData`, `injectHeatmapOverlay` | Click heatmap generation |
@@ -512,7 +512,7 @@ interface EditorTheme {
 | Export | Description |
 |--------|-------------|
 | `AutomationEngine` | Sequence execution engine |
-| `DataBrainAutomationAdapter` | Data Brain storage adapter |
+| `createAutomationAdapter` | Factory that wraps a `DatabaseAdapter` from `@marlinjai/data-table-core` |
 | `evaluateCondition` | Conditional step evaluation |
 | `SequenceBuilder`, `AutomationList`, `EnrollmentStatusView` | React components |
 
@@ -520,8 +520,8 @@ interface EditorTheme {
 
 | Export | Description |
 |--------|-------------|
-| `createDataBrainClient`, `createStorageBrainClient` | Client factories |
-| `PlatformProvider`, `useDataBrain`, `useStorageBrain` | React context providers |
+| `createStorageBrainClient` | Storage Brain client factory |
+| `PlatformProvider`, `useDatabase`, `useStorageBrain` | React context providers (database is a `DatabaseAdapter` instance) |
 | `WorkspaceProvider`, `useWorkspace` | Workspace context |
 | `AuthProvider`, `useAuth` | Auth context |
 | `usePaginatedQuery` | Pagination hook |

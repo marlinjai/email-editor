@@ -8,7 +8,7 @@ tags: [email-editor, installation, pnpm, setup]
 projects: [email-editor]
 ---
 
-> **Note (2026-03-22):** Data Brain has been archived. References in this document to configuring platform packages with a Data Brain storage backend are deprecated.
+> **Note (2026-03-22):** Data Brain has been archived. Platform packages now consume the `DatabaseAdapter` interface from `@marlinjai/data-table-core`. Pair with `@marlinjai/data-table-adapter-d1` (Cloudflare D1) or `@marlinjai/data-table-adapter-prisma` (PostgreSQL) as the concrete adapter.
 
 # Installation Instructions
 
@@ -130,7 +130,7 @@ pnpm install @marlinjai/email-teams
 pnpm install @marlinjai/email-automation
 ```
 
-All platform packages use **Data Brain** as their storage backend via adapter classes. See the [Integration](./integration) guide for setup examples.
+All platform packages consume the `DatabaseAdapter` interface from `@marlinjai/data-table-core`. Pair with `@marlinjai/data-table-adapter-d1` for Cloudflare D1 or `@marlinjai/data-table-adapter-prisma` for PostgreSQL. See the [Integration](./integration) guide for setup examples.
 
 ## Alternative: Use npm with Local Packages
 

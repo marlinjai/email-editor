@@ -1,7 +1,7 @@
 /**
- * Data Brain table schema definitions for the contacts package.
- * These describe the tables that need to exist in Data Brain
- * to store contacts, segments, and unsubscribe records.
+ * Table schema definitions for the contacts package.
+ * Describes the tables that the configured DatabaseAdapter must
+ * provide to store contacts, segments, and unsubscribe records.
  */
 export const CONTACT_TABLES = {
   contacts: {

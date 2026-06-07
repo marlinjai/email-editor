@@ -11,6 +11,8 @@ status: draft
 date: 2026-02-21
 ---
 
+> **Note (2026-05-01):** This research assumes Data Brain and Lumitra Cloud as active components. Data Brain was archived 2026-03-22; Lumitra Cloud was never built and the architecture analysis it depended on (2026-03-04-lumitra-cloud-architecture-analysis.md) is itself archived. The strategic argument here may still hold under a different orchestration architecture; treat specific service names as illustrative rather than committed.
+
 # Email Editor Platform Vision
 
 **Date:** 2026-02-21

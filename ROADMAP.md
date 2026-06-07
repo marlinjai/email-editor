@@ -31,7 +31,7 @@
 - [x] Auto-generated template thumbnails
 - [x] Version history per template
 - [x] Import/export templates (JSON + HTML)
-- [x] Data Brain adapter for template storage
+- [x] DatabaseAdapter for template storage (originally shipped against Data Brain, migrated to generic `DatabaseAdapter` in 2026-03 after Data Brain archive)
 - [x] Storage Brain adapter for image assets
 
 ## Phase 2 - Contacts & Audiences (complete)
@@ -88,7 +88,7 @@
 
 ## Future
 
-- [ ] Live Data Brain integration (replace mock adapters)
+- [ ] Live database integration via `@marlinjai/data-table-core` `DatabaseAdapter` (replace mock adapters)
 - [ ] User authentication flow (login, signup, password reset)
 - [ ] Billing and subscription management
 - [ ] Custom domain support per workspace

@@ -8,7 +8,7 @@ tags: [email-editor, architecture, mobx-state-tree, monorepo]
 projects: [email-editor]
 ---
 
-> **Note (2026-03-22):** Data Brain has been archived. References below to "Data Brain adapter" and `@email-editor/shared`'s Data Brain client describe the previous architecture. Platform adapter classes (DataBrainTemplateAdapter, DataBrainContactAdapter, etc.) are deprecated. Future storage integration should target adapter-d1 or adapter-prisma directly.
+> **Note (2026-03-22):** Data Brain has been archived. Platform adapters now consume the `DatabaseAdapter` interface from `@marlinjai/data-table-core`. Pair with `@marlinjai/data-table-adapter-d1` (Cloudflare D1) or `@marlinjai/data-table-adapter-prisma` (PostgreSQL). The legacy `DataBrain*Adapter` classes are deprecated.
 
 # Email Editor Architecture
 
@@ -469,14 +469,14 @@ packages/
 ├── templates/                     # Template management
 │   └── src/
 │       ├── manager.ts             # TemplateManager
-│       ├── data-brain-adapter.ts  # Data Brain adapter
+│       ├── database-adapter.ts    # DatabaseAdapter wrapper
 │       ├── workspace-scoped.ts    # Workspace-scoped manager
 │       ├── schema.ts              # Table definitions
 │       └── components/            # React dashboard UI
 │
 ├── contacts/                      # Contact management
 │   └── src/
-│       ├── adapter.ts             # Data Brain adapter
+│       ├── adapter.ts             # DatabaseAdapter wrapper
 │       ├── csv-importer.ts        # CSV import utilities
 │       ├── merge-fields.ts        # Merge field resolution
 │       ├── segment-evaluator.ts   # Segment rule evaluation
@@ -486,7 +486,7 @@ packages/
 ├── campaigns/                     # Campaign management
 │   └── src/
 │       ├── manager.ts             # CampaignManager
-│       ├── adapter.ts             # Data Brain adapter
+│       ├── adapter.ts             # DatabaseAdapter wrapper
 │       ├── tracking.ts            # Pixel injection, link rewriting
 │       ├── scheduler.ts           # Schedule queries
 │       └── ab-testing.ts          # A/B test utilities
@@ -498,7 +498,7 @@ packages/
 ├── analytics/                     # Analytics & tracking
 │   └── src/
 │       ├── tracker.ts             # AnalyticsTracker
-│       ├── adapter.ts             # Data Brain adapter
+│       ├── adapter.ts             # DatabaseAdapter wrapper
 │       ├── endpoints.ts           # Open/click tracking handlers
 │       ├── engagement.ts          # Engagement scoring
 │       ├── heatmap.ts             # Click heatmap generation
@@ -516,13 +516,13 @@ packages/
 ├── automation/                    # Automation sequences
 │   └── src/
 │       ├── engine.ts              # AutomationEngine
-│       ├── adapter.ts             # Data Brain adapter
+│       ├── adapter.ts             # DatabaseAdapter wrapper
 │       ├── condition-evaluator.ts # Condition evaluation
 │       └── components/            # SequenceBuilder UI
 │
 └── shared/                        # Cross-package infrastructure
     └── src/
-        ├── clients/               # Data Brain, Storage Brain factories
+        ├── clients/               # Storage Brain factory (database is injected as a `DatabaseAdapter`)
         ├── context/               # PlatformProvider, WorkspaceProvider, AuthProvider
         ├── hooks/                 # usePaginatedQuery
         ├── schema/                # Database bootstrapper

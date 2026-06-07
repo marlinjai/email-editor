@@ -8,7 +8,7 @@ tags: [email-editor, integration, react, patterns]
 projects: [email-editor]
 ---
 
-> **Note (2026-03-22):** Data Brain has been archived. The platform integration examples below that use `DataBrainTemplateAdapter`, `DataBrainAutomationAdapter`, and `PlatformProvider` with a `dataBrain` config are deprecated. These adapters should not be used in new integrations.
+> **Note (2026-03-22):** Data Brain has been archived. Platform packages now consume the generic `DatabaseAdapter` interface from `@marlinjai/data-table-core`. Use `@marlinjai/data-table-adapter-d1` (Cloudflare D1) or `@marlinjai/data-table-adapter-prisma` (PostgreSQL) as the concrete adapter. The legacy `DataBrain*Adapter` classes are deprecated.
 
 # Getting Started with @marlinjai/email-editor
 
@@ -170,15 +170,17 @@ const editor = createEditor({
 
 ## Platform Integration
 
-The platform packages extend the editor into a full email marketing solution. All platform adapters use **Data Brain** for storage.
+The platform packages extend the editor into a full email marketing solution. All platform adapters use the `DatabaseAdapter` interface from `@marlinjai/data-table-core` for storage. Pair with `@marlinjai/data-table-adapter-d1` for Cloudflare D1 or `@marlinjai/data-table-adapter-prisma` for PostgreSQL.
 
 ### Template Management
 
 ```typescript
-import { TemplateManager, DataBrainTemplateAdapter } from '@marlinjai/email-templates';
+import { TemplateManager, createTemplateAdapter } from '@marlinjai/email-templates';
+import { D1Adapter } from '@marlinjai/data-table-adapter-d1';
 
-const adapter = new DataBrainTemplateAdapter({
-  client: dataBrainClient,
+const dbAdapter = new D1Adapter({ db: env.DB });
+const adapter = createTemplateAdapter({
+  database: dbAdapter,
   workspaceId: 'ws_123',
 });
 
@@ -278,7 +280,13 @@ const approval = await approvalManager.submit({
 ### Automation Sequences
 
 ```typescript
-import { AutomationEngine, DataBrainAutomationAdapter } from '@marlinjai/email-automation';
+import { AutomationEngine, createAutomationAdapter } from '@marlinjai/email-automation';
+import { D1Adapter } from '@marlinjai/data-table-adapter-d1';
+
+const automationAdapter = createAutomationAdapter({
+  database: new D1Adapter({ db: env.DB }),
+  workspaceId: 'ws_123',
+});
 
 const engine = new AutomationEngine({
   adapter: automationAdapter,
@@ -292,13 +300,15 @@ const engine = new AutomationEngine({
 ### Shared Infrastructure
 
 ```typescript
-import { PlatformProvider, useDataBrain, useStorageBrain } from '@email-editor/shared';
+import { PlatformProvider, useDatabase, useStorageBrain } from '@email-editor/shared';
+import { D1Adapter } from '@marlinjai/data-table-adapter-d1';
 
 // Wrap your app with platform context
 function App() {
+  const database = new D1Adapter({ db: env.DB });
   return (
     <PlatformProvider
-      dataBrain={{ baseUrl: '...', apiKey: '...' }}
+      database={database}
       storageBrain={{ baseUrl: '...', apiKey: '...' }}
     >
       <Dashboard />

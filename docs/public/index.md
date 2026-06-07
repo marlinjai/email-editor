@@ -8,7 +8,7 @@ tags: [email-editor, index, drag-and-drop, mjml]
 projects: [email-editor]
 ---
 
-> **Note (2026-03-22):** Data Brain has been archived. Platform packages that previously used Data Brain for storage (via `DataBrain*Adapter` classes) are deprecated. The editor core layer is unaffected.
+> **Note (2026-03-22):** Data Brain has been archived. Platform packages now consume the `DatabaseAdapter` interface from `@marlinjai/data-table-core` (pair with `@marlinjai/data-table-adapter-d1` or `@marlinjai/data-table-adapter-prisma`). The legacy `DataBrain*Adapter` classes are deprecated. The editor core layer is unaffected.
 
 # Email Editor
 
@@ -38,7 +38,7 @@ The Email Editor is a **pnpm monorepo** with 12 packages organized into two laye
 | `@marlinjai/email-analytics` | Open/click/bounce tracking, heatmaps, engagement scoring |
 | `@marlinjai/email-teams` | Multi-user workspaces, roles, approval workflows, brand kit |
 | `@marlinjai/email-automation` | Trigger-based sequences, conditional logic, webhooks |
-| `@email-editor/shared` | Cross-package infrastructure: Data Brain client, auth, workspace context |
+| `@email-editor/shared` | Cross-package infrastructure: database adapter context, auth, workspace context |
 
 ## Block Types
 
@@ -73,7 +73,7 @@ The platform packages combine to form a complete SaaS email marketing dashboard 
 - **Device Preview** -- Desktop and mobile views
 - **Theming** -- Customizable colors and fonts
 - **Type Safe** -- Full TypeScript support with Zod validation
-- **Data Brain Integration** -- All platform adapters use Data Brain for storage
+- **Database Agnostic** : All platform adapters consume the `DatabaseAdapter` interface from `@marlinjai/data-table-core` (works with D1, Prisma, or any custom adapter)
 
 ## Quick Start
 

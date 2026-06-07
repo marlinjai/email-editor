@@ -25,7 +25,7 @@ export interface DatabaseContactAdapterConfig {
 }
 
 /**
- * Maps a Data Brain Row to a Contact object.
+ * Maps a DatabaseAdapter Row to a Contact object.
  */
 function rowToContact(row: Row): Contact {
   const cells = row.cells;
@@ -55,7 +55,7 @@ function parseCustomFields(value: CellValue | undefined): Record<string, string>
 }
 
 /**
- * Maps a Data Brain Row to a Segment object.
+ * Maps a DatabaseAdapter Row to a Segment object.
  */
 function rowToSegment(row: Row): Segment {
   const cells = row.cells;

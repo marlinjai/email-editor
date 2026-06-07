@@ -15,7 +15,7 @@ interface DatabaseAdapterConfig {
 }
 
 /**
- * Maps a Data Brain row to a Template object.
+ * Maps a DatabaseAdapter row to a Template object.
  */
 function rowToTemplate(row: {
   id: string;
