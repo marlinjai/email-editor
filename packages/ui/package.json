@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-editor-ui",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "React UI components for email editor",
   "main": "./dist/index.js",

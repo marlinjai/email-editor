@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-teams",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Teams, workspaces, roles, approvals, audit log, and brand kit for email editor",
   "main": "./dist/index.js",

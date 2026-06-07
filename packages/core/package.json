@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-editor-core",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Framework-agnostic core engine for email editor",
   "main": "./dist/index.js",

@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-send-adapter-resend",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Resend send adapter for @marlinjai/email-campaigns",
   "main": "./dist/index.js",

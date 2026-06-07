@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-editor-blocks",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Standard block library for email editor",
   "main": "./dist/index.js",

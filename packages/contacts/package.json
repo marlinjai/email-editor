@@ -1,5 +1,8 @@
 {
   "name": "@marlinjai/email-contacts",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "0.0.1",
   "description": "Contact management, segmentation, CSV import, and merge fields for email campaigns",
   "main": "./dist/index.js",
