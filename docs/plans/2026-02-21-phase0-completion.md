@@ -4,7 +4,7 @@ summary: Implementation plan to complete the email-editor foundation by renaming
 type: plan
 tags: [email-editor, implementation, block-renderers, testing, monorepo]
 projects: [email-editor]
-status: draft
+status: completed
 date: 2026-02-21
 ---
 

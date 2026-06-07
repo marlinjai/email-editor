@@ -1,7 +1,7 @@
 ---
 title: Nested Columns (Depth-2) Design
 type: plan
-status: decided
+status: completed
 summary: Allow a column to split into 2-4 sub-columns side by side, compiled to email-safe nested HTML tables for the 85-90% client tier (Apple Mail + Gmail + modern Outlook).
 tags: [nesting, mjml, columns, canvas-ux, compatibility]
 date: 2026-04-26
