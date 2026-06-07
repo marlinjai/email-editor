@@ -408,8 +408,8 @@ importers:
         specifier: ^0.3.0
         version: 0.3.0
       '@marlinjai/storage-brain-sdk':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.9.0
+        version: 0.9.0(zod@3.25.76)
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.2.4
@@ -433,8 +433,8 @@ importers:
         specifier: ^0.3.0
         version: 0.3.0
       '@marlinjai/storage-brain-sdk':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.9.0
+        version: 0.9.0(zod@3.25.76)
       nanoid:
         specifier: ^5.0.4
         version: 5.1.6
@@ -476,8 +476,8 @@ importers:
         specifier: workspace:*
         version: link:../teams
       '@marlinjai/storage-brain-sdk':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.9.0
+        version: 0.9.0(zod@3.25.76)
       nanoid:
         specifier: ^5.0.4
         version: 5.1.6
@@ -1890,6 +1890,17 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
+  '@marlinjai/brain-core@0.1.0':
+    resolution: {integrity: sha512-1Ot/3uDM4Ewf18dlzgkAterIa2H5o8+V7IaknR5L4odI+zgMlPPtQ8CbjxU8Z/JnhwF3R+dqIxW+k/o0ithZPg==}
+    peerDependencies:
+      hono: ^4.0.0
+      zod: ^3.22.4
+    peerDependenciesMeta:
+      hono:
+        optional: true
+      zod:
+        optional: true
+
   '@marlinjai/clearify@1.11.2':
     resolution: {integrity: sha512-oiTZrYQJs6mhHA/FLRfSxD5vooNT/z97ruWYgvyPZBuvXqcXFt2PnPGDuX8c1jQPUeShLkI9n2uxdlLTlSEzvA==}
     hasBin: true
@@ -1904,8 +1915,8 @@ packages:
   '@marlinjai/data-table-core@0.3.0':
     resolution: {integrity: sha512-BMa7qGoDf0AukqorHPVEOc1i2KAa63PcNuklSA+LP9jXabLbY/dIlHLuuNIChhRgq7sA6RIrbYyQktHj9O3ZGQ==}
 
-  '@marlinjai/storage-brain-sdk@0.5.0':
-    resolution: {integrity: sha512-dLQAadnkOrRcBfwyrugatLqr2cvbbx5pDfyBQTpnAjWme28I2NR5sPnBGpAdml97Aptxp5S+fr3MFKuqtOHQGg==}
+  '@marlinjai/storage-brain-sdk@0.9.0':
+    resolution: {integrity: sha512-DxQqPv8zOVBwTFJEDN7P+qpSjdT7M0ZZj2L3Cde/8CaLUlwWAEkvILxwCxX+WUcCKyITXk/xnWjvGFiC+iDpOg==}
 
   '@mdx-js/mdx@3.1.1':
     resolution: {integrity: sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ==}
@@ -7831,6 +7842,10 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@marlinjai/brain-core@0.1.0(zod@3.25.76)':
+    optionalDependencies:
+      zod: 3.25.76
+
   '@marlinjai/clearify@1.11.2(@types/node@20.19.35)(@types/react@19.2.14)(jiti@2.6.1)(lightningcss@1.31.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(rollup@4.59.0)(terser@5.16.9)(yaml@2.8.2)':
     dependencies:
       '@mdx-js/react': 3.1.1(@types/react@19.2.14)(react@19.2.4)
@@ -7877,7 +7892,12 @@ snapshots:
 
   '@marlinjai/data-table-core@0.3.0': {}
 
-  '@marlinjai/storage-brain-sdk@0.5.0': {}
+  '@marlinjai/storage-brain-sdk@0.9.0(zod@3.25.76)':
+    dependencies:
+      '@marlinjai/brain-core': 0.1.0(zod@3.25.76)
+    transitivePeerDependencies:
+      - hono
+      - zod
 
   '@mdx-js/mdx@3.1.1':
     dependencies:
