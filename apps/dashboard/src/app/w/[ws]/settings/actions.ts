@@ -41,7 +41,6 @@ const GeneralInput = z
     name: z.string().trim().min(1, 'Give the workspace a name').max(120),
     locales: z.array(Locale).min(1, 'At least one language').max(20),
     defaultLocale: Locale,
-    trackingEnabled: z.boolean(),
     assetPolicy: z.enum(['any', 'service_only']),
   })
   .refine((v) => v.locales.includes(v.defaultLocale), {
@@ -59,12 +58,31 @@ export async function updateGeneral(ws: string, input: z.input<typeof GeneralInp
       settings: {
         locales: parsed.data.locales,
         default_locale: parsed.data.defaultLocale,
-        tracking_enabled: parsed.data.trackingEnabled,
         asset_policy: parsed.data.assetPolicy,
       },
     });
     revalidatePath(`/w/${ws}`, 'layout');
     return null;
+  });
+}
+
+// Tracking
+
+const TrackingInput = z.object({ opens: z.boolean(), clicks: z.boolean() });
+
+/**
+ * Open and click tracking (`tracking.update`, admin). It also sets the
+ * workspace's master switch `tracking_enabled` to `opens || clicks`; a plan
+ * without tracking refuses to turn it on with `plan_limit_reached`.
+ */
+export async function saveTracking(ws: string, input: z.input<typeof TrackingInput>): Promise<ActionResult<{ opens: boolean; clicks: boolean }>> {
+  const parsed = parseInput(TrackingInput, input);
+  if (!parsed.ok) return parsed;
+  return act('tracking.update', async () => {
+    const { api } = await mail(ws);
+    const saved = await api.tracking.update(parsed.data);
+    revalidatePath(`/w/${ws}`, 'layout');
+    return saved;
   });
 }
 
