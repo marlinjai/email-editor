@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@marlinjai/email-editor-core';
 import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
-import { EmailEditor } from '@marlinjai/email-editor-ui';
+import { EmailEditor, type OnRequestImage } from '@marlinjai/email-editor-ui';
 import type { EditorTheme } from './types';
 
 interface EmailEditorReactProps {
@@ -22,6 +22,13 @@ interface EmailEditorReactProps {
   onExport?: (template: TemplateSnapshotOut) => void;
   /** Called when back button is clicked to navigate away from editor */
   onNavigateBack?: () => void;
+  /**
+   * Supply images from your own picker or uploader. Resolve with
+   * `{ url, alt? }`, or `null` when the user cancels (the block is left
+   * unchanged). A rejected promise is shown inline in the image inspector.
+   * Without it, the image inspector shows a plain URL field.
+   */
+  onRequestImage?: OnRequestImage;
 }
 
 /**
@@ -36,6 +43,7 @@ export function EmailEditorReact({
   onSave,
   onExport,
   onNavigateBack,
+  onRequestImage,
 }: EmailEditorReactProps) {
   const [registry] = useState(() => {
     const reg = createStandardBlockRegistry();
@@ -74,6 +82,7 @@ export function EmailEditorReact({
       onSave={onSave}
       onExport={onExport}
       onNavigateBack={onNavigateBack}
+      onRequestImage={onRequestImage}
     />
   );
 }
@@ -81,3 +90,4 @@ export function EmailEditorReact({
 // Re-export types
 export type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@marlinjai/email-editor-core';
 export type { EditorTheme } from './types';
+export type { OnRequestImage, ImageRequest, RequestedImage } from '@marlinjai/email-editor-ui';

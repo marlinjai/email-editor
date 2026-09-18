@@ -4,7 +4,7 @@
 import { createRoot, Root } from 'react-dom/client';
 import { createElement } from 'react';
 import type { EmailTemplate, TemplateSnapshotIn, TemplateSnapshotOut } from '@marlinjai/email-editor-core';
-import { createStandardBlockRegistry } from '@marlinjai/email-editor-blocks';
+import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
 import { EmailEditor } from '@marlinjai/email-editor-ui';
 import type { EditorOptions, EditorInstance } from './types';
 
@@ -45,6 +45,7 @@ export function createEditor(options: EditorOptions): EditorInstance {
     blocks = [],
     onChange,
     onSave,
+    onRequestImage,
   } = options;
 
   // Convert to MST-compatible snapshot
@@ -55,6 +56,9 @@ export function createEditor(options: EditorOptions): EditorInstance {
 
   // Register custom blocks
   blocks.forEach((block) => registry.register(block));
+
+  // Pre-built sections, as the React wrapper offers them
+  const prebuiltRegistry = createStandardPrebuiltRegistry();
 
   // Current template state
   let currentTemplate: EmailTemplate = initialValue || ({
@@ -87,8 +91,10 @@ export function createEditor(options: EditorOptions): EditorInstance {
         initialTemplate: initialSnapshot,
         onChange: handleChange,
         blockRegistry: registry,
+        prebuiltRegistry,
         onSave: handleSave,
-      } as any)
+        onRequestImage,
+      })
     );
   };
 

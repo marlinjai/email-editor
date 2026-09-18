@@ -40,6 +40,7 @@ import { EmailRenderer } from './renderer';
 import { PropertyInspector } from './inspector';
 import { LeftSidebar } from './sidebar/LeftSidebar';
 import { DragOverlayContent } from './DragOverlayContent';
+import { EditorHostProvider, type OnRequestImage } from './host/EditorHostContext';
 import { nanoid } from 'nanoid';
 import clsx from 'clsx';
 import type { BlockRegistryImpl, PrebuiltTemplateRegistry } from '@marlinjai/email-editor-core';
@@ -59,6 +60,12 @@ export interface EmailEditorProps {
   onExport?: (template: TemplateSnapshotOut) => void;
   /** Called when back button is clicked to navigate away from editor */
   onNavigateBack?: () => void;
+  /**
+   * Supply images from the host's own picker or uploader. When set, the image
+   * block's inspector shows a "Choose image" button that calls it instead of a
+   * URL field. Resolve with `null` to cancel; a rejection is shown inline.
+   */
+  onRequestImage?: OnRequestImage;
 }
 
 /**
@@ -75,6 +82,7 @@ export const EmailEditor = observer(function EmailEditor({
   onSave,
   onExport,
   onNavigateBack,
+  onRequestImage,
 }: EmailEditorProps) {
   const [store] = useState(() =>
     createRootStore({
@@ -85,13 +93,15 @@ export const EmailEditor = observer(function EmailEditor({
 
   return (
     <StoreProvider value={store}>
-      <EmailEditorContent
-        blockRegistry={blockRegistry}
-        prebuiltRegistry={prebuiltRegistry}
-        onSave={onSave}
-        onExport={onExport}
-        onNavigateBack={onNavigateBack}
-      />
+      <EditorHostProvider onRequestImage={onRequestImage}>
+        <EmailEditorContent
+          blockRegistry={blockRegistry}
+          prebuiltRegistry={prebuiltRegistry}
+          onSave={onSave}
+          onExport={onExport}
+          onNavigateBack={onNavigateBack}
+        />
+      </EditorHostProvider>
     </StoreProvider>
   );
 });

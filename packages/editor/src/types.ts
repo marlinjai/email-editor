@@ -2,6 +2,7 @@
 // Public API types
 
 import type { EmailTemplate, BlockDefinition } from '@marlinjai/email-editor-core';
+import type { OnRequestImage } from '@marlinjai/email-editor-ui';
 
 /**
  * Editor theme configuration
@@ -29,6 +30,13 @@ export interface EditorOptions {
   blocks?: BlockDefinition[];
   onChange?: (template: EmailTemplate) => void;
   onSave?: (template: EmailTemplate) => void;
+  /**
+   * Supply images from your own picker or uploader. Resolve with
+   * `{ url, alt? }`, or `null` when the user cancels (the block is left
+   * unchanged). A rejected promise is shown inline in the image inspector.
+   * Without it, the image inspector shows a plain URL field.
+   */
+  onRequestImage?: OnRequestImage;
 }
 
 /**
