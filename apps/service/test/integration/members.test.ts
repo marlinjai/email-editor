@@ -129,7 +129,7 @@ describe('workspaces', () => {
   it('creating makes the acting person the owner and writes the audit trail', async () => {
     const res = await h.call({ method: 'POST', path: '/v1/workspaces', subject: 'founder', body: { slug: 'fresh', name: 'Fresh', owner: { email: 'Founder@Fresh.io' } } });
     expect(res.status).toBe(201);
-    expect(res.body.settings).toEqual({ default_locale: 'en', locales: ['en'], tracking_enabled: false });
+    expect(res.body.settings).toEqual({ default_locale: 'en', locales: ['en'], tracking_enabled: false, asset_policy: 'any' });
     const members = await h.call({ path: '/v1/members', subject: 'founder', workspace: res.body.id });
     expect(members.body.data).toEqual([expect.objectContaining({ subject: 'founder', email: 'founder@fresh.io', role: 'owner' })]);
     const audit = await h.call({ path: '/v1/audit-log', subject: 'founder', workspace: res.body.id });
@@ -167,6 +167,6 @@ describe('workspaces', () => {
     expect(free.body.error).toMatchObject({ code: 'plan_limit_reached', details: { feature: 'tracking', plan: 'free' } });
     await setExemption(h.sql, ok.body.id, true, 'test: a plan with tracking');
     const good = await h.call({ method: 'PATCH', path: '/v1/workspace', subject: 'polyglot', workspace: ok.body.id, body: { settings: { tracking_enabled: true } } });
-    expect(good.body.settings).toEqual({ default_locale: 'de', locales: ['de', 'en', 'fr', 'it', 'es'], tracking_enabled: true });
+    expect(good.body.settings).toEqual({ default_locale: 'de', locales: ['de', 'en', 'fr', 'it', 'es'], tracking_enabled: true, asset_policy: 'any' });
   });
 });
