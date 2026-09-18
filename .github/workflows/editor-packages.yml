@@ -1,0 +1,39 @@
+name: Editor packages
+
+# Proves on every pull request that the four published editor packages
+# (core, blocks, ui, editor) typecheck, pass their tests, build, still work in
+# a real Next.js 16 + React 19 + Tailwind CSS 4 host (examples/nextjs), and
+# pack into tarballs that are publishable as they are.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: editor-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck, test and build the editor packages and the example host
+        run: >-
+          pnpm turbo run lint test build
+          --filter=@marlinjai/email-editor...
+          --filter=email-editor-nextjs-example
+
+      - name: Check the packed tarballs
+        run: node scripts/check-packed-manifests.mjs
