@@ -630,7 +630,12 @@ export const sendingRoutes = {
     access: 'write',
     phase: 'S2',
   },
-  /** Copies any mailing, in any state, into a new `draft` with the same content, topic and provider (no recipients). */
+  /**
+   * Copies any mailing, in any state, into a new `draft` with the same content,
+   * topic and provider (no recipients). An A/B test's definition is copied
+   * (variants, test fraction, winner metric and wait) with its run reset: the
+   * copy's test is `pending`, with no winner and no results.
+   */
   'mailings.duplicate': {
     method: 'POST',
     path: '/v1/mailings/:id/duplicate',

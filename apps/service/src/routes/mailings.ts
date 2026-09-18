@@ -447,14 +447,37 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
         metadata: source.metadata,
         createdBy: actorOf(access),
       });
+      // The A/B test's definition comes along (variants, test fraction, winner
+      // metric and wait); its run does not: no winner, no decision time, no
+      // results, as in any new draft. The plan and tracking checks apply again
+      // when the copy starts.
+      if (source.ab_test) {
+        const variants = await r.mailingPlatform.variants(access.workspaceId, id);
+        await r.mailingPlatform.replaceVariants(
+          access.workspaceId,
+          created.id,
+          variants.map((v) => ({ key: v.key, subject: v.subject, document: v.document })),
+        );
+        await r.mailingPlatform.setAbTest(access.workspaceId, created.id, {
+          variants: source.ab_test.variants,
+          test_fraction: source.ab_test.test_fraction,
+          winner_metric: source.ab_test.winner_metric,
+          decide_after_minutes: source.ab_test.decide_after_minutes,
+          status: 'pending',
+          decide_at: null,
+          winner: null,
+          decided_by: null,
+          decided_at: null,
+        });
+      }
       await r.audit.record(access.workspaceId, {
         action: 'mailing.created',
         actor: actorOf(access),
         targetType: 'mailing',
         targetId: created.id,
-        details: { duplicated_from: id },
+        details: { duplicated_from: id, ab_test: source.ab_test !== null },
       });
-      return respond(tx, access.workspaceId, created);
+      return respond(tx, access.workspaceId, (await r.mailings.get(access.workspaceId, created.id))!);
     });
     return c.json(mailing, 201);
   });
