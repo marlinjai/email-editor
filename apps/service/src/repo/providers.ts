@@ -28,6 +28,12 @@ export type ProviderRow = {
   events_source: 'automatic' | 'manual' | null;
   events_webhook_id: string | null;
   events_error: string | null;
+  events_unmatched_count: number;
+  /** The last time the bounce circuit breaker tripped on a mailing of this provider. */
+  anomaly_at: string | null;
+  anomaly_mailing_id: string | null;
+  anomaly_reason: string | null;
+  anomaly_sample: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -45,7 +51,8 @@ export type ProviderForSend = ProviderRow & { secret_sealed: string | null };
 
 const COLUMNS = `id, kind, name, config, secret_sealed IS NOT NULL AS has_secret, from_name, from_email, reply_to,
   daily_recipient_budget, min_interval_ms, max_recipients_per_message, rejections_count, last_rejection, last_rejection_at,
-  events_secret_sealed IS NOT NULL AS has_events_secret, events_source, events_webhook_id, events_error, created_at, updated_at`;
+  events_secret_sealed IS NOT NULL AS has_events_secret, events_source, events_webhook_id, events_error, events_unmatched_count, anomaly_at, anomaly_mailing_id, anomaly_reason,
+  anomaly_sample, created_at, updated_at`;
 
 /** Longest provider reply kept on the row (the column allows 1000). */
 const MAX_REJECTION_TEXT = 1000;
@@ -189,6 +196,21 @@ export function providersRepo(db: Db) {
         WHERE workspace_id = ${workspaceId} AND id = ${providerId} AND deleted_at IS NULL
         RETURNING ${db.unsafe(COLUMNS)}`;
       return rows[0] ?? null;
+    },
+
+    /** Counts a Resend event that names no message this provider sent. */
+    async countUnmatchedEvent(workspaceId: string, providerId: string): Promise<void> {
+      await db`
+        UPDATE providers SET events_unmatched_count = events_unmatched_count + 1
+        WHERE workspace_id = ${workspaceId} AND id = ${providerId}`;
+    },
+
+    /** Records that the bounce circuit breaker tripped on one of this provider's mailings. */
+    async recordAnomaly(workspaceId: string, providerId: string, input: { mailingId: string; reason: string; sample: string }): Promise<void> {
+      await db`
+        UPDATE providers SET anomaly_at = now(), anomaly_mailing_id = ${input.mailingId},
+          anomaly_reason = ${input.reason.slice(0, MAX_REJECTION_TEXT)}, anomaly_sample = ${input.sample.slice(0, MAX_REJECTION_TEXT)}
+        WHERE workspace_id = ${workspaceId} AND id = ${providerId}`;
     },
 
     /** Records why automatic registration of the events endpoint failed (null clears it). */

@@ -58,6 +58,17 @@ export const ProviderRejections = z.object({
   count: z.number().int().min(0),
   last_error: z.string().nullable(),
   last_at: Timestamp.nullable(),
+  /**
+   * The last time the bounce circuit breaker tripped on one of this provider's
+   * mailings: too many recipients of one run were refused as dead addresses
+   * (five in a row with the same reply, or more than 20 percent of the first
+   * 50), which points at the provider or the setup rather than the list. The
+   * run's bounce blocks were undone and the mailing paused. `sample` is the
+   * reply that tripped it.
+   */
+  anomaly: z
+    .object({ at: Timestamp, mailing_id: Id.nullable(), reason: z.string(), sample: z.string() })
+    .nullable(),
 });
 export type ProviderRejections = z.infer<typeof ProviderRejections>;
 
@@ -70,12 +81,19 @@ export type ProviderRejections = z.infer<typeof ProviderRejections>;
  * - `url`: the endpoint to register at Resend by hand when automatic
  *   registration is not possible (a sending-only API key).
  * - `error`: why the last automatic registration failed, if it did.
+ * - `unmatched`: events for emails this provider did not send (see below).
  */
 export const ProviderEvents = z.object({
   status: z.enum(['active', 'needs_secret']),
   source: z.enum(['automatic', 'manual']).nullable(),
   url: z.string().url(),
   error: z.string().nullable(),
+  /**
+   * Events that named an email this provider never sent through the service
+   * (another workspace or system sharing the Resend account): counted, never
+   * acted on.
+   */
+  unmatched: z.number().int().min(0),
 });
 export type ProviderEvents = z.infer<typeof ProviderEvents>;
 

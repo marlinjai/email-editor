@@ -65,6 +65,21 @@ export function suppressionsRepo(db: Db) {
       return rows[0] ?? null;
     },
 
+    /**
+     * The `bounced` blocks whose source message belongs to a mailing's run
+     * (sent since `runStartedAt`, all of them when it is null): what the bounce
+     * circuit breaker undoes when it trips.
+     */
+    async bouncedInRun(workspaceId: string, mailingId: string, runStartedAt: string | null): Promise<SuppressionRow[]> {
+      return db<SuppressionRow[]>`
+        ${SELECT(db)}
+        JOIN messages m ON m.workspace_id = s.workspace_id AND m.id = s.source_message_id
+        WHERE s.workspace_id = ${workspaceId} AND s.reason = 'bounced' AND m.mailing_id = ${mailingId}
+          AND m.is_test = false
+          ${runStartedAt === null ? db`` : db`AND m.created_at >= ${runStartedAt}`}
+        ORDER BY s.created_at, s.id`;
+    },
+
     async get(workspaceId: string, suppressionId: string): Promise<SuppressionRow | null> {
       const rows = await db<SuppressionRow[]>`${SELECT(db)} WHERE s.workspace_id = ${workspaceId} AND s.id = ${suppressionId}`;
       return rows[0] ?? null;

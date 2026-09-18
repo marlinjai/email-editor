@@ -56,7 +56,14 @@ export function toProvider(row: ProviderRow, publicBaseUrl: string): Provider {
     from_email: row.from_email,
     reply_to: row.reply_to,
     policy: policyOf(row),
-    rejections: { count: row.rejections_count, last_error: row.last_rejection, last_at: row.last_rejection_at },
+    rejections: {
+      count: row.rejections_count,
+      last_error: row.last_rejection,
+      last_at: row.last_rejection_at,
+      anomaly: row.anomaly_at
+        ? { at: row.anomaly_at, mailing_id: row.anomaly_mailing_id, reason: row.anomaly_reason ?? '', sample: row.anomaly_sample ?? '' }
+        : null,
+    },
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -82,6 +89,7 @@ export function toProvider(row: ProviderRow, publicBaseUrl: string): Provider {
       source: row.events_source,
       url: resendEventsUrl(publicBaseUrl, row.id),
       error: row.events_error,
+      unmatched: row.events_unmatched_count,
     },
   };
 }

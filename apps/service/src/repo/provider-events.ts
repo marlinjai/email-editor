@@ -1,6 +1,6 @@
 import type { Db } from '../db.js';
 
-export type ProviderEventOutcome = 'suppressed' | 'already_suppressed' | 'ignored';
+export type ProviderEventOutcome = 'suppressed' | 'already_suppressed' | 'ignored' | 'unmatched';
 
 /** How long a provider event's id is remembered: well past Resend's last retry (about 33 hours). */
 const RETENTION = '30 days';

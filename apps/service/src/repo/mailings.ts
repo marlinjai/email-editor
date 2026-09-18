@@ -26,6 +26,12 @@ export type MailingRow = {
   tracking: TrackingSettings | null;
   started_at: string | null;
   finished_at: string | null;
+  /** When the current run began (the last entry into `sending`); the bounce circuit breaker judges only it. */
+  run_started_at: string | null;
+  /** Why the service paused the mailing itself (the bounce circuit breaker), null otherwise. */
+  pause_reason: string | null;
+  /** When the bounce circuit breaker last tripped on this mailing. */
+  breaker_tripped_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -34,7 +40,8 @@ export type MailingRow = {
 export type MailingCompiled = { mjml: string | null; html: string | null };
 
 const COLUMNS_M = `m.id, m.name, m.subject, m.preheader, m.template_id, m.document, m.topic_id, t.slug AS topic,
-  m.provider_id, m.status, m.metadata, m.created_by, m.scheduled_at, m.ab_test, m.tracking, m.started_at, m.finished_at, m.created_at, m.updated_at`;
+  m.provider_id, m.status, m.metadata, m.created_by, m.scheduled_at, m.ab_test, m.tracking, m.started_at, m.finished_at,
+  m.run_started_at, m.pause_reason, m.breaker_tripped_at, m.created_at, m.updated_at`;
 
 const EMPTY_COUNTS: MailingCounts = { total: 0, queued: 0, sending: 0, sent: 0, failed: 0, skipped: 0 };
 
@@ -175,10 +182,30 @@ export function mailingsRepo(db: Db) {
           status = ${to},
           started_at = ${stamp.startedAt ? db`COALESCE(started_at, now())` : db`started_at`},
           finished_at = ${stamp.finishedAt ? db`now()` : stamp.clearFinishedAt ? db`NULL` : db`finished_at`},
+          run_started_at = ${to === 'sending' ? db`clock_timestamp()` : db`run_started_at`},
+          pause_reason = ${to === 'sending' ? db`NULL` : db`pause_reason`},
           updated_at = now()
         WHERE workspace_id = ${workspaceId} AND id = ${mailingId} AND status = ANY(${from as MailingStatus[]})
         RETURNING id`;
       return rows[0] ? selectOne(workspaceId, mailingId, false) : null;
+    },
+
+    /**
+     * The bounce circuit breaker tripped: stamps it with the reason, and pauses
+     * the mailing when it is still sending (a person may have paused or
+     * cancelled it meanwhile; a cancelled one gets no pause reason). Returns
+     * whether it paused the mailing.
+     */
+    async tripBreaker(workspaceId: string, mailingId: string, reason: string): Promise<boolean> {
+      const rows = await db<{ paused: boolean }[]>`
+        UPDATE mailings SET
+          breaker_tripped_at = clock_timestamp(),
+          pause_reason = CASE WHEN status IN ('sending', 'paused') THEN ${reason.slice(0, 1000)} ELSE pause_reason END,
+          status = CASE WHEN status = 'sending' THEN 'paused' ELSE status END,
+          updated_at = now()
+        WHERE workspace_id = ${workspaceId} AND id = ${mailingId}
+        RETURNING status = 'paused' AS paused`;
+      return rows[0]?.paused ?? false;
     },
 
     /** Live counts per recipient status. */

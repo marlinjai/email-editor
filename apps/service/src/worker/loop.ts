@@ -1,4 +1,3 @@
-import { handlePermanentRejection } from '../bounces.js';
 import { ledgerBudget, type Budget } from '../budget.js';
 import type { Db, Sql } from '../db.js';
 import { repos } from '../repo/index.js';
@@ -9,6 +8,8 @@ import type { RecipientRow } from '../repo/recipients.js';
 import { OutcomeUnknownSendError, PermanentSendError, SendError, TransientSendError } from '../transport/index.js';
 import type { UnsubscribeSigner } from '../unsubscribe.js';
 import { applyTracking, CLICK_PATH_PREFIX, OPEN_PATH_PREFIX, type TrackingTokens } from '../platform/tracking.js';
+import { classifyRejection, rejectionAction, rejectionSignature } from '../transport/rejection.js';
+import { onDeadAddress } from './breaker.js';
 import { composeMessage } from './compose.js';
 import { DEFAULT_PUBLIC_BASE_URL, unsubscribeUrl } from './merge.js';
 import { finishIfDrained, recordFailed, recordSent } from './settle.js';
@@ -349,7 +350,7 @@ export class SendWorker {
 
     await this.sql.begin(async (tx) => {
       const r = repos(tx);
-      await r.mailings.lock(workspaceId, mailing.id);
+      const locked = (await r.mailings.lock(workspaceId, mailing.id)) ?? mailing;
       if (outcome.ok) {
         const row = await recordSent(tx, workspaceId, { ...archive, outcome: 'sent', error: null, providerMessageId: outcome.providerMessageId }, eventCtx);
         await this.settle(tx, workspaceId, recipient.id, { status: 'sent', messageId: row.id });
@@ -371,14 +372,28 @@ export class SendWorker {
         const row = await recordFailed(tx, workspaceId, { ...archive, outcome: 'failed', error, providerMessageId: null }, { ...eventCtx, retryable });
         await this.settle(tx, workspaceId, recipient.id, { status: 'failed', messageId: row.id, error });
         if (outcome.error instanceof PermanentSendError) {
-          // A hard bounce suppresses the address; the sender's own problem is counted on the provider.
-          await handlePermanentRejection(tx, workspaceId, {
-            provider,
-            error: outcome.error,
-            handedOver: outcome.handedOver,
-            to: recipient.email,
-            message: row,
-          });
+          // A hard bounce suppresses the address (unless the circuit breaker says
+          // the refusals are the provider's fault); the sender's own problem is
+          // counted on the provider.
+          const err = outcome.error;
+          const action = rejectionAction(provider.kind, err, outcome.handedOver);
+          if (provider.kind === 'smtp' && outcome.handedOver) {
+            await r.messages.setRejection(workspaceId, row.id, {
+              rejectionClass: classifyRejection(err.code, err.message),
+              signature: rejectionSignature(err.message),
+            });
+          }
+          if (action === 'count') await r.providers.recordRejection(workspaceId, provider.id, err.message);
+          if (action === 'suppress') {
+            const verdict = await onDeadAddress(tx, workspaceId, {
+              mailing: locked,
+              providerId: provider.id,
+              to: recipient.email,
+              message: row,
+              diagnostic: err.message,
+            });
+            if (verdict === 'breaker_tripped') this.log.error(`[worker] bounce circuit breaker tripped on mailing ${mailing.id}; paused`);
+          }
         }
       } else {
         // Unknown outcome: it may have been delivered. Keep the budget spent, never retry.

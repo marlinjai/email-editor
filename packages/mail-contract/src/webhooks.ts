@@ -80,9 +80,17 @@ export type ContactUnsubscribedData = z.infer<typeof ContactUnsubscribedData>;
  * client or member lifting their own `unsubscribed` block). The same shape as
  * `contact.unsubscribed`, so a mirror can apply both with one code path: `topic`
  * null means the block on every topic was lifted. Blocks for a bounce, a
- * complaint or a manual block are never lifted this way.
+ * complaint or a manual block are never lifted this way, except that the
+ * bounce circuit breaker undoes the `bounced` blocks of a run it trips on
+ * (source `bounce_reverted`).
  */
 export const ContactResubscribedData = ContactUnsubscribedData.omit({ unsubscribed_at: true }).extend({
+  /**
+   * As on `contact.unsubscribed`, plus `bounce_reverted`: the bounce circuit
+   * breaker undid a `bounced` block it judged false (a `contact.bounced` for the
+   * same address and mailing went out before); `topic` is null.
+   */
+  source: z.enum([...UNSUBSCRIBE_SOURCES, 'bounce_reverted']),
   resubscribed_at: Timestamp,
 });
 export type ContactResubscribedData = z.infer<typeof ContactResubscribedData>;

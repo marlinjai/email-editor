@@ -17,6 +17,7 @@ const resendEvents = {
   source: 'automatic',
   url: 'https://mail.lumitra.co/providers/prv_2/events/resend',
   error: null,
+  unmatched: 0,
 };
 
 describe('providers', () => {
@@ -44,7 +45,9 @@ describe('providers', () => {
   it('counts rejections the sender is at fault for, on every kind', () => {
     const { rejections: _r, ...without } = smtpProvider;
     expect(Provider.safeParse(without).success).toBe(false);
-    const rejected = { count: 3, last_error: '550 5.7.1 blocked', last_at: TS };
+    const rejected = { count: 3, last_error: '550 5.7.1 blocked', last_at: TS, anomaly: null };
+    const tripped = { ...rejected, anomaly: { at: TS, mailing_id: 'm_1', reason: 'five in a row', sample: '550 5.1.1 user unknown' } };
+    expect(Provider.parse({ ...smtpProvider, rejections: tripped }).rejections.anomaly?.sample).toBe('550 5.1.1 user unknown');
     expect(Provider.parse({ ...smtpProvider, rejections: rejected }).rejections).toEqual(rejected);
     expect(Provider.safeParse({ ...smtpProvider, rejections: { ...rejected, count: -1 } }).success).toBe(false);
   });

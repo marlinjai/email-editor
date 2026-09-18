@@ -13,7 +13,6 @@ import { verifySvix } from '../provider-events/svix.js';
 const MAX_EVENT_BYTES = 256 * 1024;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ADDRESS = z.string().trim().toLowerCase().email().max(254);
 
 /**
  * The parts of a Resend event this service reads
@@ -26,7 +25,6 @@ const ResendEvent = z.object({
   data: z
     .object({
       email_id: z.string().min(1).max(200).optional(),
-      to: z.union([z.array(z.string()), z.string()]).optional(),
       bounce: z.object({ type: z.string().optional(), subType: z.string().optional(), message: z.string().optional() }).partial().optional(),
     })
     .passthrough(),
@@ -69,12 +67,13 @@ const ACTOR = (type: string) => ({ type: 'system' as const, reason: `Resend ${ty
  *    transaction as the block it causes. A retry or a replay changes nothing.
  * 5. `email.bounced` of type Permanent blocks the address as `bounced`,
  *    `email.complained` as `complained`, on every topic, and emits
- *    `contact.bounced`. The message is found by Resend's email id; when it is
- *    not (the event can outrun the worker recording the send, or the email was
- *    sent from the same Resend account by something else) the address the event
- *    names is blocked anyway, since a hard bounce or a complaint on the account
- *    hurts every sender on it. `email.delivery_delayed`, transient bounces and
- *    every other type are acknowledged and ignored.
+ *    `contact.bounced`. The message is found by Resend's email id, within this
+ *    provider and workspace; the address blocked is the one the message went
+ *    to. An event for an email the service did not send through this provider
+ *    (another workspace or system sharing the Resend account) is counted on the
+ *    provider (`events.unmatched`) and logged, never acted on: a wrong block
+ *    costs a real person their mail. `email.delivery_delayed`, transient
+ *    bounces and every other type are acknowledged and ignored.
  *
  * A processing failure answers 500, so Resend retries on its schedule.
  */
@@ -116,19 +115,21 @@ export function providerEventRoutes(sql: Sql, deps: ProviderEventsDeps) {
       let outcome: ProviderEventOutcome = 'ignored';
       if (action) {
         const message = emailId ? await r.messages.byProviderMessageId(workspaceId, provider.id, emailId) : null;
-        const named = typeof event.data.to === 'string' ? [event.data.to] : (event.data.to ?? []);
-        const parsed = named.length === 1 ? ADDRESS.safeParse(named[0]) : null;
-        const address = message?.to ?? (parsed?.success ? parsed.data : undefined);
-        if (address) {
+        if (message) {
           outcome = await suppressBounce(tx, workspaceId, {
-            email: address,
+            email: message.to,
             reason: action.reason,
-            message: message ? { id: message.id, contact_id: message.contact_id } : null,
+            message: { id: message.id, contact_id: message.contact_id },
             diagnostic: action.diagnostic,
             actor: ACTOR(event.type),
           });
         } else {
-          log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} names no single address; ignored`);
+          // Not a message this provider sent through the service: another
+          // workspace or system may share the Resend account, and a wrong block
+          // costs a real person their mail. Counted and logged, never acted on.
+          outcome = 'unmatched';
+          await r.providers.countUnmatchedEvent(workspaceId, provider.id);
+          log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} names email ${emailId ?? '(none)'}, which this provider never sent; ignored`);
         }
         await r.providerEvents.setOutcome(workspaceId, provider.id, externalId, outcome);
       }

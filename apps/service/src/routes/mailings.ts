@@ -64,6 +64,7 @@ export function toMailingSummary(row: MailingRow, counts: MailingCounts): Mailin
     ab_test: row.ab_test,
     started_at: row.started_at,
     finished_at: row.finished_at,
+    pause_reason: row.status === 'paused' ? row.pause_reason : null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
