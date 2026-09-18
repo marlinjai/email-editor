@@ -225,12 +225,13 @@ export function createNamespaces(config: CoreConfig) {
       delete: (key: string, opts?: RequestOpts) => execute(config, 'contactProperties.delete', { params: { key } }, opts),
     },
 
-    // S5: billing. Typed against the contract; the service answers `not_found` until S5 ships.
+    // S5: billing.
     billing: {
       plans: (opts?: RequestOpts) => execute(config, 'billing.plans', {}, opts),
       subscription: (opts?: RequestOpts) => execute(config, 'billing.subscription', {}, opts),
       usage: (opts?: RequestOpts) => execute(config, 'billing.usage', {}, opts),
       checkout: (body: RouteBody<'billing.checkout'>, opts?: RequestOpts) => execute(config, 'billing.checkout', { body }, opts),
+      portal: (body: RouteBody<'billing.portal'>, opts?: RequestOpts) => execute(config, 'billing.portal', { body }, opts),
     },
   };
 }

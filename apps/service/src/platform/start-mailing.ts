@@ -5,6 +5,7 @@ import {
   type TemplateDocument,
 } from '@marlinjai/mail-contract';
 import { ApiError } from '../api-error.js';
+import { assertCanSend, assertFeature } from '../billing/usage.js';
 import type { Db } from '../db.js';
 import { validateDocument } from '../documents.js';
 import { emitEvent } from '../events.js';
@@ -94,8 +95,16 @@ export async function applyStart(
   const counts = await r.mailings.counts(workspaceId, row.id);
   if (counts.total === 0) throw new ApiError('mailing_not_ready', 'The mailing has no recipients yet.');
 
-  const tracking = await effectiveTracking(tx, workspaceId);
+  // S5: the whole audience must fit the plan's period, or the mailing does not
+  // start (once started it always finishes). An A/B test needs the plan's
+  // A/B testing, and tracking is only switched on for a mailing whose plan
+  // includes it (the workspace may have moved to a plan without it).
+  await assertCanSend(tx, workspaceId, counts.queued, opts.now);
   const ab = row.ab_test;
+  if (ab) await assertFeature(tx, workspaceId, 'ab_testing');
+  const wanted = await effectiveTracking(tx, workspaceId);
+  const planTracks = wanted.opens || wanted.clicks ? await hasFeature(tx, workspaceId, 'tracking') : false;
+  const tracking = { opens: wanted.opens && planTracks, clicks: wanted.clicks && planTracks };
   if (ab && ab.winner_metric !== 'manual' && !tracking[ab.winner_metric]) {
     throw new ApiError(
       'tracking_disabled',
@@ -154,4 +163,15 @@ export async function applyStart(
     },
   });
   return moved;
+}
+
+/** Whether the workspace's plan includes a feature, without failing. */
+async function hasFeature(db: Db, workspaceId: string, feature: 'tracking' | 'ab_testing'): Promise<boolean> {
+  try {
+    await assertFeature(db, workspaceId, feature);
+    return true;
+  } catch (err) {
+    if (err instanceof ApiError && err.code === 'plan_limit_reached') return false;
+    throw err;
+  }
 }

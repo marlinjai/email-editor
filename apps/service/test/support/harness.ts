@@ -8,6 +8,7 @@ import { createSealer, type Sealer } from '../../src/sealing.js';
 import type { SsrfPolicy } from '../../src/webhooks/ssrf.js';
 import type { SignupOptions } from '../../src/signup/service.js';
 import { freshDatabase } from './db.js';
+import { setExemption } from '../../src/billing/exempt.js';
 import { MemoryAssetStorage } from './fakes.js';
 
 export const DASHBOARD_TOKEN = 'a'.repeat(64);
@@ -75,8 +76,13 @@ export async function startHarness(
     return { status: res.status, body: text ? JSON.parse(text) : {}, headers: res.headers };
   }
 
-  /** A workspace with an owner (subject `owner-<slug>`) and a full-scope key. */
-  async function seedWorkspace(slug: string) {
+  /**
+   * A workspace with an owner (subject `owner-<slug>`) and a full-scope key.
+   * Exempt from billing (a design partner, no limits) unless `billing: 'free'`,
+   * so suites about other features are not bound by the free plan's limits;
+   * the billing suites seed free workspaces.
+   */
+  async function seedWorkspace(slug: string, options: { billing?: 'exempt' | 'free' } = {}) {
     const owner = `owner-${slug}`;
     const ws = await call({
       method: 'POST',
@@ -93,6 +99,7 @@ export async function startHarness(
       body: { name: `${slug} key` },
     });
     if (key.status !== 201) throw new Error(`seed key ${slug}: ${JSON.stringify(key.body)}`);
+    if ((options.billing ?? 'exempt') === 'exempt') await setExemption(db.sql, ws.body.id, true, 'test seed');
     return { id: ws.body.id as string, owner, key: key.body.key as string, keyId: key.body.api_key.id as string };
   }
 

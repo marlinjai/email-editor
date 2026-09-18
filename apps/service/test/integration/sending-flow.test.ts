@@ -9,6 +9,7 @@ import {
   createMailing,
   eventsOf,
   mailingStatus,
+  drainUntilSettled,
   makeWorker,
   recipientsOf,
   seedContact,
@@ -223,7 +224,7 @@ describe('resume from persistence', () => {
     const { mailing } = await setup(undefined, ['ada']);
     await send(mailing.id);
     h.transport.failNext('transient', 2);
-    await makeWorker(h).drain();
+    await drainUntilSettled(h, makeWorker(h), W.id, mailing.id);
     expect(h.transport.attempts).toHaveLength(3);
     expect(h.transport.sent).toHaveLength(1);
     const [r] = await recipientsOf(h, W.id, mailing.id);
@@ -323,7 +324,7 @@ describe('re-entry after completion or failure', () => {
     const { mailing } = await setup(undefined, ['ada']);
     await send(mailing.id);
     h.transport.failNext('transient', 4);
-    await makeWorker(h).drain();
+    await drainUntilSettled(h, makeWorker(h), W.id, mailing.id);
     const [r] = await recipientsOf(h, W.id, mailing.id);
     expect(r).toMatchObject({ status: 'failed', attempts: 4 });
     const [event] = await eventsOf(h, W.id, 'message.failed');

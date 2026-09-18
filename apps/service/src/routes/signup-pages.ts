@@ -197,6 +197,8 @@ export function signupPageRoutes(sql: Sql, deps: SignupPageDeps) {
           return message(c, 410, 'superseded', outcome.workspace, { explicit });
         case 'already':
           return message(c, 200, 'already', outcome.workspace, { explicit });
+        case 'full':
+          return message(c, 503, 'full', outcome.workspace, { explicit });
         case 'confirmed':
           if (outcome.form.redirect_url && !outcome.paused) return c.redirect(outcome.form.redirect_url, 303);
           return message(c, 200, 'confirmed', outcome.workspace, { explicit, paused: outcome.paused });

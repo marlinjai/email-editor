@@ -6,6 +6,7 @@ import {
 } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { ApiError } from '../api-error.js';
+import { assertFeature } from '../billing/usage.js';
 import { actorOf, type AppEnv, type WorkspaceAccess } from '../context.js';
 import type { Db, Sql } from '../db.js';
 import { validateDocument } from '../documents.js';
@@ -173,6 +174,7 @@ export function mailingPlatformRoutes(sql: Sql, deps: MailingPlatformDeps) {
           status: row.status,
         });
       }
+      await assertFeature(tx, access.workspaceId, 'ab_testing');
       await requireMetricTracking(tx, access.workspaceId, state);
       await r.mailingPlatform.replaceVariants(access.workspaceId, id, variants);
       await r.mailingPlatform.setAbTest(access.workspaceId, id, state);
@@ -283,6 +285,10 @@ export function mailingPlatformRoutes(sql: Sql, deps: MailingPlatformDeps) {
       const workspace = await r.workspaces.get(access.workspaceId);
       if (!workspace) throw new ApiError('not_found', 'No such workspace.');
       const before = await r.workspaceTracking.get(access.workspaceId);
+      // S5: turning tracking on needs a plan that includes it; turning it off never does.
+      if ((input.opens && !before.opens) || (input.clicks && !before.clicks)) {
+        await assertFeature(tx, access.workspaceId, 'tracking');
+      }
       await r.workspaceTracking.set(access.workspaceId, input);
       // The master switch follows, so `workspace.get` tells the truth.
       await r.workspaces.update(access.workspaceId, {

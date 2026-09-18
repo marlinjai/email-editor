@@ -122,6 +122,7 @@ export type SignupMessageKind =
   | 'gone'
   | 'invalid'
   | 'rate'
+  | 'full'
   | 'error';
 
 export type SignupMessageView = {
@@ -152,6 +153,7 @@ const TITLES: Record<SignupMessageKind, SignupMessageKey> = {
   gone: 'gone_title',
   invalid: 'invalid_title',
   rate: 'rate_title',
+  full: 'full_title',
   error: 'error_title',
 };
 

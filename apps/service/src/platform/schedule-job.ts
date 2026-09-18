@@ -9,7 +9,7 @@ import type { PlatformJob } from './worker.js';
 const ACTOR: AuditActor = { type: 'system', reason: 'scheduled send' };
 
 /** Errors that say the mailing itself cannot start; anything else (the compile pool full, the database away) is retried. */
-const FINAL_ERRORS = new Set(['compile_failed', 'missing_unsubscribe_url', 'mailing_not_ready', 'unknown_provider', 'tracking_disabled', 'validation_failed']);
+const FINAL_ERRORS = new Set(['compile_failed', 'missing_unsubscribe_url', 'mailing_not_ready', 'unknown_provider', 'tracking_disabled', 'validation_failed', 'plan_limit_reached']);
 
 /**
  * Releases scheduled mailings at their time: the same start as `mailings.send`

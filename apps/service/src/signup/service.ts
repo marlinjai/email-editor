@@ -1,3 +1,5 @@
+import { assertWithinLimit } from '../billing/usage.js';
+import { ApiError } from '../api-error.js';
 import type { AuditActor } from '@marlinjai/mail-contract';
 import type { Db, Sql } from '../db.js';
 import { emitEvent } from '../events.js';
@@ -88,7 +90,16 @@ export type ConfirmState =
 
 export type ConfirmOutcome =
   | Exclude<ConfirmState, { kind: 'open' }>
-  | { kind: 'confirmed'; workspace: Workspace; form: SignupFormRow; paused: boolean; changed: boolean };
+  | { kind: 'confirmed'; workspace: Workspace; form: SignupFormRow; paused: boolean; changed: boolean }
+  /** The workspace's plan has no room for another contact (S5): nothing was written, the link stays valid. */
+  | { kind: 'full'; workspace: Workspace };
+
+/** Carries the workspace out of a rolled-back confirmation that hit the plan's contact limit. */
+class PlanFull extends Error {
+  constructor(readonly workspace: Workspace) {
+    super('plan_limit_reached');
+  }
+}
 
 const ACTOR: AuditActor = { type: 'system', reason: 'hosted signup form (double opt-in)' };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -232,9 +243,15 @@ export function createSignupService(deps: { sql: Sql; keys: RootKeys; options?: 
         return (await sql.begin('isolation level serializable', async (tx) => {
           const state = await inspect(token, tx, true);
           if (state.kind !== 'open') return state;
-          return apply(tx, state, hashAddress(ip));
+          try {
+            return await apply(tx, state, hashAddress(ip));
+          } catch (err) {
+            if (err instanceof ApiError && err.code === 'plan_limit_reached') throw new PlanFull(state.workspace);
+            throw err;
+          }
         })) as ConfirmOutcome;
       } catch (err) {
+        if (err instanceof PlanFull) return { kind: 'full', workspace: err.workspace };
         if (attempt < SERIALIZATION_RETRIES && isSerializationFailure(err)) continue;
         throw err;
       }
@@ -261,6 +278,8 @@ export function createSignupService(deps: { sql: Sql; keys: RootKeys; options?: 
         locale: submission.locale,
       });
       created = inserted !== null;
+      // S5: a new contact must fit the plan; over it, the whole confirmation rolls back.
+      if (created) await assertWithinLimit(tx, ws, 'contacts');
       contact = await r.contacts.byEmail(ws, submission.email);
       if (!contact) throw new Error(`contact ${submission.email} vanished while confirming a signup`);
     } else {

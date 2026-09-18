@@ -8,6 +8,7 @@ import { checkProperties } from '../platform/properties.js';
 import { repos } from '../repo/index.js';
 import type { ContactWithTopics } from '../repo/contacts.js';
 import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
+import { assertWithinLimit } from '../billing/usage.js';
 
 /** Addresses are stored and compared trimmed and lowercased. */
 export function normaliseEmail(email: string): string {
@@ -95,6 +96,8 @@ async function upsertOnce(tx: Db, workspaceId: string, input: ContactUpsert): Pr
       : undefined;
     const inserted = await r.contacts.insert(workspaceId, { ...fields, email, properties });
     if (!inserted) return null;
+    // S5: rolls the insert back when the plan's contact limit is now exceeded.
+    await assertWithinLimit(tx, workspaceId, 'contacts');
     id = inserted.id;
     created = true;
   } else {

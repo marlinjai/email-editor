@@ -1,3 +1,5 @@
+import { ApiError } from '../api-error.js';
+import { assertWithinLimit } from '../billing/usage.js';
 import type { AuditActor, ImportReport } from '@marlinjai/mail-contract';
 import type { Db, Sql } from '../db.js';
 import { emitEvent } from '../events.js';
@@ -139,12 +141,17 @@ export function createImportJob(options: ImportJobOptions): PlatformJob {
     if (rows.length > 0) {
       const ctx = await context(tx, job, rows);
       const results: RowResult[] = [];
+      let created = false;
       for (const row of rows) {
         const plan = evaluateRow(ctx, row.row_number, row.cells);
         const contactId = await apply(tx, job, plan);
+        if (plan.write?.kind === 'create') created = true;
         results.push(toResult(row, plan, contactId));
         options.afterRowWritten?.(job.id, row.row_number);
       }
+      // S5: the contacts this batch added must fit the plan, or the batch rolls
+      // back and the import stops (see tick): earlier batches stay committed.
+      if (created) await assertWithinLimit(tx, ws, 'contacts');
       await r.imports.saveOutcomes(ws, job.id, results);
     }
     const { report, processed } = await r.imports.commitReport(ws, job.id);
@@ -218,12 +225,27 @@ export function createImportJob(options: ImportJobOptions): PlatformJob {
       } catch (err) {
         if (!claimed) throw err;
         const { workspace_id: ws, id } = claimed as { workspace_id: string; id: string };
+        if (err instanceof ApiError && err.code === 'plan_limit_reached') {
+          // Retrying cannot help until the plan changes: stop now, with the reason.
+          await failNow(ws, id, `The plan's contact limit was reached: ${err.message} Rows before this batch were imported.`);
+          return true;
+        }
         log.error(`[imports] a batch of import ${id} failed:`, err);
         await recordFailure(ws, id, errorText(err), now);
         return false;
       }
     },
   };
+
+  async function failNow(ws: string, id: string, error: string): Promise<void> {
+    await sql.begin(async (tx) => {
+      const r = repos(tx);
+      const job = await r.imports.lock(ws, id);
+      if (!job || job.status !== 'committing') return;
+      const failed = await r.imports.finish(ws, id, 'failed', error);
+      await announce(tx, failed, failed.result);
+    });
+  }
 
   async function recordFailure(ws: string, id: string, message: string, now: Date): Promise<void> {
     await sql.begin(async (tx) => {

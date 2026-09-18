@@ -10,6 +10,7 @@ import { policyOf, type ProviderRow } from '../repo/providers.js';
 import type { SmtpSettings } from '../transport/smtp.js';
 import { SendError, type Transport } from '../transport/types.js';
 import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
+import { assertWithinLimit } from '../billing/usage.js';
 
 export type ProviderRouteOptions = {
   /** Builds the SMTP transport `verify` connects through; `createSmtpTransport` in production. */
@@ -222,6 +223,7 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
         replyTo: input.reply_to,
         policy: input.policy,
       });
+      await assertWithinLimit(tx, access.workspaceId, 'providers');
       await r.audit.record(access.workspaceId, {
         action: 'provider.created',
         actor: actorOf(access),

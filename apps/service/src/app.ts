@@ -37,6 +37,10 @@ import { tagRoutes } from './routes/tags.js';
 import { contactPropertyRoutes } from './routes/contact-properties.js';
 import { segmentRoutes } from './routes/segments.js';
 import { importRoutes } from './routes/imports.js';
+import { billingRoutes } from './routes/billing.js';
+import { stripeWebhookRoutes } from './routes/stripe-webhook.js';
+import type { BillingConfig } from './billing/plans.js';
+import type { StripeApi } from './billing/stripe.js';
 import { createSmtpTransport, type SmtpSettings } from './transport/smtp.js';
 import type { Transport } from './transport/types.js';
 import { signupFormRoutes } from './routes/signup-forms.js';
@@ -90,6 +94,10 @@ export type AppOptions = {
   platformKeys?: RootKeys;
   /** S4: the time check and rate limits of the signup forms (defaults in src/signup/service.ts). */
   signup?: SignupOptions;
+  /** S5: plans' Stripe Price ids and the webhook secret; absent means billing without Stripe (checkout fails closed). */
+  billing?: BillingConfig;
+  /** S5: the Stripe client (null without a key). Tests pass a fake. */
+  stripe?: StripeApi | null;
 };
 
 const PUBLIC_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -123,6 +131,8 @@ export function createApp({
   transportFor,
   platformKeys,
   signup,
+  billing = { prices: {} },
+  stripe = null,
 }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
@@ -144,6 +154,8 @@ export function createApp({
   if (platformKeys) app.route('/', trackingRoutes(sql, { tokens: createTrackingTokens(platformKeys) }));
   const signupService = platformKeys ? createSignupService({ sql, keys: platformKeys, options: signup }) : null;
   if (signupService) app.route('/', signupPageRoutes(sql, { service: signupService, publicBaseUrl, log: { error: log.error, log: console.log } }));
+  // Public and outside /v1 too: Stripe signs its requests, it holds no API key.
+  app.route('/', stripeWebhookRoutes(sql, { config: billing, stripe, log: { error: log.error, log: console.log } }));
 
   const limit = (maxSize: number) =>
     bodyLimit({
@@ -220,6 +232,7 @@ export function createApp({
       service: signupService,
     }),
   );
+  app.route('/', billingRoutes(sql, { ...deps, config: billing, stripe, log }));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 

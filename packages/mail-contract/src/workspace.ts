@@ -187,6 +187,9 @@ export const AUDIT_ACTIONS = [
   'mailing.ab_test_updated',
   'mailing.ab_winner_selected',
   'tracking.updated',
+  'billing.checkout_started',
+  'billing.subscription_changed',
+  'billing.exemption_changed',
 ] as const;
 export const AuditAction = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof AuditAction>;

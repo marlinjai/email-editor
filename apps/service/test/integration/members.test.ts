@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from '../support/harness.js';
+import { setExemption } from '../../src/billing/exempt.js';
 
 let h: Harness;
 beforeAll(async () => {
@@ -160,6 +161,11 @@ describe('workspaces', () => {
     expect(ok.status).toBe(201);
     const patch = await h.call({ method: 'PATCH', path: '/v1/workspace', subject: 'polyglot', workspace: ok.body.id, body: { settings: { locales: ['en'] } } });
     expect(patch.body.error.code).toBe('validation_failed');
+    // S5: tracking needs a plan that includes it; the free plan does not.
+    const free = await h.call({ method: 'PATCH', path: '/v1/workspace', subject: 'polyglot', workspace: ok.body.id, body: { settings: { tracking_enabled: true } } });
+    expect(free.status).toBe(429);
+    expect(free.body.error).toMatchObject({ code: 'plan_limit_reached', details: { feature: 'tracking', plan: 'free' } });
+    await setExemption(h.sql, ok.body.id, true, 'test: a plan with tracking');
     const good = await h.call({ method: 'PATCH', path: '/v1/workspace', subject: 'polyglot', workspace: ok.body.id, body: { settings: { tracking_enabled: true } } });
     expect(good.body.settings).toEqual({ default_locale: 'de', locales: ['de', 'en', 'fr', 'it', 'es'], tracking_enabled: true });
   });
