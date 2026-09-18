@@ -26,13 +26,24 @@ export type WebhookDeliveryRow = {
   created_at: string;
 };
 
-/** What the delivery loop needs to send one delivery. */
+/**
+ * What the delivery loop needs to send one delivery. `secret_sealed` is the
+ * endpoint's current signing secret; `previous_secret_sealed` is still valid
+ * until `previous_secret_expires_at` (0007's rotation window), and the loop
+ * signs with both while it holds. `enabled` lets the loop skip (never attempt,
+ * never consume a retry) a delivery whose endpoint was disabled after it was
+ * queued.
+ */
 export type DueDelivery = {
   workspace_id: string;
   id: string;
+  endpoint_id: string;
   attempts: number;
   url: string;
+  enabled: boolean;
   secret_sealed: string;
+  previous_secret_sealed: string | null;
+  previous_secret_expires_at: string | null;
   payload: WebhookEvent;
 };
 
@@ -58,6 +69,11 @@ export function webhookEndpointsRepo(db: Db) {
       const rows = await db<WebhookEndpointRow[]>`
         SELECT ${db.unsafe(ENDPOINT)} FROM webhook_endpoints WHERE workspace_id = ${workspaceId} AND id = ${endpointId}`;
       return rows[0] ?? null;
+    },
+
+    async exists(workspaceId: string, endpointId: string): Promise<boolean> {
+      const rows = await db`SELECT 1 FROM webhook_endpoints WHERE workspace_id = ${workspaceId} AND id = ${endpointId}`;
+      return rows.length > 0;
     },
 
     async list(workspaceId: string, page: { afterId?: string; limit: number }): Promise<WebhookEndpointRow[]> {
@@ -90,9 +106,25 @@ export function webhookEndpointsRepo(db: Db) {
       return rows[0] ?? null;
     },
 
-    async rotateSecret(workspaceId: string, endpointId: string, secretSealed: string): Promise<WebhookEndpointRow | null> {
+    /**
+     * Rotates the signing secret. The old secret moves to `previous_secret_sealed`
+     * and keeps signing (alongside the new one) until `previousExpiresAt`, so a
+     * receiver has a window to pick up the new secret before the old one stops
+     * working. One UPDATE, so there is no read-then-write race with a concurrent
+     * rotation.
+     */
+    async rotateSecret(
+      workspaceId: string,
+      endpointId: string,
+      newSecretSealed: string,
+      previousExpiresAt: Date,
+    ): Promise<WebhookEndpointRow | null> {
       const rows = await db<WebhookEndpointRow[]>`
-        UPDATE webhook_endpoints SET secret_sealed = ${secretSealed}, updated_at = now()
+        UPDATE webhook_endpoints SET
+          previous_secret_sealed = secret_sealed,
+          previous_secret_expires_at = ${previousExpiresAt},
+          secret_sealed = ${newSecretSealed},
+          updated_at = now()
         WHERE workspace_id = ${workspaceId} AND id = ${endpointId}
         RETURNING ${db.unsafe(ENDPOINT)}`;
       return rows[0] ?? null;
@@ -142,6 +174,13 @@ export function webhookDeliveriesRepo(db: Db) {
       return rows[0] ?? null;
     },
 
+    async exists(workspaceId: string, endpointId: string, deliveryId: string): Promise<boolean> {
+      const rows = await db`
+        SELECT 1 FROM webhook_deliveries
+        WHERE workspace_id = ${workspaceId} AND endpoint_id = ${endpointId} AND id = ${deliveryId}`;
+      return rows.length > 0;
+    },
+
     async list(
       workspaceId: string,
       endpointId: string,
@@ -182,7 +221,8 @@ export function webhookDeliveriesRepo(db: Db) {
           FROM due WHERE d.id = due.id
           RETURNING d.id, d.workspace_id, d.attempts, d.endpoint_id, d.event_id
         )
-        SELECT l.workspace_id, l.id, l.attempts, e.url, e.secret_sealed, ev.payload
+        SELECT l.workspace_id, l.id, l.attempts, l.endpoint_id, e.url, e.enabled,
+               e.secret_sealed, e.previous_secret_sealed, e.previous_secret_expires_at, ev.payload
         FROM leased l
         JOIN webhook_endpoints e ON e.workspace_id = l.workspace_id AND e.id = l.endpoint_id
         JOIN webhook_events ev ON ev.workspace_id = l.workspace_id AND ev.id = l.event_id`;
@@ -191,14 +231,23 @@ export function webhookDeliveriesRepo(db: Db) {
     /**
      * Records one attempt: `succeeded`, `failed` for good, or back to `pending`
      * with the next attempt time (the contract's WEBHOOK_RETRY_DELAYS_SECONDS).
+     * `responseSnippet` and `durationMs` are diagnostics for operators, never
+     * returned by the API.
      */
     async recordAttempt(
       workspaceId: string,
       deliveryId: string,
       result:
-        | { status: 'succeeded'; statusCode: number }
-        | { status: 'failed'; statusCode: number | null; error: string }
-        | { status: 'pending'; statusCode: number | null; error: string; nextAttemptAt: Date },
+        | { status: 'succeeded'; statusCode: number; responseSnippet: string | null; durationMs: number }
+        | { status: 'failed'; statusCode: number | null; error: string; responseSnippet: string | null; durationMs: number | null }
+        | {
+            status: 'pending';
+            statusCode: number | null;
+            error: string;
+            nextAttemptAt: Date;
+            responseSnippet: string | null;
+            durationMs: number | null;
+          },
     ): Promise<WebhookDeliveryRow | null> {
       const rows = await db<WebhookDeliveryRow[]>`
         UPDATE webhook_deliveries SET
@@ -206,6 +255,8 @@ export function webhookDeliveriesRepo(db: Db) {
           attempts = attempts + 1,
           last_status_code = ${result.statusCode},
           last_error = ${result.status === 'succeeded' ? null : result.error},
+          last_response_snippet = ${result.responseSnippet},
+          last_duration_ms = ${result.durationMs},
           next_attempt_at = ${result.status === 'pending' ? result.nextAttemptAt : null},
           delivered_at = ${result.status === 'succeeded' ? db`now()` : db`NULL`}
         WHERE workspace_id = ${workspaceId} AND id = ${deliveryId}
@@ -217,7 +268,7 @@ export function webhookDeliveriesRepo(db: Db) {
     async resetForRedelivery(workspaceId: string, endpointId: string, deliveryId: string): Promise<WebhookDeliveryRow | null> {
       const rows = await db<WebhookDeliveryRow[]>`
         UPDATE webhook_deliveries SET status = 'pending', attempts = 0, next_attempt_at = now(), delivered_at = NULL,
-          last_error = NULL, last_status_code = NULL
+          last_error = NULL, last_status_code = NULL, last_response_snippet = NULL, last_duration_ms = NULL
         WHERE workspace_id = ${workspaceId} AND endpoint_id = ${endpointId} AND id = ${deliveryId}
         RETURNING ${db.unsafe(DELIVERY)}`;
       return rows[0] ?? null;
