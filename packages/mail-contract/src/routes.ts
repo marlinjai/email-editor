@@ -414,7 +414,7 @@ export const sendingRoutes = {
     access: 'admin',
     phase: 'S2',
   },
-  'providers.set_events_secret': {
+  'providers.setEventsSecret': {
     method: 'PUT',
     path: '/v1/providers/:id/events-secret',
     params: IdParams,

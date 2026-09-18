@@ -460,7 +460,7 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
   pruned after 30 days). Create and verify register the endpoint at Resend
   (`registerResendEvents`); when that fails (a sending-only key, no public
   https address, Resend unreachable) `events.error` says why and
-  `providers.set_events_secret` takes the secret pasted from Resend's
+  `providers.setEventsSecret` takes the secret pasted from Resend's
   dashboard. Bounces an SMTP server reports later by email (iCloud+) are not
   detected. Tests: `test/unit/rejection.test.ts` (the classification table),
   `test/integration/bounces.test.ts`.

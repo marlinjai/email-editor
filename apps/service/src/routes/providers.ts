@@ -485,10 +485,10 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
 
   // The signing secret of an events endpoint a member registered at Resend by
   // hand (a sending-only key cannot register one). Arrives here, leaves sealed.
-  mount(app, 'providers.set_events_secret', deps, async (c) => {
+  mount(app, 'providers.setEventsSecret', deps, async (c) => {
     const access = c.get('access');
-    const id = rowId(params(c, 'providers.set_events_secret').id, 'provider');
-    const input = await body(c, 'providers.set_events_secret');
+    const id = rowId(params(c, 'providers.setEventsSecret').id, 'provider');
+    const input = await body(c, 'providers.setEventsSecret');
     const row = await sql.begin(async (tx) => {
       const r = repos(tx);
       const existing = await r.providers.lock(access.workspaceId, id);

@@ -238,7 +238,7 @@ export async function verifyProvider(ws: string, providerId: string): Promise<Ac
 export async function setProviderEventsSecret(ws: string, providerId: string, signingSecret: string): Promise<ActionResult> {
   const parsed = parseInput(ProviderEventsSecret, { signing_secret: signingSecret.trim() });
   if (!parsed.ok) return parsed;
-  return act('providers.set_events_secret', async () => {
+  return act('providers.setEventsSecret', async () => {
     const { api } = await mail(ws);
     await api.providers.setEventsSecret(providerId, parsed.data);
     revalidatePath(settingsPath(ws, '/providers'));

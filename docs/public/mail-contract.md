@@ -155,7 +155,7 @@ if it bounces again, it is blocked again.
   `needs_secret`). Creating or verifying the provider registers the endpoint at
   Resend when the API key allows it; with a sending-only key, add a webhook at
   Resend for that URL with the events `email.bounced` and `email.complained`,
-  and store its signing secret with `providers.set_events_secret`
+  and store its signing secret with `providers.setEventsSecret`
   (`PUT /v1/providers/:id/events-secret`, `{ signing_secret: "whsec_..." }`).
 - **Not detected:** bounces that an SMTP server reports later as an email to
   the sender's inbox. That is how iCloud+ reports almost all of them, so with an

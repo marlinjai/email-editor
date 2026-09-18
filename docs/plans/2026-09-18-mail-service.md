@@ -772,7 +772,7 @@ block: a permanent rejection only recorded `message.failed`. Now:
   (Resend answers `restricted_api_key`), and an instance without a public
   https address cannot either: the provider then shows `events.status:
   needs_secret`, the reason, and the URL to add at Resend by hand, and
-  `PUT /v1/providers/:id/events-secret` (`providers.set_events_secret`)
+  `PUT /v1/providers/:id/events-secret` (`providers.setEventsSecret`)
   stores the pasted secret. Deleting a provider removes an endpoint the
   service registered itself.
 - **Hardening an existing block.** An `unsubscribed` block the person could
