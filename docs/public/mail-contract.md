@@ -154,8 +154,12 @@ check the service runs before `send`.
 Events: `message.sent`, `message.failed`, `contact.unsubscribed`,
 `contact.resubscribed`, `contact.bounced`, `mailing.finished`.
 `contact.resubscribed` has the shape of `contact.unsubscribed` with
-`resubscribed_at` in place of `unsubscribed_at`: the person opted back in on the
-hosted page (topic null means the block on every topic was lifted). A mirror that
+`resubscribed_at` in place of `unsubscribed_at`: an `unsubscribed` block was
+lifted, by the person on the hosted page (`hosted_page`), or through
+`suppressions.delete` (`api`, `dashboard`). Topic null means the block on every
+topic was lifted. Lifting a bounce, complaint or manual block sends nothing. A
+resubscribe on the hosted page to one topic also subscribes the contact to it;
+an API lift leaves subscriptions to your next upsert. A mirror that
 applies unsubscribes must apply it too, or it keeps excluding someone who asked
 to receive mail again. After an all-topics unsubscribe, a `contact.resubscribed` naming a topic
 lifts that topic only: the service turns the block on everything into blocks on

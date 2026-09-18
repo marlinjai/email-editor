@@ -419,6 +419,17 @@ describe('the four paths', () => {
     expect(stateOf(again, 'Programme updates')).toBe('Unsubscribed');
   });
 
+  it('backtrack after a client upsert dropped the topic: the resubscribe subscribes again', async () => {
+    const s = await scenario();
+    await post(s.token(), { action: 'unsubscribe', scope: 'topic', topic: s.news.id });
+    // The client re-sent both topics while the block stood; the upsert keeps only
+    // the unblocked one (suppressions win), so the subscription is gone.
+    await pool.contacts.setSubscriptions(s.ws.id, s.contact.id, [s.venues.id]);
+    const back = await post(s.token(), { action: 'resubscribe', scope: 'topic', topic: s.news.id });
+    expect(stateOf(back, 'Programme updates')).toBe('Subscribed');
+    expect((await pool.contacts.get(s.ws.id, s.contact.id))!.topics).toEqual(['programme-updates', 'venue-outreach']);
+  });
+
   it('resume: reopening the link later shows the stored state and offers the way back', async () => {
     const s = await scenario();
     await post(s.token(), { 'List-Unsubscribe': 'One-Click' });

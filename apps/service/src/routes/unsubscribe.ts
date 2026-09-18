@@ -44,8 +44,11 @@ import type { UnsubscribeSigner } from '../unsubscribe.js';
  *   still shows success.
  *
  * Suppressions are the service's record of the person's choice; the contact's
- * topic subscriptions are the client's and are never touched here. So an
- * unsubscribe followed by a resubscribe restores exactly the previous state.
+ * topic subscriptions are the client's. An unsubscribe never touches them, so an
+ * unsubscribe followed by a resubscribe restores the previous state. The one
+ * write to them is a resubscribe to a named topic, which also subscribes the
+ * contact to it: that is exactly what the person asked for, and a client upsert
+ * made while the block stood will have dropped the subscription.
  * Resubscribing lifts only blocks with reason `unsubscribed`: a bounce, a
  * complaint or a manual block shows as "paused by the sender" and has no button.
  *
@@ -248,7 +251,7 @@ export function unsubscribeRoutes(sql: Sql, deps: UnsubscribeRouteDeps) {
       const token = c.req.param('token') ?? '';
       const form = await readForm(c);
       const oneClick = isOneClick(form);
-      const resolved = await resolve(token);
+      let resolved = await resolve(token);
 
       if (oneClick) {
         // Mail clients read the status, not the body: 200 for a genuine token,
@@ -277,7 +280,11 @@ export function unsubscribeRoutes(sql: Sql, deps: UnsubscribeRouteDeps) {
         return preferences(c, resolved, state, token, { kind: 'test' }, explicit);
       }
       const changed = await change(resolved, { action: choice.action, topic, source: 'hosted_page' });
-      const state = await loadState(sql, resolved.workspace.id, resolved.contact.email);
+      // Render what is stored now, not the contact as it was read before the write.
+      const current = await pool.contacts.get(resolved.workspace.id, resolved.contact.id);
+      if (!current) return message(c, 200, 'gone', resolved.workspace, explicit);
+      resolved = { ...resolved, contact: current };
+      const state = await loadState(sql, resolved.workspace.id, current.email);
       // A repeated unsubscribe still confirms (the person is unsubscribed). A
       // resubscribe that lifted nothing (a bounce or manual block landed after
       // the page was opened, or nothing was blocked) must not claim success:
@@ -389,6 +396,10 @@ export function unsubscribeRoutes(sql: Sql, deps: UnsubscribeRouteDeps) {
         await r.suppressions.delete(ws, own.id);
         lifted.push(own.id);
       }
+      // The person asked for exactly this topic. A client upsert made while the
+      // block stood dropped the subscription (suppressions win there), so without
+      // this the opt-in would lift the block and still send nothing.
+      await r.contacts.subscribe(ws, contact.id, input.topic.id);
     }
 
     await r.audit.record(ws, {
