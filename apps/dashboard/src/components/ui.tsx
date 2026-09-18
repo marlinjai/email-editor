@@ -32,7 +32,9 @@ export function Button({
   ...rest
 }: ComponentProps<'button'> & { variant?: ButtonVariant; busy?: boolean }) {
   return (
-    <button {...rest} disabled={disabled || busy} aria-busy={busy || undefined} className={buttonClass(variant, className)}>
+    // `button` unless the caller says `submit`: inside a form, a bare <button>
+    // submits it, so an "Add", "Remove" or "Delete" there would also save.
+    <button type="button" {...rest} disabled={disabled || busy} aria-busy={busy || undefined} className={buttonClass(variant, className)}>
       {busy ? <Spinner /> : null}
       {children}
     </button>

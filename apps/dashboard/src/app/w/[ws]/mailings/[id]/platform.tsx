@@ -127,8 +127,10 @@ export function SegmentAudience({ ws, mailing, segments }: { ws: string; mailing
           );
         }}
       >
-        <label htmlFor={selectId} className="flex flex-col gap-1.5 text-[12.5px] font-medium text-muted">
-          Segment
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor={selectId} className="text-[12.5px] font-medium text-muted">
+            Segment
+          </label>
           <Select id={selectId} value={segmentId} onChange={(e) => setSegmentId(e.target.value)} className="w-72">
             <option value="">Choose a segment</option>
             {segments.map((s) => (
@@ -137,7 +139,7 @@ export function SegmentAudience({ ws, mailing, segments }: { ws: string; mailing
               </option>
             ))}
           </Select>
-        </label>
+        </div>
         <Button type="submit" busy={pending} disabled={!segmentId}>
           Add its contacts
         </Button>

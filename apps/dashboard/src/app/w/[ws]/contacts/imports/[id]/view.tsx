@@ -83,7 +83,11 @@ function Report({ report, verb }: { report: ImportReport; verb: 'would' | 'did' 
   );
 }
 
-/** The rows of the dry run or the commit, a page at a time, filterable by outcome. */
+/**
+ * The rows of the dry run or the commit, a page at a time, filterable by
+ * outcome. Keyed by the dry run or commit it shows, so it starts over when
+ * that changes and keeps its filter and pages across refreshes otherwise.
+ */
 function Rows({ ws, job, initial }: { ws: string; job: ImportJob; initial: Page<ImportRow> | null }) {
   const [outcome, setOutcome] = useState<ImportRowOutcome | ''>('');
   const [rows, setRows] = useState<ImportRow[]>(initial?.data ?? []);
@@ -98,12 +102,6 @@ function Rows({ ws, job, initial }: { ws: string; job: ImportJob; initial: Page<
         setCursor(page.next_cursor);
       },
     );
-  useEffect(() => {
-    setRows(initial?.data ?? []);
-    setCursor(initial?.next_cursor ?? null);
-    setOutcome('');
-  }, [initial]);
-
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -460,7 +458,7 @@ export function ImportView({ ws, initial, lookups, rows, canWrite }: { ws: strin
 
       {!running && !remapping && (job.status === 'validated' || terminal) && (job.dry_run || job.result) ? (
         <Section title="Rows">
-          <Rows ws={ws} job={job} initial={rows} />
+          <Rows key={`${job.status}-${job.mapping_version}`} ws={ws} job={job} initial={rows} />
         </Section>
       ) : null}
 

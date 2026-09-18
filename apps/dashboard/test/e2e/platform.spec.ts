@@ -10,7 +10,7 @@ import { SERVICE_URL } from './stack';
  * - CSV import: forward (upload, map, dry run, commit); backtrack (a changed
  *   mapping gives a new dry run, and a commit of an older dry run is refused
  *   with nothing written); resume (a reload during the dry run, and a service
- *   restart during the commit); re-entry (the same file again changes nothing,
+ *   restart once the commit was taken); re-entry (the same file again changes nothing,
  *   a cancelled or failed import stays read-only).
  * - Scheduling: schedule, move, reload, unschedule, and a scheduled mailing
  *   that goes out on its own.
@@ -139,7 +139,7 @@ test('tags and typed properties', async ({ page }) => {
   await page.getByLabel('New tag').fill('Workshop');
   await expect(page.getByLabel('Slug')).toHaveValue('workshop');
   await page.getByRole('button', { name: 'Add tag' }).click();
-  await expect(page.getByRole('cell', { name: 'Workshop' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Workshop', exact: true })).toBeVisible();
   // A slug that is taken is refused with the reason.
   await page.getByLabel('New tag').fill('Workshop');
   await page.getByRole('button', { name: 'Add tag' }).click();
@@ -231,9 +231,12 @@ test('import, resume and re-entry: a reload mid-run resumes; the same file again
   await expect(page.getByRole('button', { name: 'Import 0 contacts' })).toBeDisabled();
   await expect(page.getByText('Nothing to import: every row is already up to date or left out.')).toBeVisible();
   // The rows say why, row by row.
-  await page.getByLabel('Show').selectOption('skipped');
   const rows = page.getByRole('table', { name: 'Rows of the file' });
-  await expect(rows.getByRole('row')).toHaveCount(3);
+  // Retried: in the dev server a choice made before the page hydrated is not seen.
+  await expect(async () => {
+    await page.getByLabel('Show').selectOption('skipped');
+    await expect(rows.getByRole('row')).toHaveCount(3, { timeout: 2_000 });
+  }).toPass();
   await expect(rows).toContainText('not-an-address');
 
   await page.getByRole('button', { name: 'Cancel import' }).click();
@@ -263,6 +266,9 @@ test('segments: a filter with a live count, saved, changed and saved again', asy
   await expect(page.getByTestId('segment-count')).toHaveText(String(TIER_2_UP));
   await page.getByRole('button', { name: 'Create segment' }).click();
   await expect(page).toHaveURL(/\/contacts\/segments\/[^/]+$/);
+  // The saved segment's own page, not the builder that is being replaced.
+  await expect(page.getByRole('heading', { name: 'Workshop, tier 2 and up' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save segment' })).toBeVisible();
   segmentId = new URL(page.url()).pathname.split('/').pop()!;
 
   // Backtrack: "any of" widens it; the count follows before saving, and the saved one after a reload.
@@ -399,7 +405,7 @@ test('signup form: created, embedded, confirmed by a person, changed and deleted
   await page.getByRole('link', { name: 'New form' }).first().click();
   await page.getByLabel('Name', { exact: true }).fill('Website footer');
   await page.getByLabel('Heading of the page').fill('Stay in touch');
-  await page.getByLabel('What people agree to').fill('I would like the newsletter.');
+  await page.getByLabel('What people agree to', { exact: true }).fill('I would like the newsletter.');
   await page.getByRole('checkbox', { name: /^News/ }).check();
   await page.getByRole('checkbox', { name: 'Workshop' }).check();
   await page.getByLabel('Heading in German').fill('Bleiben Sie dran');
@@ -439,6 +445,9 @@ test('signup form: created, embedded, confirmed by a person, changed and deleted
   await page.getByLabel('Heading of the page').fill('Stay in the loop');
   await page.getByRole('button', { name: 'Save form' }).click();
   await expect(page.getByText(/^Version 2;/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Heading of the page')).toHaveValue('Stay in the loop');
+  await expect(page.getByText(/^Version 2;/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Delete form' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Delete form' }).click();
@@ -456,7 +465,11 @@ test('import, failed at the plan limit across a restart: what was written stays,
   await page.getByRole('button', { name: 'Check the file' }).click();
   await expect(page.getByRole('button', { name: 'Import 700 contacts' })).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Import 700 contacts' }).click();
-  // The service restarts mid-commit (a deploy); the commit resumes, then stops at the contact limit.
+  // Once the service took the commit, it restarts (a deploy); the worker picks
+  // the import up again, and it stops at the contact limit.
+  const id = importIdOf(page);
+  const api = serviceFor(OWNER, ws);
+  await expect.poll(async () => (await api.imports.get(id)).status, { timeout: 30_000 }).toMatch(/committing|failed/);
   await restartService('SIGTERM');
   await page.reload();
   await expect(page.getByTestId('import-status')).toHaveText('Failed', { timeout: 90_000 });

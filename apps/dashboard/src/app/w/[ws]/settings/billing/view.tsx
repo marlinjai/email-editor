@@ -8,7 +8,7 @@ import { useAction } from '@/components/use-action';
 import { isBillingNotConfigured } from '@/lib/errors';
 import { formatCount, percent } from '@/lib/format';
 import type { ActionError } from '@/lib/result';
-import { formatPrice, METRIC_LABELS, usageLevel } from '@/lib/usage';
+import { formatPrice, METRIC_LABELS, PLAN_NAMES, usageLevel } from '@/lib/usage';
 import { openPortal, startCheckout } from './actions';
 
 const STATUS: Record<Subscription['status'], { label: string; tone: Tone }> = {
@@ -94,7 +94,7 @@ export function BillingView({
   const unavailable = error !== null && isBillingNotConfigured(error.code, error.details);
 
   const current = plans.find((p) => p.id === usage.plan);
-  const currentName = current?.name ?? usage.plan;
+  const currentName = current?.name ?? PLAN_NAMES[usage.plan];
   const exempt = subscription?.billing_exempt === true || usage.plan === 'design_partner';
   const paying = usage.plan === 'starter' || usage.plan === 'growth';
   const price = current ? formatPrice(current) : null;

@@ -1,4 +1,4 @@
-import { USAGE_WARNING_RATIO, type Plan, type UsageMetric } from '@marlinjai/mail-sdk';
+import { USAGE_WARNING_RATIO, type Plan, type PlanId, type UsageMetric } from '@marlinjai/mail-sdk';
 import { formatCount } from './format';
 
 /**
@@ -13,6 +13,12 @@ export const METRIC_LABELS: Record<UsageMetric, { name: string; unit: string; pe
   providers: { name: 'Providers', unit: 'providers', period: false },
   webhook_endpoints: { name: 'Webhook endpoints', unit: 'webhook endpoints', period: false },
 };
+
+/**
+ * Every plan's name, for a plan the catalogue does not list: `billing.plans`
+ * returns what can be bought, never the design partners' exemption.
+ */
+export const PLAN_NAMES: Record<PlanId, string> = { free: 'Free', starter: 'Starter', growth: 'Growth', design_partner: 'Design partner' };
 
 export type UsageLevel = 'ok' | 'approaching' | 'reached';
 
