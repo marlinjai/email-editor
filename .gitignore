@@ -41,3 +41,6 @@ coverage
 .infisical.json
 .worktrees/
 .superpowers/
+
+# TypeScript incremental build state
+*.tsbuildinfo
