@@ -12,10 +12,14 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/service/package.json apps/service/package.json
 COPY packages/mail-contract/package.json packages/mail-contract/package.json
+COPY packages/core/package.json packages/core/package.json
 RUN pnpm install --frozen-lockfile --filter @email-editor/service...
-# The service and the workspace packages it imports (the API contract).
+# The service and the workspace packages it imports: the API contract (bundled
+# into dist/main.js) and the editor core (document validation and the MJML
+# compiler, installed as a package by `pnpm deploy`).
 COPY tsconfig.json ./
 COPY packages/mail-contract packages/mail-contract
+COPY packages/core packages/core
 COPY apps/service apps/service
 RUN pnpm --filter "@email-editor/service..." build \
  && pnpm --filter @email-editor/service deploy --prod /out
