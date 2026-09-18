@@ -7,6 +7,7 @@ const valid = {
   MAIL_SECRETS_KEY: 'cd'.repeat(32),
   PUBLIC_BASE_URL: 'https://mail.lumitra.co',
   STORAGE_BRAIN_API_KEY: `sk_test_${'x'.repeat(32)}`,
+  MAIL_UNSUBSCRIBE_KEY: 'ef'.repeat(32),
 };
 
 describe('config', () => {
@@ -16,6 +17,7 @@ describe('config', () => {
     expect(config.secretsKeys.get(1)).toHaveLength(32);
     expect(config.compile).toEqual({ workers: 2, timeoutMs: 10_000, maxQueue: 32 });
     expect(config.storageBrain.baseUrl).toBeUndefined();
+    expect(config.unsubscribeKeys.get(1)).toHaveLength(32);
   });
 
   it('names every missing variable at once', () => {
@@ -31,6 +33,7 @@ describe('config', () => {
           'MAIL_SECRETS_KEY is not set',
           'PUBLIC_BASE_URL is not set',
           'STORAGE_BRAIN_API_KEY is not set',
+          'MAIL_UNSUBSCRIBE_KEY is not set',
         ]),
       );
     }
@@ -63,6 +66,10 @@ describe('config', () => {
     expect(() => loadConfig({ ...valid, PUBLIC_BASE_URL: 'http://mail.lumitra.co' })).toThrow(/PUBLIC_BASE_URL/);
     expect(() => loadConfig({ ...valid, PUBLIC_BASE_URL: 'https://mail.lumitra.co/' })).toThrow(/PUBLIC_BASE_URL/);
     expect(() => loadConfig({ ...valid, PUBLIC_BASE_URL: 'https://mail.lumitra.co/x' })).toThrow(/PUBLIC_BASE_URL/);
+  it('refuses to boot without the unsubscribe key, or with a malformed one', () => {
+    const { MAIL_UNSUBSCRIBE_KEY: _omitted, ...withoutKey } = valid;
+    expect(() => loadConfig(withoutKey)).toThrow(/MAIL_UNSUBSCRIBE_KEY is not set/);
+    expect(() => loadConfig({ ...valid, MAIL_UNSUBSCRIBE_KEY: 'ab'.repeat(16) })).toThrow(/MAIL_UNSUBSCRIBE_KEY: must be 64 hex/);
   });
 
   it('rejects a non-postgres database URL', () => {

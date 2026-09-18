@@ -1,0 +1,97 @@
+name: Publish packages
+
+# Publishes one release set to npm when its tag is pushed:
+#   editor-v<version>  @marlinjai/email-editor-core, -blocks, -ui, @marlinjai/email-editor
+#   mail-v<version>    @marlinjai/mail-contract, @marlinjai/mail-sdk
+# The sets, their tag prefixes and their publish order live in
+# scripts/release-sets.mjs.
+#
+# Authentication is npm Trusted Publishing (OpenID Connect): no npm token is
+# stored anywhere. Each package must be registered once on npmjs.com with this
+# repository and this workflow file (publish.yml) as its trusted publisher.
+# Until it is, the upload fails with a 404 on PUT for that package. npm only
+# allows that registration on a package that already exists, so a package's
+# very first version is published by hand (see the mail-service plan,
+# docs/plans/2026-09-18-mail-service.md, question 4).
+#
+# Re-running after a partial failure is safe: a version already on the
+# registry is skipped, the rest are published.
+
+on:
+  push:
+    tags:
+      - 'editor-v*'
+      - 'mail-v*'
+
+permissions:
+  contents: read
+  id-token: write # npm Trusted Publishing (OIDC), and provenance
+
+concurrency:
+  group: publish-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install an npm CLI that supports Trusted Publishing (11.5.1 or newer)
+        run: npm install -g npm@latest && npm --version
+
+      - name: Resolve the release set from the tag and check every version
+        id: release
+        run: |
+          node --input-type=module -e "
+            import { setForTag, RELEASE_SETS } from './scripts/release-sets.mjs';
+            import { readFileSync, appendFileSync } from 'node:fs';
+            const found = setForTag(process.env.GITHUB_REF_NAME);
+            if (!found) { console.error('::error::' + process.env.GITHUB_REF_NAME + ' matches no release set'); process.exit(1); }
+            const [set, version] = found;
+            let bad = false;
+            for (const dir of RELEASE_SETS[set].dirs) {
+              const pkg = JSON.parse(readFileSync('packages/' + dir + '/package.json', 'utf8'));
+              if (pkg.version !== version) {
+                console.error('::error::' + pkg.name + ' is at ' + pkg.version + ' but the tag is ' + process.env.GITHUB_REF_NAME + '. Bump the version or fix the tag.');
+                bad = true;
+              }
+            }
+            if (bad) process.exit(1);
+            appendFileSync(process.env.GITHUB_OUTPUT, 'set=' + set + '\nversion=' + version + '\n');
+            console.log('release set ' + set + ' at ' + version);
+          "
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck, test and build the set and its dependencies
+        run: >-
+          node scripts/release-sets.mjs "${{ steps.release.outputs.set }}"
+          | sed 's/.*/--filter=&.../'
+          | xargs pnpm turbo run lint test build
+
+      - name: Pack and check the tarballs
+        run: >-
+          node scripts/check-packed-manifests.mjs
+          --set "${{ steps.release.outputs.set }}"
+          --version "${{ steps.release.outputs.version }}"
+          --out "$RUNNER_TEMP/tarballs"
+
+      - name: Publish, in dependency order
+        env:
+          SET: ${{ steps.release.outputs.set }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          for pkg in $(node scripts/release-sets.mjs "$SET"); do
+            if npm view "$pkg@$VERSION" version >/dev/null 2>&1; then
+              echo "$pkg@$VERSION is already on the registry, skipping"
+              continue
+            fi
+            tarball="$RUNNER_TEMP/tarballs/$(echo "${pkg#@}" | tr '/' '-')-$VERSION.tgz"
+            npm publish "$tarball" --access public --provenance
+          done

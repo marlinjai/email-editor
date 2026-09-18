@@ -271,7 +271,7 @@ Written once so the phases built in parallel cannot drift apart:
   tarballs in CI by `scripts/check-packed-manifests.mjs`); `onRequestImage` and
   `migrateTemplate` exist; the prebuilt stylesheet is scoped under `.ee-root`
   and verified in a Next 16, React 19, Tailwind CSS 4 host (`examples/nextjs`);
-  `publish-editor.yml` publishes on a tag `editor-v*`. The document's schema
+  `publish.yml` publishes on a tag `editor-v*` (and the mail contract and SDK on `mail-v*`). The document's schema
   field is `version` (today `"1.0"`); the service's `schema_version` column
   stores that value. Not yet published: waits on the npm steps in question 4
   below.
@@ -321,8 +321,8 @@ Built and verified:
   secrets through Terraform; the Coolify application `c60ld4gx620wemkvvj9l9p51`
   pulling `ghcr.io/marlinjai/email-editor-service`. `MAIL_SECRETS_KEY` and
   `DASHBOARD_SERVICE_TOKEN` minted per environment with `copy_secret op=generate`.
-- **auth-brain** (marlinjai/auth-brain#141): the `mail` app-grant, hidden until the
-  dashboard ships.
+- **auth-brain** (marlinjai/auth-brain#141, merged and deployed): the `mail`
+  app-grant, hidden until the dashboard ships, granted to Lumitra and ŌPUNTIA.
 
 Defaults taken in S0 (each can be overturned later):
 
@@ -341,8 +341,9 @@ Defaults taken in S0 (each can be overturned later):
    signed in, grants or removes the owner role, and anyone may leave.
 4. **Idempotency** is opt-in per request, stores every response below 500 sealed, keeps
    keys 24 hours, and clears a claim left `in_progress` for more than 5 minutes.
-5. **The auth-brain app slug is `mail`**, hidden until S3; the grant for the Lumitra
-   company (and ŌPUNTIA's) is written after that PR deploys.
+5. **The auth-brain app slug is `mail`**, hidden until S3. Granted on 2026-09-18
+   through the machine API to the Lumitra (`lumitra-core`) and ŌPUNTIA (`opuntia`)
+   companies, and read back.
 6. **Image** `ghcr.io/marlinjai/email-editor-service`, deployed by
    `.github/workflows/deploy-service.yml` on pushes to `main` that touch the service.
    `/healthz` reports the served commit, and the deploy waits until every reply
@@ -385,21 +386,25 @@ later decision can overturn:
    package still has to be registered as a trusted publisher on npmjs.com by
    Marlin before the first publish succeeds (a 404 on the upload means it is not
    registered yet). Until then hosts consume the packages from the workspace.
-   For the editor that is four registrations on npmjs.com, each with repository
-   `marlinjai/email-editor` and workflow file `publish-editor.yml`:
-   `@marlinjai/email-editor-core`, `@marlinjai/email-editor-blocks`,
-   `@marlinjai/email-editor-ui` and `@marlinjai/email-editor`. None of them
-   exists on npm yet (checked 2026-09-18), and npm only lets a trusted
-   publisher be attached to an existing package, so the very first publish is
-   manual and Marlin's: build, run
-   `node scripts/check-packed-manifests.mjs --out /tmp/editor-tarballs`, then
-   `npm publish <tarball> --access public` for core, blocks, ui and editor in
-   that order (publish the checked tarballs, never `npm publish` inside a
-   package directory, which would ship `workspace:` ranges). Then attach the
-   trusted publisher to each package and push the tag `editor-v0.1.0`: the
-   workflow skips versions already on the registry, so it verifies the setup
-   without republishing, and every later `editor-v*` tag publishes through
-   OpenID Connect with provenance.
+   That is six registrations on npmjs.com, each with repository
+   `marlinjai/email-editor` and workflow file `publish.yml`, in two release
+   sets (`scripts/release-sets.mjs`): the editor set
+   (`@marlinjai/email-editor-core`, `-blocks`, `-ui`, `@marlinjai/email-editor`,
+   tag `editor-v*`) and the mail set (`@marlinjai/mail-contract`,
+   `@marlinjai/mail-sdk`, tag `mail-v*`). None of them exists on npm yet
+   (checked 2026-09-18), and npm only lets a trusted publisher be attached to
+   an existing package, so the very first publish is manual and Marlin's:
+   after `npm login`, run `scripts/first-publish.sh` from a clean checkout of
+   main (try `scripts/first-publish.sh --dry-run` first). It builds, tests and
+   packs all six, publishes the checked tarballs in dependency order, asks for
+   the one-time password once if npm wants one, skips anything already
+   published (so it is safe to re-run), and ends by printing, per package,
+   the npmjs.com link and the exact trusted-publisher settings to enter
+   (GitHub Actions, `marlinjai` / `email-editor`, workflow `publish.yml`, no
+   environment), followed by the two tag commands (`editor-v0.1.0`,
+   `mail-v0.1.0`). The workflow skips versions already on the registry, so
+   those first tags only prove the registration works, and every later tag
+   publishes through OpenID Connect with provenance.
 5. **Contract details the plan left open** (fixed in `@marlinjai/mail-contract`,
    2026-09-18): a recipient whose outcome is unknown after a crash ends `skipped`
    with `skip_reason` `outcome_unknown` rather than `failed`, so `retry-failed`
