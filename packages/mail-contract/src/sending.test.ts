@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ICLOUD_SMTP_POLICY, Provider, ProviderCreate, ProviderPolicy, ProviderUpdate } from './providers';
+import { ICLOUD_SMTP_POLICY, Provider, ProviderCreate, ProviderEventsSecret, ProviderPolicy, ProviderUpdate } from './providers';
 import {
   Contact,
   ContactErased,
@@ -12,6 +12,13 @@ import {
 } from './contacts';
 import { TS, contact, smtpProvider } from './test-fixtures';
 
+const resendEvents = {
+  status: 'active',
+  source: 'automatic',
+  url: 'https://mail.lumitra.co/providers/prv_2/events/resend',
+  error: null,
+};
+
 describe('providers', () => {
   it('reads an smtp provider without its password', () => {
     const parsed = Provider.parse({ ...smtpProvider, config: { ...smtpProvider.config, password: 'secret' } });
@@ -20,9 +27,33 @@ describe('providers', () => {
   });
 
   it('reads a resend provider without its api key', () => {
-    const resend = { ...smtpProvider, id: 'prv_2', kind: 'resend', config: { api_key: 're_x' } };
+    const resend = { ...smtpProvider, id: 'prv_2', kind: 'resend', config: { api_key: 're_x' }, events: resendEvents };
     const parsed = Provider.parse(resend);
     expect(parsed.config).not.toHaveProperty('api_key');
+  });
+
+  it('a resend provider says where its events arrive; an smtp provider has no events', () => {
+    const resend = { ...smtpProvider, id: 'prv_2', kind: 'resend', config: {} };
+    expect(Provider.safeParse(resend).success).toBe(false);
+    expect(Provider.safeParse({ ...resend, events: resendEvents }).success).toBe(true);
+    expect(Provider.safeParse({ ...resend, events: { ...resendEvents, status: 'pending' } }).success).toBe(false);
+    const parsed = Provider.parse({ ...smtpProvider, events: resendEvents });
+    expect(parsed).not.toHaveProperty('events');
+  });
+
+  it('counts rejections the sender is at fault for, on every kind', () => {
+    const { rejections: _r, ...without } = smtpProvider;
+    expect(Provider.safeParse(without).success).toBe(false);
+    const rejected = { count: 3, last_error: '550 5.7.1 blocked', last_at: TS };
+    expect(Provider.parse({ ...smtpProvider, rejections: rejected }).rejections).toEqual(rejected);
+    expect(Provider.safeParse({ ...smtpProvider, rejections: { ...rejected, count: -1 } }).success).toBe(false);
+  });
+
+  it('accepts only a Resend signing secret for the events', () => {
+    expect(ProviderEventsSecret.safeParse({ signing_secret: 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw' }).success).toBe(true);
+    expect(ProviderEventsSecret.safeParse({ signing_secret: 're_123456789012345678' }).success).toBe(false);
+    expect(ProviderEventsSecret.safeParse({ signing_secret: 'whsec_short' }).success).toBe(false);
+    expect(ProviderEventsSecret.safeParse({}).success).toBe(false);
   });
 
   it('creating smtp requires the password; creating resend requires the api key', () => {

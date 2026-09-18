@@ -174,6 +174,8 @@ export const AUDIT_ACTIONS = [
   'provider.created',
   'provider.updated',
   'provider.deleted',
+  'provider.events_registered',
+  'provider.events_secret_set',
   'topic.created',
   'topic.updated',
   'template.created',

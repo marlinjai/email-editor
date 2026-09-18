@@ -47,6 +47,50 @@ const SmtpConfigBase = z.object({
 
 const ResendConfigBase = z.object({});
 
+/**
+ * Permanent rejections the sender's side is at fault for: the receiving server
+ * or the relay refused the sender (policy, relaying, authentication, reputation,
+ * rate: SMTP 5.7.x; for Resend, an unverified domain or a refused key). They
+ * never suppress the recipient. `count` is cumulative; `last_error` is the
+ * latest reply as the provider gave it.
+ */
+export const ProviderRejections = z.object({
+  count: z.number().int().min(0),
+  last_error: z.string().nullable(),
+  last_at: Timestamp.nullable(),
+});
+export type ProviderRejections = z.infer<typeof ProviderRejections>;
+
+/**
+ * Where a Resend provider's events (bounces, spam complaints) arrive, and
+ * whether the service can check their signature.
+ * - `status`: `active` once a signing secret is stored; `needs_secret` until then.
+ * - `source`: `automatic` when the service registered the endpoint at Resend
+ *   itself (on create or verify), `manual` when a member pasted the secret.
+ * - `url`: the endpoint to register at Resend by hand when automatic
+ *   registration is not possible (a sending-only API key).
+ * - `error`: why the last automatic registration failed, if it did.
+ */
+export const ProviderEvents = z.object({
+  status: z.enum(['active', 'needs_secret']),
+  source: z.enum(['automatic', 'manual']).nullable(),
+  url: z.string().url(),
+  error: z.string().nullable(),
+});
+export type ProviderEvents = z.infer<typeof ProviderEvents>;
+
+/** The Resend event types the endpoint subscribes to. */
+export const RESEND_EVENT_TYPES = ['email.bounced', 'email.complained', 'email.delivery_delayed'] as const;
+
+/** A Svix signing secret as Resend shows it: `whsec_` and the base64 key. */
+export const ResendSigningSecret = z
+  .string()
+  .max(200)
+  .regex(/^whsec_[A-Za-z0-9+/]{16,}={0,2}$/, 'must be the signing secret Resend shows, starting with whsec_');
+
+export const ProviderEventsSecret = z.object({ signing_secret: ResendSigningSecret });
+export type ProviderEventsSecret = z.infer<typeof ProviderEventsSecret>;
+
 const ProviderFields = {
   name: z.string().min(1).max(120),
   from_name: z.string().min(1).max(120),
@@ -55,7 +99,15 @@ const ProviderFields = {
   policy: ProviderPolicy,
 };
 
-/** A provider as read. `has_secret` tells whether a credential is stored. */
+/**
+ * A provider as read. `has_secret` tells whether a credential is stored.
+ *
+ * Bounces: a hard bounce the SMTP server reports while the message is handed
+ * over is detected for every kind. Bounces that arrive later as an email in the
+ * sender's inbox (how iCloud+ and most SMTP servers report them) are not read,
+ * so they are not detected. A Resend provider also reports later bounces and
+ * spam complaints through `events`.
+ */
 export const Provider = z.discriminatedUnion('kind', [
   z.object({
     id: Id,
@@ -63,6 +115,7 @@ export const Provider = z.discriminatedUnion('kind', [
     config: SmtpConfigBase,
     has_secret: z.boolean(),
     ...ProviderFields,
+    rejections: ProviderRejections,
     created_at: Timestamp,
     updated_at: Timestamp,
   }),
@@ -72,6 +125,8 @@ export const Provider = z.discriminatedUnion('kind', [
     config: ResendConfigBase,
     has_secret: z.boolean(),
     ...ProviderFields,
+    rejections: ProviderRejections,
+    events: ProviderEvents,
     created_at: Timestamp,
     updated_at: Timestamp,
   }),
