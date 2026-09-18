@@ -1,0 +1,143 @@
+import { describe, expect, it } from 'vitest';
+import { MailApiError, MailNetworkError, MailResponseValidationError, MailTimeoutError } from '@marlinjai/mail-sdk';
+import { describeError } from '@/lib/errors';
+import { formatBytes, percent, slugify } from '@/lib/format';
+import { mailingControls, mailingProgress } from '@/lib/mailing-status';
+import { can } from '@/lib/roles';
+import { signInvite, verifyInvite, INVITE_TTL_MS } from '@/lib/invite-token';
+import { assertTestAuthNotInProduction, decodeTestIdentity, encodeTestIdentity, testAuthEnabled, TestAuthInProductionError } from '@/lib/test-auth';
+
+const api = (code: ConstructorParameters<typeof MailApiError>[0]['code'], extra: Partial<ConstructorParameters<typeof MailApiError>[0]> = {}) =>
+  new MailApiError({ code, status: 400, message: 'service says so', requestId: 'req-1', ...extra });
+
+describe('describeError: every contract error becomes a sentence a person can act on', () => {
+  it('turns validation issues into per-field messages', () => {
+    const e = describeError(
+      api('validation_failed', {
+        details: {
+          issues: [
+            { path: ['config', 'port'], message: 'Expected number' },
+            { path: ['name'], message: 'Required' },
+            { path: ['name'], message: 'second message for the same field is dropped' },
+          ],
+        },
+      }),
+    );
+    expect(e.code).toBe('validation_failed');
+    expect(e.fields).toEqual({ 'config.port': 'Expected number', name: 'Required' });
+    expect(e.requestId).toBe('req-1');
+  });
+
+  it('keeps the service reason where only it knows the specifics', () => {
+    expect(describeError(api('mailing_invalid_state', { message: 'A sent mailing cannot pause.' })).message).toContain('A sent mailing cannot pause.');
+    expect(describeError(api('last_owner')).message).toMatch(/at least one owner/);
+  });
+
+  it('names the fix for the send-time refusals', () => {
+    expect(describeError(api('missing_unsubscribe_url')).message).toContain('{{unsubscribe_url}}');
+    expect(describeError(api('mailing_not_ready')).message).toMatch(/recipient/);
+    expect(describeError(api('daily_budget_exhausted')).message).toMatch(/budget/);
+    expect(describeError(api('insufficient_role')).message).toMatch(/role/);
+  });
+
+  it('separates an unreachable service from a broken contract and from anything else', () => {
+    expect(describeError(new MailNetworkError('down', null)).code).toBe('network');
+    expect(describeError(new MailTimeoutError(10_000)).code).toBe('network');
+    expect(describeError(new MailResponseValidationError('workspace.get', [])).message).toMatch(/shape/);
+    const missingConfig = Object.assign(new Error('x'), { name: 'DashboardConfigError' });
+    expect(describeError(missingConfig).code).toBe('service_unavailable');
+    expect(describeError(new Error('boom'))).toEqual({ code: 'internal_error', message: expect.stringMatching(/our side/) });
+  });
+});
+
+describe('mailing controls follow the contract table', () => {
+  it('offers exactly what MAILING_TRANSITIONS allows', () => {
+    expect(mailingControls('draft')).toMatchObject({ editable: true, send: true, cancel: true, pause: false, duplicate: false, live: false });
+    expect(mailingControls('sending')).toMatchObject({ editable: false, send: false, pause: true, cancel: true, live: true, duplicate: true });
+    expect(mailingControls('paused')).toMatchObject({ resume: true, cancel: true, pause: false, live: true });
+    expect(mailingControls('partially_failed')).toMatchObject({ retryFailed: true, cancel: false, live: false, duplicate: true });
+    // A cancelled mailing is read-only: nothing but duplicating it.
+    const cancelled = mailingControls('cancelled');
+    expect(cancelled).toMatchObject({ editable: false, send: false, pause: false, resume: false, cancel: false, retryFailed: false, duplicate: true, terminal: true });
+  });
+
+  it('computes progress without dividing by zero', () => {
+    expect(mailingProgress({ total: 0, queued: 0, sending: 0, sent: 0, failed: 0, skipped: 0 })).toEqual({ settled: 0, total: 0, percent: 0 });
+    expect(mailingProgress({ total: 4, queued: 1, sending: 0, sent: 2, failed: 1, skipped: 0 }).percent).toBe(75);
+  });
+});
+
+describe('small helpers', () => {
+  it('slugify suggests a valid slug', () => {
+    expect(slugify('ŌPUNTIA Gatherings!')).toBe('opuntia-gatherings');
+    expect(slugify('  --  ')).toBe('');
+    expect(slugify('a'.repeat(80))).toHaveLength(64);
+  });
+  it('percent clamps and never returns NaN', () => {
+    expect(percent(5, 0)).toBe(0);
+    expect(percent(200, 100)).toBe(100);
+  });
+  it('formatBytes', () => {
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(10 * 1024 * 1024)).toBe('10.0 MB');
+  });
+  it('roles reach the contract access levels', () => {
+    expect(can('viewer', 'read')).toBe(true);
+    expect(can('viewer', 'write')).toBe(false);
+    expect(can('editor', 'write')).toBe(true);
+    expect(can('editor', 'admin')).toBe(false);
+    expect(can('admin', 'admin')).toBe(true);
+    expect(can('admin', 'owner')).toBe(false);
+    expect(can('owner', 'owner')).toBe(true);
+  });
+});
+
+describe('invitation tokens', () => {
+  const secret = 's'.repeat(40);
+  const input = { workspaceId: 'ws-1', inviterSubject: 'sub-admin', email: 'Ana@Example.com', role: 'editor' as const };
+
+  it('round-trips and lowercases the invited address', () => {
+    const { token } = signInvite(input, secret, 1_000);
+    const check = verifyInvite(token, secret, 2_000);
+    expect(check).toMatchObject({ ok: true, payload: { w: 'ws-1', s: 'sub-admin', e: 'ana@example.com', r: 'editor', x: 1_000 + INVITE_TTL_MS } });
+  });
+
+  it('refuses a token signed with another secret, a tampered body, garbage and an expired one', () => {
+    const { token } = signInvite(input, secret, 1_000);
+    expect(verifyInvite(token, 'other'.repeat(10), 2_000)).toEqual({ ok: false, reason: 'bad_signature' });
+    const [body, sig] = token.split('.');
+    const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(body!, 'base64url').toString()), r: 'owner' })).toString('base64url');
+    expect(verifyInvite(`${forged}.${sig}`, secret, 2_000)).toEqual({ ok: false, reason: 'bad_signature' });
+    expect(verifyInvite('nonsense', secret)).toEqual({ ok: false, reason: 'malformed' });
+    expect(verifyInvite(token, secret, 1_000 + INVITE_TTL_MS)).toEqual({ ok: false, reason: 'expired' });
+  });
+
+  it('gives every invitation its own id (the idempotency key of accepting it)', () => {
+    expect(signInvite(input, secret).payload.n).not.toBe(signInvite(input, secret).payload.n);
+  });
+});
+
+describe('the end-to-end sign-in bypass cannot be enabled in production', () => {
+  it('is on only with the flag and outside production', () => {
+    expect(testAuthEnabled({ MAIL_DASHBOARD_TEST_AUTH: '1', NODE_ENV: 'development' })).toBe(true);
+    expect(testAuthEnabled({ MAIL_DASHBOARD_TEST_AUTH: '1', NODE_ENV: 'test' })).toBe(true);
+    expect(testAuthEnabled({ MAIL_DASHBOARD_TEST_AUTH: '1', NODE_ENV: 'production' })).toBe(false);
+    expect(testAuthEnabled({ MAIL_DASHBOARD_TEST_AUTH: 'true', NODE_ENV: 'development' })).toBe(false);
+    expect(testAuthEnabled({ NODE_ENV: 'development' })).toBe(false);
+  });
+
+  it('makes a production process refuse to start when the flag is present at all', () => {
+    expect(() => assertTestAuthNotInProduction({ MAIL_DASHBOARD_TEST_AUTH: '1', NODE_ENV: 'production' })).toThrow(TestAuthInProductionError);
+    expect(() => assertTestAuthNotInProduction({ MAIL_DASHBOARD_TEST_AUTH: '0', NODE_ENV: 'production' })).toThrow(TestAuthInProductionError);
+    expect(() => assertTestAuthNotInProduction({ NODE_ENV: 'production' })).not.toThrow();
+    expect(() => assertTestAuthNotInProduction({ MAIL_DASHBOARD_TEST_AUTH: '1', NODE_ENV: 'development' })).not.toThrow();
+  });
+
+  it('ignores a malformed identity cookie', () => {
+    const good = encodeTestIdentity({ subject: 's', email: 'a@b.co', name: null, companies: [{ id: 't', name: 'T' }] });
+    expect(decodeTestIdentity(good)).toEqual({ subject: 's', email: 'a@b.co', name: null, companies: [{ id: 't', name: 'T' }] });
+    expect(decodeTestIdentity('not base64 json')).toBeNull();
+    expect(decodeTestIdentity(encodeTestIdentity({ subject: '', email: 'a@b.co', name: null, companies: [] }))).toBeNull();
+    expect(decodeTestIdentity(undefined)).toBeNull();
+  });
+});

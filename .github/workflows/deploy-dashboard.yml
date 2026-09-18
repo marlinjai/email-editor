@@ -1,0 +1,114 @@
+# Production deploy of the dashboard (apps/dashboard) to app.mail.lumitra.co.
+#
+# Build the image for linux/arm64 on an ARM runner, push it to GitHub Container
+# Registry, then hand over to the shared coolify-deploy-verify workflow, which
+# fires Coolify's deploy webhook and fails the run unless the public health URL
+# answers. A last job proves the answering container is THIS build.
+name: Deploy dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/dashboard/**
+      - packages/mail-contract/**
+      - packages/mail-sdk/**
+      - packages/core/**
+      - packages/ui/**
+      - packages/blocks/**
+      - packages/editor/**
+      - pnpm-lock.yaml
+      - .github/workflows/deploy-dashboard.yml
+  workflow_dispatch:
+
+# Queue, never cancel: cancelling a run does not cancel the Coolify deployment
+# it already triggered, and overlapping deploys can leave two containers serving.
+concurrency:
+  group: deploy-dashboard
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/marlinjai/email-editor-dashboard
+  HEALTH_URL: https://app.mail.lumitra.co/api/health
+
+jobs:
+  publish:
+    name: Build and push to GHCR
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/dashboard/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha,scope=dashboard
+          cache-to: type=gha,scope=dashboard,mode=max
+      - name: Summary
+        run: |
+          {
+            echo "### Image published"
+            echo ""
+            echo "- \`${IMAGE}:latest\`"
+            echo "- \`${IMAGE}:${GITHUB_SHA}\`"
+            echo "- ref: \`${GITHUB_REF}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Pinned to @v1, never @main.
+  deploy-verify:
+    needs: publish
+    permissions:
+      contents: read
+      deployments: write
+    uses: marlinjai/actions-shared/.github/workflows/coolify-deploy-verify.yml@v1
+    with:
+      health_url: https://app.mail.lumitra.co/api/health
+      environment: production-mail-dashboard
+    secrets:
+      coolify_webhook: ${{ secrets.COOLIFY_WEBHOOK_DASHBOARD }}
+      coolify_token: ${{ secrets.COOLIFY_TOKEN }}
+
+  confirm-served-build:
+    name: The deployed commit is the one serving
+    needs: deploy-verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for a clean block of replies from ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          expected='${{ github.sha }}'
+          block=20
+          deadline=$((SECONDS + 300))
+          last=none
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            stale=0
+            for _ in $(seq 1 "$block"); do
+              body="$(curl -fsS --max-time 10 "$HEALTH_URL" || echo '{}')"
+              got="$(printf '%s' "$body" | sed -n 's/.*"commit":"\([^"]*\)".*/\1/p')"
+              last="${got:-none}"
+              [ "$got" = "$expected" ] || stale=$((stale + 1))
+            done
+            if [ "$stale" -eq 0 ]; then
+              echo "All $block replies served $expected."
+              exit 0
+            fi
+            echo "$stale of $block replies were not $expected (last: $last). Waiting."
+            sleep 10
+          done
+          echo "::error::After 300s ${HEALTH_URL} is not consistently serving $expected (last reply: $last). The deploy rolled back, or an older container is still in rotation." >&2
+          exit 1
