@@ -636,6 +636,23 @@ Defaults taken in S5 (each can be overturned later):
 11. **The suites of earlier phases seed design-partner workspaces**, so they stay
     about their own features; the billing suites seed free ones.
 
+### First-client findings: document ids and the asset policy (built 2026-09-18, #28)
+
+ŌPUNTIA, the first client, found two gaps; #28 (merged as `62cf0c1`) closed both:
+
+- **Documents without an `id`.** The editor store required one, while the
+  contract and the core schema did not. The store now assigns a stable id when
+  it opens an id-less document; the service stores documents exactly as sent.
+- **Remote assets.** A per-workspace `settings.asset_policy` (`any`, the
+  default, or `service_only`) makes every image, stylesheet or font address off
+  the service's host a compile error, so such a mail cannot be sent, and
+  `assets.import` copies a remote image into the asset store over `https`
+  behind the webhooks' server-side request forgery (SSRF) guard, which #28 also
+  hardened (IPv4-mapped IPv6 in hex form, the 100.64.0.0/10 range).
+- **Done 2026-09-18:** ŌPUNTIA's workspace (`9402caff-1afc-4875-b849-63a9dda9b35e`)
+  was switched to `asset_policy: service_only` after the deploy; its only
+  template (the base template) compiles without errors under it.
+
 ## Legal shape
 
 The service is a data processor for each workspace's controller. It ships with a
