@@ -667,7 +667,7 @@ describe('erasure', () => {
     const [audit] = await h.sql`SELECT details FROM audit_log WHERE workspace_id = ${W.id} AND action = 'contact.erased'`;
     expect(audit!.details).toMatchObject({ erased_signups: 2 });
     expect((await h.sql`SELECT count(*)::int AS n FROM signup_submissions WHERE email = ${email}`)[0]!.n).toBe(0);
-    expect((await h.sql`SELECT count(*)::int AS n FROM contact_consents WHERE workspace_id = ${W.id}`)[0]!.n).toBe(0);
+    expect((await h.sql`SELECT count(*)::int AS n FROM contact_consents WHERE workspace_id = ${W.id} AND contact_id = ${contact.id}`)[0]!.n).toBe(0);
 
     // The pending link no longer subscribes anyone.
     const late = await confirm(pending);

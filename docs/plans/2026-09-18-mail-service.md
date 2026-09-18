@@ -508,6 +508,24 @@ Defaults taken (each can be overturned later):
 9. **`mailings.addSegment`** queues only matching contacts subscribed to the
    mailing's topic; suppressions are still checked at send time.
 
+10. **Signup forms**: the time trap accepts a form token 3 seconds to 24 hours
+    old, and a post without one gets the form back to confirm once more; rate
+    limits are 5 submissions per client address per 10 minutes and 300 per
+    workspace per hour, in Postgres; the client address is `cf-connecting-ip`,
+    else the first `x-forwarded-for`, else the socket. Every accepted-looking
+    submission gets the same answer (202 for the JSON route). A confirmation
+    link lasts 72 hours; the same address resubmitted supersedes its earlier
+    link. Confirming lifts only `unsubscribed` blocks, narrowing an all-topics
+    block to the topics not on the form, and records `contact.resubscribed`
+    with source `hosted_page` (the contract has no signup source). The
+    confirmation mail is transactional: no List-Unsubscribe, no `message.*`
+    webhook, counted against the provider's budget, and resent if a worker died
+    while sending it (a duplicate confirmation is harmless, a lost one blocks
+    the person). Settled submissions are purged after 30 days; erasing a
+    contact deletes its submissions at once. A confirmation template is
+    compiled when the form is saved, so a later template edit reaches the form
+    on its next save.
+
 Also fixed on the way: a transient retry's due time was stamped with the app
 host's clock and compared with the database's, so a few milliseconds of skew
 delayed a zero-delay retry (sending-flow's retry test flaked on main); it is now

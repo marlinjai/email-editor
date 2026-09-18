@@ -387,6 +387,49 @@ never changes a contact's email. Each new subscription gets a consent record
 naming who confirmed consent and when. Five failed batches in a row end the
 import `failed`. `import.finished` reports the end.
 
+### Signup forms with double opt-in
+
+`signupForms.*` manage a form: its topics and tags, the provider the
+confirmation goes through, the consent text (with translations), a version
+bumped on every change, and optionally a template for the confirmation mail,
+compiled when the form is saved and required to contain `{{confirm_url}}`.
+Deleting is soft: pending links then show "no longer available".
+
+- **Hosted page and embed.** `/f/<id>` is the form in the five languages of the
+  hosted pages (`src/pages/signup-i18n.ts`), chosen by `?lang` or the browser's
+  languages among the workspace's. `signupForms.embed` gives a no-JavaScript
+  HTML form posting to the hosted page, and the optional `/f/<id>/embed.js`,
+  which fetches a fresh token from `/f/<id>/token`. The JSON
+  `signupForms.submit` is the one public `/v1` route (the authentication
+  middleware skips routes the contract marks public) and answers CORS only for
+  the form's `allowed_origins`.
+- **Bot protection.** A honeypot field; a time trap (the signed `form_token` must
+  be 3 seconds to 24 hours old; a post without a valid one, like the static
+  embed's, gets the form back prefilled with a fresh token and one more button);
+  and fixed-window rate limits in Postgres, 5 per client address per 10 minutes
+  and 300 per workspace per hour, so they hold across restarts and instances.
+  Every accepted-looking submission gets the same answer, so the form never
+  discloses whether an address is known.
+- **Double opt-in.** Nothing is subscribed and no contact is created until the
+  person confirms. The confirmation mail goes out from an outbox the platform
+  worker drains through the form's provider (counted against its daily budget,
+  honouring `min_interval_ms`, archived, retried on transient failures). The link
+  `/f/confirm/<token>` lasts 72 hours; GET only shows a button (link scanners
+  confirm nobody), POST confirms. A resubmission of the same address supersedes
+  its earlier link; a different address has its own. Confirming twice is a
+  no-op, an expired link says so and points back to the form, and an address
+  already subscribed to every topic gets no mail at all.
+- **What confirming writes**, in one transaction: the contact (names and locale
+  only where empty), the subscriptions and tags, one consent record per topic
+  (the consent text as shown, the form version, keyed hashes of the submitting
+  and confirming addresses, both timestamps), the audit row and
+  `contact.subscribed`. A suppressed address can opt in again only this way: an
+  `unsubscribed` block on the form's topics is lifted (an all-topics block becomes
+  per-topic blocks on every topic not on the form), with `contact.resubscribed`
+  for each; bounced, complained and manual blocks are never lifted.
+- Erasing a contact deletes its signup submissions too, pending links included,
+  and its consent records go with the contact.
+
 ### Scheduling
 
 `mailings.schedule` (from `draft`, or again from `scheduled` to move it) runs
