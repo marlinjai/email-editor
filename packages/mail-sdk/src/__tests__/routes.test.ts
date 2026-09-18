@@ -1,4 +1,5 @@
 import {
+  ContactPropertyParams,
   IdParams,
   TemplateVersionParams,
   WebhookDeliveryParams,
@@ -44,6 +45,7 @@ function sampleParams(operationId: OperationId): Record<string, string | number>
   if (route.params === IdParams) return { id: 'id_1' };
   if (route.params === TemplateVersionParams) return { id: 'id_1', version: 1 };
   if (route.params === WebhookDeliveryParams) return { id: 'id_1', delivery_id: 'del_1' };
+  if (route.params === ContactPropertyParams) return { key: 'city' };
   throw new Error(`"${operationId}" uses an unrecognised params schema; teach sampleParams() its shape`);
 }
 

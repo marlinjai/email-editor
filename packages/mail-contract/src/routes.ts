@@ -71,16 +71,24 @@ import {
 } from './webhooks';
 import {
   AbTestConfig,
+  AbWinnerRequest,
   ContactPropertyDefinition,
+  ContactPropertyParams,
+  ImportCommitRequest,
   ImportJob,
-  ImportJobCreate,
+  ImportMappingRequest,
+  ImportRow,
+  ImportRowListQuery,
   MailingAnalytics,
   MailingAudienceFromSegment,
   MailingScheduleRequest,
   Segment,
   SegmentCreate,
+  SegmentPreview,
+  SegmentPreviewRequest,
   SignupForm,
   SignupFormCreate,
+  SignupFormEmbed,
   SignupSubmission,
   Tag,
   TagAssignment,
@@ -727,11 +735,12 @@ export const sendingRoutes = {
   },
 } as const satisfies Record<string, RouteDef>;
 
-// S4: platform features (typed, not served before S4)
+// S4: platform features
 
 export const platformRoutes = {
   'tags.list': { method: 'GET', path: '/v1/tags', query: PageQuery, response: list(Tag), status: 200, access: 'read', phase: 'S4' },
   'tags.create': { method: 'POST', path: '/v1/tags', body: TagCreate, response: Tag, status: 201, access: 'write', phase: 'S4' },
+  /** Deleting a tag takes it off every contact; segments that name it then match nobody for it. */
   'tags.delete': { method: 'DELETE', path: '/v1/tags/:id', params: IdParams, response: Ok, status: 200, access: 'write', phase: 'S4' },
   'tags.assign': {
     method: 'POST',
@@ -753,6 +762,34 @@ export const platformRoutes = {
     access: 'write',
     phase: 'S4',
   },
+  'contactProperties.list': {
+    method: 'GET',
+    path: '/v1/contact-properties',
+    response: z.object({ data: z.array(ContactPropertyDefinition) }),
+    status: 200,
+    access: 'read',
+    phase: 'S4',
+  },
+  /** Defining a key refuses when a stored value of an existing contact has another type (`conflict`, with examples). */
+  'contactProperties.create': {
+    method: 'POST',
+    path: '/v1/contact-properties',
+    body: ContactPropertyDefinition,
+    response: ContactPropertyDefinition,
+    status: 201,
+    access: 'admin',
+    phase: 'S4',
+  },
+  /** Removes the definition only; stored values stay and become free-form again. */
+  'contactProperties.delete': {
+    method: 'DELETE',
+    path: '/v1/contact-properties/:key',
+    params: ContactPropertyParams,
+    response: Ok,
+    status: 200,
+    access: 'admin',
+    phase: 'S4',
+  },
   'segments.list': {
     method: 'GET',
     path: '/v1/segments',
@@ -769,6 +806,16 @@ export const platformRoutes = {
     response: Segment,
     status: 201,
     access: 'write',
+    phase: 'S4',
+  },
+  /** Counts what a filter matches without saving it. */
+  'segments.preview': {
+    method: 'POST',
+    path: '/v1/segments/preview',
+    body: SegmentPreviewRequest,
+    response: SegmentPreview,
+    status: 200,
+    access: 'read',
     phase: 'S4',
   },
   'segments.get': { method: 'GET', path: '/v1/segments/:id', params: IdParams, response: Segment, status: 200, access: 'read', phase: 'S4' },
@@ -803,11 +850,43 @@ export const platformRoutes = {
     access: 'write',
     phase: 'S4',
   },
+  /** A `scheduled` mailing back to `draft`. */
+  'mailings.unschedule': {
+    method: 'POST',
+    path: '/v1/mailings/:id/unschedule',
+    params: IdParams,
+    body: MailingActionRequest,
+    response: Mailing,
+    status: 200,
+    access: 'write',
+    phase: 'S4',
+  },
+  /** Sets or replaces the A/B test of a `draft` or `scheduled` mailing. */
   'mailings.setAbTest': {
     method: 'PUT',
     path: '/v1/mailings/:id/ab-test',
     params: IdParams,
     body: AbTestConfig,
+    response: Mailing,
+    status: 200,
+    access: 'write',
+    phase: 'S4',
+  },
+  'mailings.clearAbTest': {
+    method: 'DELETE',
+    path: '/v1/mailings/:id/ab-test',
+    params: IdParams,
+    response: Mailing,
+    status: 200,
+    access: 'write',
+    phase: 'S4',
+  },
+  /** Picks the winner of a running test by hand; the held recipients get it. */
+  'mailings.pickAbWinner': {
+    method: 'POST',
+    path: '/v1/mailings/:id/ab-test/winner',
+    params: IdParams,
+    body: AbWinnerRequest,
     response: Mailing,
     status: 200,
     access: 'write',
@@ -840,6 +919,15 @@ export const platformRoutes = {
     access: 'admin',
     phase: 'S4',
   },
+  'signupForms.get': {
+    method: 'GET',
+    path: '/v1/signup-forms/:id',
+    params: IdParams,
+    response: SignupForm,
+    status: 200,
+    access: 'read',
+    phase: 'S4',
+  },
   'signupForms.update': {
     method: 'PUT',
     path: '/v1/signup-forms/:id',
@@ -850,6 +938,7 @@ export const platformRoutes = {
     access: 'admin',
     phase: 'S4',
   },
+  /** Pending confirmations of a deleted form stop working; confirmed subscriptions stay. */
   'signupForms.delete': {
     method: 'DELETE',
     path: '/v1/signup-forms/:id',
@@ -859,6 +948,20 @@ export const platformRoutes = {
     access: 'admin',
     phase: 'S4',
   },
+  'signupForms.embed': {
+    method: 'GET',
+    path: '/v1/signup-forms/:id/embed',
+    params: IdParams,
+    response: SignupFormEmbed,
+    status: 200,
+    access: 'read',
+    phase: 'S4',
+  },
+  /**
+   * The public submission, as JSON (the optional embed script and custom
+   * frontends). Answers 202 for every accepted-looking submission, whatever
+   * happens next, so it discloses nobody's membership.
+   */
   'signupForms.submit': {
     method: 'POST',
     path: '/v1/signup-forms/:id/submit',
@@ -869,12 +972,13 @@ export const platformRoutes = {
     access: 'public',
     phase: 'S4',
   },
+  /** Uploads the CSV (`file` field, UTF-8, comma or semicolon separated, a header row). */
   'imports.create': {
     method: 'POST',
     path: '/v1/imports',
-    multipart: { fileField: 'file', jsonField: 'options', json: ImportJobCreate },
+    multipart: { fileField: 'file' },
     response: ImportJob,
-    status: 202,
+    status: 201,
     access: 'write',
     phase: 'S4',
   },
@@ -888,29 +992,61 @@ export const platformRoutes = {
     phase: 'S4',
   },
   'imports.get': { method: 'GET', path: '/v1/imports/:id', params: IdParams, response: ImportJob, status: 200, access: 'read', phase: 'S4' },
+  /** Sets or revises the mapping and starts its dry run (a revision discards the previous dry run). */
+  'imports.setMapping': {
+    method: 'PUT',
+    path: '/v1/imports/:id/mapping',
+    params: IdParams,
+    body: ImportMappingRequest,
+    response: ImportJob,
+    status: 202,
+    access: 'write',
+    phase: 'S4',
+  },
+  'imports.commit': {
+    method: 'POST',
+    path: '/v1/imports/:id/commit',
+    params: IdParams,
+    body: ImportCommitRequest,
+    response: ImportJob,
+    status: 202,
+    access: 'write',
+    phase: 'S4',
+  },
+  'imports.cancel': {
+    method: 'POST',
+    path: '/v1/imports/:id/cancel',
+    params: IdParams,
+    body: MailingActionRequest,
+    response: ImportJob,
+    status: 200,
+    access: 'write',
+    phase: 'S4',
+  },
+  'imports.rows': {
+    method: 'GET',
+    path: '/v1/imports/:id/rows',
+    params: IdParams,
+    query: ImportRowListQuery,
+    response: list(ImportRow),
+    status: 200,
+    access: 'read',
+    phase: 'S4',
+  },
+  'tracking.get': {
+    method: 'GET',
+    path: '/v1/workspace/tracking',
+    response: TrackingSettings,
+    status: 200,
+    access: 'read',
+    phase: 'S4',
+  },
   'tracking.update': {
     method: 'PUT',
     path: '/v1/workspace/tracking',
     body: TrackingSettings,
     response: TrackingSettings,
     status: 200,
-    access: 'admin',
-    phase: 'S4',
-  },
-  'contactProperties.list': {
-    method: 'GET',
-    path: '/v1/contact-properties',
-    response: z.object({ data: z.array(ContactPropertyDefinition) }),
-    status: 200,
-    access: 'read',
-    phase: 'S4',
-  },
-  'contactProperties.create': {
-    method: 'POST',
-    path: '/v1/contact-properties',
-    body: ContactPropertyDefinition,
-    response: ContactPropertyDefinition,
-    status: 201,
     access: 'admin',
     phase: 'S4',
   },

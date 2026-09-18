@@ -51,6 +51,8 @@ export const Contact = z.object({
   locale: z.string().min(2).max(35).nullable(),
   properties: Properties,
   topics: z.array(Slug),
+  /** The slugs of the contact's tags (S4). */
+  tags: z.array(Slug),
   created_at: Timestamp,
   updated_at: Timestamp,
 });

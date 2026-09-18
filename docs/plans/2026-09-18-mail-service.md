@@ -443,6 +443,111 @@ stated defaults, open to change:
 - **Compiling** goes through S1's compile pool and document validation, the same
   path as the compile API.
 
+### S4, the platform features (built 2026-09-18, branch `feat/s4-platform`)
+
+The service side of the marketing platform: tags, typed contact properties,
+segments, the CSV import, hosted signup forms with double opt-in, scheduling, A/B
+tests, and open and click tracking with campaign analytics. The dashboard screens
+for them follow S3 (the dashboard, built in parallel). Details in
+`apps/service/README.md`, section "S4, the platform features". Migrations 0010
+to 0013 (0008 and 0009 are the dashboard's).
+
+**Contract extensions** (the typed S4 namespace was incomplete for these flows):
+the import became upload, mapping with a dry run, and commit
+(`imports.setMapping`, `imports.commit` naming the `mapping_version` it saw,
+`imports.cancel`, `imports.rows`, a richer `ImportJob`); `segments.preview`;
+`contactProperties.delete`; signup forms gained `title`, `consent_text`,
+`translations`, `provider_id` and `version`, plus `signupForms.get` and
+`signupForms.embed`, and a submission carries a signed `form_token`;
+`mailings.unschedule` and rescheduling (`schedule` from `scheduled`); A/B tests
+with `winner_metric: manual`, their state on `Mailing.ab_test`,
+`mailings.clearAbTest` and `mailings.pickAbWinner`; `tracking.get`; the error
+code `tracking_disabled`; `Contact.tags`; the webhook events `contact.subscribed`,
+`import.finished`, `mailing.scheduled`, `mailing.started`,
+`mailing.schedule_failed` and `mailing.ab_winner_selected`; and the S4 audit
+actions. The SDK gained the matching methods.
+
+Defaults taken (each can be overturned later):
+
+1. **Tracking is off by default and stays off for ŌPUNTIA.** `tracking.update`
+   holds opens and clicks separately and keeps `settings.tracking_enabled` equal
+   to `opens || clicks`; that flag stays the master switch. A mailing snapshots
+   its tracking when it starts. After tracking is turned off, opens are refused,
+   and clicks on links already sent still reach their destination without being
+   recorded, so no recipient's link breaks.
+2. **Only flags are stored for tracking events**, never the address or user
+   agent. A machine event is a known scanner or prefetcher, no user agent, or a
+   click within 5 seconds of delivery; Apple Mail Privacy Protection is a bare
+   `Mozilla/5.0` or an address in 17.0.0.0/8, counted apart and never as a human
+   open. Engagement segments and A/B metrics count human events only.
+3. **The S4 tokens derive their keys from `MAIL_UNSUBSCRIBE_KEY`**, one key per
+   purpose, so no new secret had to be provisioned.
+4. **Scheduling validates at schedule time** everything `send` checks, and a
+   mailing edited into one that cannot start goes back to `draft` at its time
+   with `mailing.schedule_failed`; a passing problem leaves it scheduled. A
+   schedule lies in the future and within a year. `send_at` in the past while no
+   process ran is released on the next start.
+5. **A/B cohorts**: the test group is `test_fraction` of the queued recipients,
+   at least one per variant, split round-robin in an order hashed from row ids;
+   the rest is held until the winner is known, so a mailing with a manual test
+   stays `sending` until someone picks. Ties go to the earlier key. A metric test
+   whose tracking was turned off after the start waits for a manual pick.
+6. **Typed properties**: a definition checks later writes (and is refused while
+   existing values break it); keys without a definition stay free-form as in S2.
+   Text filters compare case-insensitively; a missing value never matches.
+7. **Tag assignment ignores unknown ids** rather than failing the batch, so
+   nothing is disclosed about ids of other workspaces.
+8. **The import** stores the parsed file row by row in Postgres (50 MB, 200,000
+   rows at most), commits in batches of 500, never changes a contact's email or
+   lifts a suppression, adds topics and tags but never removes them, and treats
+   an address blocked for every topic (any reason) as `suppressed`. With
+   `update_existing: false` it only fills missing fields. The first row with an
+   address wins over later duplicates. Five failed batches in a row end it
+   `failed`. Each new subscription gets a consent record naming who confirmed
+   consent.
+9. **`mailings.addSegment`** queues only matching contacts subscribed to the
+   mailing's topic; suppressions are still checked at send time.
+
+10. **Signup forms**: the time trap accepts a form token 3 seconds to 24 hours
+    old, and a post without one gets the form back to confirm once more; rate
+    limits are 5 submissions per client address per 10 minutes and 300 per
+    workspace per hour, in Postgres; the client address is `cf-connecting-ip`,
+    else the first `x-forwarded-for`, else the socket. Every accepted-looking
+    submission gets the same answer (202 for the JSON route). A confirmation
+    link lasts 72 hours; the same address resubmitted supersedes its earlier
+    link. Confirming lifts only `unsubscribed` blocks, narrowing an all-topics
+    block to the topics not on the form, and records `contact.resubscribed`
+    with the new source `signup_form`. The
+    confirmation mail is transactional: no List-Unsubscribe, no `message.*`
+    webhook, counted against the provider's budget, and resent if a worker died
+    while sending it (a duplicate confirmation is harmless, a lost one blocks
+    the person). Settled submissions are purged after 30 days; erasing a
+    contact deletes its submissions at once. A confirmation template is
+    compiled when the form is saved, so a later template edit reaches the form
+    on its next save.
+
+11. **S5's plan limits on the S4 paths** (S4 merged after S5): `setAbTest` and
+    the start of a mailing with an A/B test need the plan's `ab_testing`;
+    turning tracking on needs `tracking`, and a mailing started on a plan
+    without it is sent untracked whatever the settings say; the start of every
+    mailing, scheduled ones included, checks the period's message budget (a
+    scheduled mailing over it goes back to `draft` with
+    `mailing.schedule_failed`); the contacts a CSV import batch or a signup
+    confirmation adds must fit the plan's contact limit. Over it, the import
+    stops `failed` at that batch (earlier batches stay imported) and the
+    confirmation rolls back with a localised "not possible right now" page, its
+    link still valid for when there is room.
+
+12. **`mailings.duplicate` copies no A/B test**: the copy is a plain draft
+    with the base content (variants, test settings and tracking are not
+    copied). Whether a copy should carry the test is a product call for when
+    the dashboard offers it.
+
+Also fixed on the way: a transient retry's due time was stamped with the app
+host's clock and compared with the database's, so a few milliseconds of skew
+delayed a zero-delay retry (sending-flow's retry test flaked on main); it is now
+stamped on the database clock, and so is a click's age.
+
 ### S5, billing, service side (built 2026-09-18, branch `feat/s5-billing`)
 
 Built and verified (details in `apps/service/README.md`, section "Billing (S5)"):

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Email, Id, PageQuery, Slug, Timestamp } from './common';
 import { MailingCounts, MailingMetadata } from './mailings';
+import { ImportReport, VariantAnalytics } from './platform';
 
 /*
  * S2: webhook endpoints, deliveries, and the events the service sends to them.
@@ -13,6 +14,13 @@ export const WEBHOOK_EVENT_TYPES = [
   'contact.resubscribed',
   'contact.bounced',
   'mailing.finished',
+  // S4: the platform features
+  'contact.subscribed',
+  'import.finished',
+  'mailing.scheduled',
+  'mailing.started',
+  'mailing.schedule_failed',
+  'mailing.ab_winner_selected',
 ] as const;
 export const WebhookEventType = z.enum(WEBHOOK_EVENT_TYPES);
 export type WebhookEventType = z.infer<typeof WebhookEventType>;
@@ -48,7 +56,12 @@ export const MessageFailedData = MessageEventBase.extend({
 });
 export type MessageFailedData = z.infer<typeof MessageFailedData>;
 
-export const UNSUBSCRIBE_SOURCES = ['hosted_page', 'one_click', 'api', 'dashboard'] as const;
+/**
+ * Where a subscription change came from. `signup_form` (S4) only ever appears
+ * on `contact.resubscribed`: a confirmed double opt-in lifting an earlier
+ * unsubscribe.
+ */
+export const UNSUBSCRIBE_SOURCES = ['hosted_page', 'one_click', 'api', 'dashboard', 'signup_form'] as const;
 
 export const ContactUnsubscribedData = z.object({
   contact_id: Id.nullable(),
@@ -95,6 +108,75 @@ export const MailingFinishedData = z.object({
 });
 export type MailingFinishedData = z.infer<typeof MailingFinishedData>;
 
+/**
+ * A person confirmed a signup (double opt-in) and is now subscribed to `topics`.
+ * When the confirmation lifted an earlier unsubscribe, `contact.resubscribed`
+ * is emitted for it as well.
+ */
+export const ContactSubscribedData = z.object({
+  contact_id: Id,
+  external_id: z.string().nullable(),
+  email: Email,
+  topics: z.array(Slug),
+  source: z.enum(['signup_form']),
+  signup_form_id: Id,
+  signup_form_version: z.number().int().min(1),
+  subscribed_at: Timestamp,
+});
+export type ContactSubscribedData = z.infer<typeof ContactSubscribedData>;
+
+/** A CSV import ended: committed completely, cancelled mid-commit (the rows written stay) or failed. */
+export const ImportFinishedData = z.object({
+  import_id: Id,
+  status: z.enum(['completed', 'cancelled', 'failed']),
+  result: ImportReport.nullable(),
+  error: z.string().nullable(),
+  finished_at: Timestamp,
+});
+export type ImportFinishedData = z.infer<typeof ImportFinishedData>;
+
+/** A mailing was scheduled or moved to another time; `scheduled_at` null means it went back to draft. */
+export const MailingScheduledData = z.object({
+  mailing_id: Id,
+  mailing_metadata: MailingMetadata,
+  scheduled_at: Timestamp.nullable(),
+});
+export type MailingScheduledData = z.infer<typeof MailingScheduledData>;
+
+/** Sending began, from `send` or at the scheduled time. */
+export const MailingStartedData = z.object({
+  mailing_id: Id,
+  mailing_metadata: MailingMetadata,
+  trigger: z.enum(['send', 'schedule']),
+  recipients: z.number().int().min(0),
+  started_at: Timestamp,
+});
+export type MailingStartedData = z.infer<typeof MailingStartedData>;
+
+/**
+ * A scheduled mailing could not start at its time (its provider was deleted, it
+ * no longer compiles). It is back in `draft` with the reason; nothing was sent.
+ */
+export const MailingScheduleFailedData = z.object({
+  mailing_id: Id,
+  mailing_metadata: MailingMetadata,
+  code: z.string(),
+  message: z.string(),
+  failed_at: Timestamp,
+});
+export type MailingScheduleFailedData = z.infer<typeof MailingScheduleFailedData>;
+
+/** The A/B test is decided; the rest of the recipients get `winner`. */
+export const MailingAbWinnerSelectedData = z.object({
+  mailing_id: Id,
+  mailing_metadata: MailingMetadata,
+  winner: z.string(),
+  decided_by: z.enum(['metric', 'manual']),
+  variants: z.array(VariantAnalytics),
+  decided_at: Timestamp,
+});
+export type MailingAbWinnerSelectedData = z.infer<typeof MailingAbWinnerSelectedData>;
+
 const envelope = <T extends WebhookEventType, D extends z.ZodTypeAny>(type: T, data: D) =>
   z.object({
     /** Unique per event: a receiver deduplicates on it (deliveries may repeat). */
@@ -113,6 +195,12 @@ export const WebhookEvent = z.discriminatedUnion('type', [
   envelope('contact.resubscribed', ContactResubscribedData),
   envelope('contact.bounced', ContactBouncedData),
   envelope('mailing.finished', MailingFinishedData),
+  envelope('contact.subscribed', ContactSubscribedData),
+  envelope('import.finished', ImportFinishedData),
+  envelope('mailing.scheduled', MailingScheduledData),
+  envelope('mailing.started', MailingStartedData),
+  envelope('mailing.schedule_failed', MailingScheduleFailedData),
+  envelope('mailing.ab_winner_selected', MailingAbWinnerSelectedData),
 ]);
 export type WebhookEvent = z.infer<typeof WebhookEvent>;
 export type WebhookEventOf<T extends WebhookEventType> = Extract<WebhookEvent, { type: T }>;
