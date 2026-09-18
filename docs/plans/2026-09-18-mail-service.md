@@ -756,8 +756,13 @@ every unsubscribe link and image URL points at this host.
   of the Cloudflare tokens in Infisical can manage rulesets (verified
   2026-09-19: all three answer "Authentication error" on the zone's
   `http_request_dynamic_redirect` phase), minting one is Marlin's step, and the
-  demo was a manual wrangler deploy anyway. The deploy waits until this page is
-  live, so old links never land on a 404 (ROADMAP.md).
+  demo was a manual wrangler deploy anyway. The deploy waited until this page was
+  live, so old links never landed on a 404.
+- **Live on 2026-09-19.** #31 merged as `2ac6b84` and deployed: `/`, `/en`, `/de`
+  and `robots.txt` answer 200, and `/u/` and `/v1/` keep their own behaviour. The
+  redirect Worker is deployed and `email-editor.lumitra.co` answers 308 to
+  `https://mail.lumitra.co/` (checked `/` and `/editor`). email-mcp #18 is merged
+  and its Pages deploy put the footer cross-link live on email.lumitra.co.
 - Screenshots: `docs/plans/assets/2026-09-19-landing-desktop.png` and
   `-mobile.png`.
 

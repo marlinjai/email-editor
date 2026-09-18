@@ -61,15 +61,6 @@
 - [ ] Mail service dashboard: the billing screens (plan, usage with the 80
       percent warning, checkout, the portal) over `billing.*`, after S3 lands
       [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
-- [ ] Redirect `email-editor.lumitra.co` to the landing page: once the landing
-      PR is merged and `curl -sI https://mail.lumitra.co/en` answers 200, run
-      `pnpm -F email-editor-nextjs-example deploy` (wrangler, logged in on
-      Marlin's Mac with Workers write) and check that
-      `curl -sI https://email-editor.lumitra.co/editor` answers 308 with
-      `location: https://mail.lumitra.co/`. If wrangler fails on the custom
-      domain, delete the `routes` block from `redirect/wrangler.jsonc` and retry:
-      the domain stays bound to the script name `email-editor`. Deploying earlier
-      would send old links to a 404 [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
 - [ ] Lumitra Mail privacy notice (needs Marlin's legal review): lumitra.co/datenschutz
       covers the landing page but defers product-specific processing to a notice on
       the product's own domain, and Mail has none. Write `mail.lumitra.co/privacy`
@@ -81,6 +72,10 @@
 
 ## Recently shipped
 
+- Lumitra Mail landing page live at `https://mail.lumitra.co/` in five
+  languages (#31, 2026-09-19); `email-editor.lumitra.co` answers 308 to it
+  through the redirect Worker, and email.lumitra.co links back (email-mcp #18)
+  [plan](docs/plans/2026-09-18-mail-service.md)
 - Depth-2 nested columns (a column can split into 2-4 sub-columns) with a
   full canvas UX: handle-on-hover, inspector panel, layers-panel nesting,
   Backspace-to-delete with auto-merge, container-block palette filter.
