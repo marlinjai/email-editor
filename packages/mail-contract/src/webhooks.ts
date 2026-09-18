@@ -56,7 +56,12 @@ export const MessageFailedData = MessageEventBase.extend({
 });
 export type MessageFailedData = z.infer<typeof MessageFailedData>;
 
-export const UNSUBSCRIBE_SOURCES = ['hosted_page', 'one_click', 'api', 'dashboard'] as const;
+/**
+ * Where a subscription change came from. `signup_form` (S4) only ever appears
+ * on `contact.resubscribed`: a confirmed double opt-in lifting an earlier
+ * unsubscribe.
+ */
+export const UNSUBSCRIBE_SOURCES = ['hosted_page', 'one_click', 'api', 'dashboard', 'signup_form'] as const;
 
 export const ContactUnsubscribedData = z.object({
   contact_id: Id.nullable(),

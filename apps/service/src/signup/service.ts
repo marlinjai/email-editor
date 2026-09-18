@@ -405,7 +405,7 @@ export function createSignupService(deps: { sql: Sql; keys: RootKeys; options?: 
           email: contact.email,
           topic: topic.slug,
           mailing_id: null,
-          source: 'hosted_page',
+          source: 'signup_form',
           resubscribed_at: confirmedAt,
         },
       });

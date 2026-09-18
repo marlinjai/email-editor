@@ -517,7 +517,7 @@ Defaults taken (each can be overturned later):
     link lasts 72 hours; the same address resubmitted supersedes its earlier
     link. Confirming lifts only `unsubscribed` blocks, narrowing an all-topics
     block to the topics not on the form, and records `contact.resubscribed`
-    with source `hosted_page` (the contract has no signup source). The
+    with the new source `signup_form`. The
     confirmation mail is transactional: no List-Unsubscribe, no `message.*`
     webhook, counted against the provider's budget, and resent if a worker died
     while sending it (a duplicate confirmation is harmless, a lost one blocks
@@ -537,6 +537,11 @@ Defaults taken (each can be overturned later):
     stops `failed` at that batch (earlier batches stay imported) and the
     confirmation rolls back with a localised "not possible right now" page, its
     link still valid for when there is room.
+
+12. **`mailings.duplicate` copies no A/B test**: the copy is a plain draft
+    with the base content (variants, test settings and tracking are not
+    copied). Whether a copy should carry the test is a product call for when
+    the dashboard offers it.
 
 Also fixed on the way: a transient retry's due time was stamped with the app
 host's clock and compared with the database's, so a few milliseconds of skew

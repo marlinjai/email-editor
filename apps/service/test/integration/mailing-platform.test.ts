@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ApiError } from '../../src/api-error.js';
 import { createAbDecisionJob } from '../../src/platform/ab-job.js';
 import { createScheduleJob } from '../../src/platform/schedule-job.js';
 import { createTrackingTokens } from '../../src/platform/tracking.js';
@@ -163,6 +164,28 @@ describe('scheduling', () => {
     expect(h.transport.sent).toHaveLength(0);
     const [audit] = await h.sql`SELECT details FROM audit_log WHERE workspace_id = ${W.id} AND action = 'mailing.schedule_failed'`;
     expect(audit!.details).toMatchObject({ code: 'missing_unsubscribe_url' });
+  });
+
+  it('one mailing that cannot start yet does not hold back the others due after it', async () => {
+    const a = await setup(1, newsletter('Stuck headline'));
+    const b = await createMailing(h, W, { topic: a.topic.slug, provider_id: a.provider.id });
+    await addRecipients(h, W, b.id, [{ contact_id: a.contacts[0]!.id }]);
+    await schedule(a.mailing.id, inMinutes(2));
+    await schedule(b.id, inMinutes(3));
+    const errors: unknown[] = [];
+    // The compile pool is full for the first one, every time.
+    const job = createScheduleJob({
+      sql: h.sql,
+      log: { error: (...x: unknown[]) => errors.push(x), log: () => {} },
+      compile: async (d) => {
+        if (JSON.stringify(d).includes('Stuck headline')) throw new ApiError('service_unavailable', 'the compile queue is full');
+        return h.compiler.compile(d);
+      },
+    });
+    expect(await job.tick(inMinutes(5))).toBe(true);
+    expect(await mailingStatus(h, W.id, a.mailing.id)).toBe('scheduled');
+    expect(await mailingStatus(h, W.id, b.id)).toBe('sending');
+    expect(errors).toHaveLength(1);
   });
 
   it('send and cancel still work on a scheduled mailing; the release then leaves it alone', async () => {

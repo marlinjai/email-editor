@@ -456,7 +456,8 @@ need that tracking on (`tracking_disabled`, which says to use `manual`); after
 wins (a tie to the earlier key) and the held recipients get it. If the metric
 stopped being tracked meanwhile, the test waits for a person (`awaiting_pick`).
 `pickAbWinner` decides any running test by hand, once. Both emit
-`mailing.ab_winner_selected`.
+`mailing.ab_winner_selected`. `mailings.duplicate` copies the base content
+only, never the A/B test.
 
 ### Plan limits (S5)
 

@@ -446,7 +446,7 @@ describe('suppressions', () => {
     ]);
     expect((await contactOf(email))!.topics).toEqual(['news']);
     const resub = (await eventsOf(h, W.id, 'contact.resubscribed')).filter((e) => e.payload.data.email === email);
-    expect(resub.map((e) => e.payload.data.topic)).toEqual(['news']);
+    expect(resub.map((e) => [e.payload.data.topic, e.payload.data.source])).toEqual([['news', 'signup_form']]);
     expect(await consentsOf(email)).toHaveLength(1);
   });
 

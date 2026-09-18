@@ -51,7 +51,12 @@ export function createScheduleJob(deps: { sql: Sql; compile: Compile; log?: Pick
           }
         } catch (err) {
           if (err instanceof ApiError && err.code === 'conflict') continue; // edited meanwhile: the next tick looks again
-          if (!(err instanceof ApiError) || !FINAL_ERRORS.has(err.code)) throw err;
+          if (!(err instanceof ApiError) || !FINAL_ERRORS.has(err.code)) {
+            // A passing problem with this mailing: logged, and retried next
+            // tick, without holding back the mailings due after it.
+            log.error(`[schedule] mailing ${m.id} could not start yet, retrying:`, err);
+            continue;
+          }
           failure = err;
         }
         if (failure) {
