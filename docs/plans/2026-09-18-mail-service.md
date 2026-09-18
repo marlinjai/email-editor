@@ -297,9 +297,11 @@ Built and verified:
   migration `0001_foundation` (workspaces, workspace_members, api_keys, audit_log,
   idempotency_keys), the explicit `migrate` command, repositories that take
   `workspaceId` first, API-key and dashboard authentication, the shared
-  `Idempotency-Key` middleware, the typed error envelope. Routes and the role table
+  `Idempotency-Key` middleware (stored responses sealed with AES-256-GCM under
+  `MAIL_SECRETS_KEY`, since one of them carries a freshly minted key), the typed
+  error envelope. Routes and the role table
   are in `apps/service/README.md`.
-- **Tests**: 21 unit, 62 integration on Testcontainers Postgres 17 (tenancy proven on
+- **Tests**: 25 unit, 63 integration on Testcontainers Postgres 17 (tenancy proven on
   every route, revoked keys, the last-owner rule including a concurrent race,
   idempotency on all four stateful-flow paths, migrations from empty, after a failed
   file, and under two concurrent runners). CI runs them against a Postgres service
@@ -326,7 +328,7 @@ Defaults taken in S0 (each can be overturned later):
    and the audit log needs admin (full or read key); every change needs admin (full
    key); anything touching the owner role needs an owner. Members and workspace
    creation are dashboard-only.
-4. **Idempotency** is opt-in per request, stores every response below 500, keeps
+4. **Idempotency** is opt-in per request, stores every response below 500 sealed, keeps
    keys 24 hours, and clears a claim left `in_progress` for more than 5 minutes.
 5. **The auth-brain app slug is `mail`**, hidden until S3; the grant for the Lumitra
    company (and ŌPUNTIA's) is written after that PR deploys.

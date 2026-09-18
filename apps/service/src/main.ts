@@ -29,7 +29,11 @@ async function runMigrate(): Promise<void> {
 async function runServe(): Promise<void> {
   const config = loadConfig();
   const sql = createSql(config.databaseUrl, { max: config.databasePoolMax });
-  const app = createApp({ sql, dashboardServiceToken: config.dashboardServiceToken });
+  const app = createApp({
+    sql,
+    dashboardServiceToken: config.dashboardServiceToken,
+    secretsKeys: config.secretsKeys,
+  });
 
   const purge = setInterval(() => {
     repos(sql)

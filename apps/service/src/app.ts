@@ -5,6 +5,7 @@ import type { AppEnv } from './context.js';
 import type { Sql } from './db.js';
 import { ApiError } from './errors.js';
 import { repos } from './repo/index.js';
+import { createSealer, type SecretsKeys } from './sealing.js';
 import { apiKeyRoutes } from './routes/api-keys.js';
 import { auditRoutes } from './routes/audit.js';
 import { healthRoutes } from './routes/health.js';
@@ -17,12 +18,15 @@ export const MAX_BODY_BYTES = 1024 * 1024;
 export type AppOptions = {
   sql: Sql;
   dashboardServiceToken: string;
+  /** MAIL_SECRETS_KEY by version; seals what the service stores at rest. */
+  secretsKeys: SecretsKeys;
   log?: Pick<Console, 'error'>;
 };
 
-export function createApp({ sql, dashboardServiceToken, log = console }: AppOptions) {
+export function createApp({ sql, dashboardServiceToken, secretsKeys, log = console }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
+  const sealer = createSealer(secretsKeys);
 
   app.use('*', async (c, next) => {
     const incoming = c.req.header(REQUEST_ID_HEADER);
@@ -53,9 +57,9 @@ export function createApp({ sql, dashboardServiceToken, log = console }: AppOpti
     }),
   );
 
-  app.route('/', workspaceRoutes(sql));
-  app.route('/', memberRoutes(sql));
-  app.route('/', apiKeyRoutes(sql));
+  app.route('/', workspaceRoutes(sql, sealer));
+  app.route('/', memberRoutes(sql, sealer));
+  app.route('/', apiKeyRoutes(sql, sealer));
   app.route('/', auditRoutes(sql));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));

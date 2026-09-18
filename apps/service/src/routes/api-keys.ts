@@ -3,13 +3,14 @@ import { mintApiKey } from '../api-key.js';
 import { MANAGE, permit, READ_ADMIN, requireWorkspace } from '../auth.js';
 import { actorOf, type AppEnv } from '../context.js';
 import type { Sql } from '../db.js';
+import type { Sealer } from '../sealing.js';
 import { ApiError } from '../errors.js';
 import { idempotent, workspaceScope } from '../idempotency.js';
 import { repos } from '../repo/index.js';
 import { ApiKeyCreate, IdParams, PageQuery } from '../schemas.js';
 import { jsonBody, pageArgs, params, query, toPage } from '../validate.js';
 
-export function apiKeyRoutes(sql: Sql) {
+export function apiKeyRoutes(sql: Sql, sealer: Sealer) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
   const withWorkspace = requireWorkspace({ findMember: (ws, subject) => pool.members.bySubject(ws, subject) });
@@ -19,7 +20,7 @@ export function apiKeyRoutes(sql: Sql) {
   // Idempotency-Key, a retry replays this same response (so a client that lost
   // the first answer to a network error still receives its key) instead of
   // minting a second one.
-  app.post('/v1/api-keys', withWorkspace, permit(MANAGE), idempotent(ledger, workspaceScope), async (c) => {
+  app.post('/v1/api-keys', withWorkspace, permit(MANAGE), idempotent(ledger, sealer, workspaceScope), async (c) => {
     const access = c.get('access');
     const input = await jsonBody(c, ApiKeyCreate);
     const minted = await mintApiKey();
@@ -54,7 +55,7 @@ export function apiKeyRoutes(sql: Sql) {
   });
 
   // Revoking, never deleting: the row stays so the audit log keeps its target.
-  app.delete('/v1/api-keys/:id', withWorkspace, permit(MANAGE), idempotent(ledger, workspaceScope), async (c) => {
+  app.delete('/v1/api-keys/:id', withWorkspace, permit(MANAGE), idempotent(ledger, sealer, workspaceScope), async (c) => {
     const access = c.get('access');
     const { id } = params(c, IdParams);
     const result = await sql.begin(async (tx) => {

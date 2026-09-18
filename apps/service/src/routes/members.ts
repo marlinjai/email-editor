@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { dashboardOnly, MANAGE, permit, READ_WORKSPACE, requireWorkspace, roleAtLeast } from '../auth.js';
 import { actorOf, type AppEnv, type WorkspaceAccess } from '../context.js';
 import type { Sql } from '../db.js';
+import type { Sealer } from '../sealing.js';
 import { ApiError } from '../errors.js';
 import { idempotent, workspaceScope } from '../idempotency.js';
 import { repos } from '../repo/index.js';
@@ -19,7 +20,7 @@ import { jsonBody, pageArgs, params, query, toPage } from '../validate.js';
  *   (`last_owner`). Owner rows are locked first, so two owners demoting each
  *   other at once cannot both succeed.
  */
-export function memberRoutes(sql: Sql) {
+export function memberRoutes(sql: Sql, sealer: Sealer) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
   const withWorkspace = requireWorkspace({ findMember: (ws, subject) => pool.members.bySubject(ws, subject) });
@@ -39,7 +40,7 @@ export function memberRoutes(sql: Sql) {
     return c.json(toPage(rows, page.limit));
   });
 
-  app.post('/v1/members', dashboardOnly, withWorkspace, permit(MANAGE), idempotent(ledger, workspaceScope), async (c) => {
+  app.post('/v1/members', dashboardOnly, withWorkspace, permit(MANAGE), idempotent(ledger, sealer, workspaceScope), async (c) => {
     const access = c.get('access');
     const input = await jsonBody(c, MemberCreate);
     if (input.role === 'owner') requireOwner(access, 'add another owner');
@@ -66,7 +67,7 @@ export function memberRoutes(sql: Sql) {
     return c.json(member, 201);
   });
 
-  app.patch('/v1/members/:id', dashboardOnly, withWorkspace, permit(MANAGE), idempotent(ledger, workspaceScope), async (c) => {
+  app.patch('/v1/members/:id', dashboardOnly, withWorkspace, permit(MANAGE), idempotent(ledger, sealer, workspaceScope), async (c) => {
     const access = c.get('access');
     const { id } = params(c, IdParams);
     const input = await jsonBody(c, MemberUpdate);
@@ -94,7 +95,7 @@ export function memberRoutes(sql: Sql) {
   });
 
   // Not behind permit(MANAGE): leaving is allowed to everyone, so the rule is checked inside.
-  app.delete('/v1/members/:id', dashboardOnly, withWorkspace, idempotent(ledger, workspaceScope), async (c) => {
+  app.delete('/v1/members/:id', dashboardOnly, withWorkspace, idempotent(ledger, sealer, workspaceScope), async (c) => {
     const access = c.get('access');
     if (access.via !== 'member') throw new ApiError('forbidden', 'Only a person can remove members.');
     const { id } = params(c, IdParams);

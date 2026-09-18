@@ -4,6 +4,7 @@ import { migrate } from '../../src/migrate.js';
 import { freshDatabase } from './db.js';
 
 export const DASHBOARD_TOKEN = 'a'.repeat(64);
+export const SECRETS_KEYS = new Map([[1, Buffer.alloc(32, 7)]]);
 
 type Json = Record<string, any>;
 
@@ -27,7 +28,7 @@ export async function startHarness() {
   const db = await freshDatabase();
   await migrate(db.sql, { log: () => {} });
   const errors: unknown[] = [];
-  const app = createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, log: { error: (...a) => errors.push(a) } });
+  const app = createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, log: { error: (...a) => errors.push(a) } });
 
   async function call(c: Call): Promise<Result> {
     const headers: Record<string, string> = { ...(c.headers ?? {}) };

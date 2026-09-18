@@ -3,6 +3,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import type { AppEnv } from './context.js';
 import { ApiError } from './errors.js';
 import type { idempotencyRepo } from './repo/idempotency.js';
+import type { Sealer } from './sealing.js';
 
 /** Identical to IDEMPOTENCY_KEY_HEADER and its limit in `@marlinjai/mail-contract`. */
 export const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
@@ -43,8 +44,16 @@ function fingerprint(method: string, path: string, body: string): string {
  * - a 5xx releases the key, since the client is told to retry those.
  *
  * Without the header the route simply runs; the key is the client's opt-in.
+ *
+ * Stored responses are sealed (AES-256-GCM under MAIL_SECRETS_KEY), because one
+ * of them is the only copy of a freshly minted API key: a dump of the ledger
+ * must not yield a working credential.
  */
-export function idempotent(ledger: () => Ledger, scopeOf: (c: Context<AppEnv>) => IdempotencyScope): MiddlewareHandler<AppEnv> {
+export function idempotent(
+  ledger: () => Ledger,
+  sealer: Sealer,
+  scopeOf: (c: Context<AppEnv>) => IdempotencyScope,
+): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     const key = c.req.header(IDEMPOTENCY_KEY_HEADER);
     if (key === undefined) return next();
@@ -72,7 +81,7 @@ export function idempotent(ledger: () => Ledger, scopeOf: (c: Context<AppEnv>) =
       if (record.state !== 'completed' || record.response_status === null) {
         throw new ApiError('conflict', 'A request with this Idempotency-Key is still being processed. Retry shortly.');
       }
-      return new Response(record.response_body, {
+      return new Response(record.response_body === null ? null : sealer.open(record.response_body), {
         status: record.response_status,
         headers: { 'content-type': 'application/json; charset=utf-8', [IDEMPOTENT_REPLAYED_HEADER]: 'true' },
       });
@@ -91,6 +100,6 @@ export function idempotent(ledger: () => Ledger, scopeOf: (c: Context<AppEnv>) =
       return;
     }
     const responseBody = await c.res.clone().text();
-    await repo.complete(scope, key, c.res.status, responseBody);
+    await repo.complete(scope, key, c.res.status, sealer.seal(responseBody));
   };
 }

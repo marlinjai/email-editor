@@ -4,7 +4,8 @@ import { createApp } from '../../src/app.js';
 import type { AppEnv } from '../../src/context.js';
 import { idempotent, workspaceScope } from '../../src/idempotency.js';
 import { repos } from '../../src/repo/index.js';
-import { DASHBOARD_TOKEN, startHarness, type Harness } from '../support/harness.js';
+import { createSealer } from '../../src/sealing.js';
+import { DASHBOARD_TOKEN, SECRETS_KEYS, startHarness, type Harness } from '../support/harness.js';
 
 /**
  * The idempotency ledger is a stateful flow, so it is tested on the four paths
@@ -90,7 +91,7 @@ describe('idempotency: backtrack and revise', () => {
 describe('idempotency: resume from persistence', () => {
   it('a second service instance replays what the first one stored', async () => {
     const first = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, idempotencyKey: 'res-1', body: { name: 'restart' } });
-    const restarted = createApp({ sql: h.sql, dashboardServiceToken: DASHBOARD_TOKEN });
+    const restarted = createApp({ sql: h.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS });
     const res = await restarted.request('/v1/api-keys', {
       method: 'POST',
       headers: { authorization: `Bearer ${W.key}`, 'idempotency-key': 'res-1', 'content-type': 'application/json' },
@@ -136,7 +137,7 @@ describe('idempotency: re-entry after completion or failure', () => {
       c.set('access', { workspaceId: W.id, via: 'api_key', apiKeyId: W.keyId, scope: 'full' });
       await next();
     });
-    app.post('/flaky', idempotent(() => ledger, workspaceScope), (c) => {
+    app.post('/flaky', idempotent(() => ledger, createSealer(SECRETS_KEYS), workspaceScope), (c) => {
       if (fail) throw new Error('database went away');
       return c.json({ done: true }, 201);
     });

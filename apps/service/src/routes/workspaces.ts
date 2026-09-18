@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { dashboardOnly, MANAGE, permit, READ_WORKSPACE, requireWorkspace } from '../auth.js';
 import { actorOf, type AppEnv } from '../context.js';
 import type { Sql } from '../db.js';
+import type { Sealer } from '../sealing.js';
 import { ApiError } from '../errors.js';
 import { idempotent, subjectScope, workspaceScope } from '../idempotency.js';
 import { repos } from '../repo/index.js';
@@ -25,14 +26,14 @@ function mergedSettings(base: WorkspaceSettings, patch: Partial<WorkspaceSetting
   return merged;
 }
 
-export function workspaceRoutes(sql: Sql) {
+export function workspaceRoutes(sql: Sql, sealer: Sealer) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
   const withWorkspace = requireWorkspace({ findMember: (ws, subject) => pool.members.bySubject(ws, subject) });
   const ledger = () => pool.idempotency;
 
   // Creating a workspace: dashboard only. The acting person becomes its first owner.
-  app.post('/v1/workspaces', dashboardOnly, idempotent(ledger, subjectScope), async (c) => {
+  app.post('/v1/workspaces', dashboardOnly, idempotent(ledger, sealer, subjectScope), async (c) => {
     const caller = c.get('caller');
     if (caller.kind !== 'dashboard') throw new ApiError('forbidden', 'Only a person can create a workspace.');
     const input = await jsonBody(c, WorkspaceCreate);
@@ -83,7 +84,7 @@ export function workspaceRoutes(sql: Sql) {
     return c.json(workspace);
   });
 
-  app.patch('/v1/workspace', withWorkspace, permit(MANAGE), idempotent(ledger, workspaceScope), async (c) => {
+  app.patch('/v1/workspace', withWorkspace, permit(MANAGE), idempotent(ledger, sealer, workspaceScope), async (c) => {
     const access = c.get('access');
     const input = await jsonBody(c, WorkspaceUpdate);
     const updated = await sql.begin(async (tx) => {

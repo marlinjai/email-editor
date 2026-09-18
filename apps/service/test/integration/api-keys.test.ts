@@ -27,6 +27,17 @@ describe('API keys', () => {
     expect(JSON.stringify(list.body)).not.toContain(created.body.key);
   });
 
+  it('never stores the plaintext key at rest, even in the idempotency ledger', async () => {
+    const created = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, idempotencyKey: 'at-rest', body: { name: 'sealed' } });
+    expect(created.status).toBe(201);
+    const [row] = await h.sql<{ response_body: string }[]>`SELECT response_body FROM idempotency_keys WHERE key = 'at-rest'`;
+    expect(row!.response_body.startsWith('sealed:v1:')).toBe(true);
+    expect(row!.response_body).not.toContain(created.body.key);
+    expect(row!.response_body).not.toContain('sk_live_');
+    const replay = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, idempotencyKey: 'at-rest', body: { name: 'sealed' } });
+    expect(replay.body.key).toBe(created.body.key);
+  });
+
   it('records when a key was last used', async () => {
     const created = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, body: { name: 'used' } });
     await h.call({ path: '/v1/workspace', key: created.body.key });

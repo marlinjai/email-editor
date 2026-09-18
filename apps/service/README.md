@@ -50,7 +50,9 @@ printable characters). The same key and the same request replay the first
 response with `idempotent-replayed: true`; the same key with a different request
 is `idempotency_key_reused`; a key still running is `conflict`; a 5xx releases the
 key so the retry runs; keys are kept 24 hours, and a claim left behind by a crashed
-process is cleared after 5 minutes. Keys are scoped per workspace (and per person
+process is cleared after 5 minutes. Stored responses are sealed with AES-256-GCM
+under `MAIL_SECRETS_KEY` (`src/sealing.ts`), since one of them is the only copy of a
+freshly minted API key. Keys are scoped per workspace (and per person
 for creating a workspace), in the `idempotency_keys` table, for later phases to reuse
 through `idempotent()` in `src/idempotency.ts`.
 
@@ -62,6 +64,8 @@ through `idempotent()` in `src/idempotency.ts`.
   first; there is no unscoped helper. The one unscoped lookup is finding a key by
   its hash, which is how its workspace is found.
 - `src/auth.ts`: the two caller kinds, workspace resolution, role and scope checks.
+- `src/sealing.ts`: AES-256-GCM at rest under `MAIL_SECRETS_KEY`, versioned so the
+  key can rotate; S2 seals provider credentials with it.
 - `migrations/NNNN_name.sql`: ordered, additive, never edited once applied (a
   checksum enforces it). `migrate` takes an advisory lock and applies each file in
   its own transaction.
