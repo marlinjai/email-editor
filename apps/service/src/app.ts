@@ -17,6 +17,7 @@ import { auditRoutes } from './routes/audit.js';
 import { erasureRoutes } from './routes/erasure.js';
 import { inviteRoutes } from './routes/invites.js';
 import { healthRoutes } from './routes/health.js';
+import { landingRoutes } from './routes/landing.js';
 import { memberRoutes } from './routes/members.js';
 import { templateRoutes } from './routes/templates.js';
 import { webhookRoutes } from './routes/webhooks.js';
@@ -161,6 +162,7 @@ export function createApp({
   });
 
   app.route('/', healthRoutes(sql));
+  app.route('/', landingRoutes({ publicBaseUrl, billing, stripe }));
   app.route('/', publicAssetRoutes({ pool, storage: assetStorage, log }));
   // Public and outside /v1: a browser page (HTML, its own body limit, no API
   // credentials), so none of the API middleware below applies to it.

@@ -215,6 +215,41 @@ an admin calls `PATCH /v1/workspace` with `{ "settings": { "asset_policy":
 (or look for remote image hosts and `metadata.fonts`) and import what is
 remote, since every such document stops being sendable at once.
 
+## The landing page
+
+`GET /` is the public page of Lumitra Mail. Every mail the service sends links to
+this host (unsubscribe links, images, tracking), so recipients land here as well
+as prospects. `src/routes/landing.ts` serves it with `src/pages/landing-render.ts`
+and `src/pages/landing-i18n.ts`, outside `/v1` and without credentials:
+
+| Path | What |
+| --- | --- |
+| `/en`, `/de`, `/it`, `/fr`, `/es` | the page in one fixed language (the language switch links these) |
+| `/` | the same page, language from `?lang=` or Accept-Language, English otherwise; sends `Vary: Accept-Language` |
+| `/robots.txt` | allows `/`, disallows `/u/`, `/f/`, `/t/`, `/a/`, `/v1/`, `/internal/`, `/stripe/`, names the sitemap |
+| `/sitemap.xml` | the five language pages with their `hreflang` alternates |
+| `/icon.svg`, `/favicon.ico` | the dashboard's gold envelope mark (the `.ico` path redirects to it) |
+| `/og.png` | the 1200 x 630 Open Graph image, embedded in `src/pages/landing-og.ts` (source: `scripts/og-image.html`) |
+
+- **No script, nothing third-party.** One inline stylesheet, allowed by its
+  SHA-256 hash in the page's own Content-Security-Policy (`LANDING_CSP`:
+  `default-src 'none'`, `img-src 'self'`, no forms, no framing). A test hashes
+  the rendered `<style>` and compares it with the header, so a CSS edit can never
+  ship a page the browser refuses to style.
+- **Pricing reads the plan catalogue.** The cards list `LISTED_PLANS` (free,
+  starter, growth, the same list `billing.plans` answers) with limits and
+  `monthly_price_cents` from `src/billing/plans.ts`. A paid plan shows as
+  "coming soon" whenever `checkoutPriceId` returns null (no Stripe key, or no
+  Price id for it), which is exactly when checkout fails closed.
+- **Brand**: dark only, black and brushed gold, the tokens of the email-mcp site
+  (`email.lumitra.co`), system font stack. Motion is one 280 ms rise of the mail
+  mock plus 150 ms hover transitions, all off under `prefers-reduced-motion`.
+- **Legal links** go to `lumitra.co/impressum` and `lumitra.co/datenschutz`,
+  which cover the product subdomains; a Mail-specific privacy page is on
+  ROADMAP.md.
+- `email-editor.lumitra.co` (the old public editor demo) redirects here with a
+  308: the Worker in `examples/nextjs/redirect/`.
+
 ## Layout
 
 - `src/main.ts`: the commands `migrate`, `serve` and the operator's `billing-exempt`.
