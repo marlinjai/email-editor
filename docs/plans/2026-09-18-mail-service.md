@@ -196,6 +196,28 @@ inbox.
 available per workspace, off by default. ŌPUNTIA keeps it off: its privacy policy
 promises no tracking.
 
+## The marketing platform, not only an API
+
+The service is the product for two kinds of customer, and the boundary above
+serves both:
+
+- **A client with its own application** (ŌPUNTIA today) keeps its people and
+  pushes recipients per mailing. The service is its mail infrastructure.
+- **A customer with no application** (the typical newsletter or small-business
+  sender) manages people inside the service: import a CSV, tag them, collect
+  signups through a hosted form or an embed with double opt-in, build segments
+  (saved filters over contacts, tags, properties and engagement), and send
+  broadcasts to a segment. For them the service is the whole marketing platform.
+
+Same contact table, same topics, same suppression, same worker and archive.
+Segments are the service-side counterpart of a client's audience resolution, and
+a client with an application may use them too. Everything a marketing platform is
+expected to carry (scheduling, A/B testing of subject and content, campaign
+analytics with open and click tracking opt-in per workspace, automations, billing)
+is in scope for the service; the repository already holds first versions of all of
+it over mock adapters, and the phases below sequence them behind the parts ŌPUNTIA
+needs first.
+
 ## Phases
 
 - **S0, foundation.** Name and domain decided; Coolify app, Postgres, Infisical
@@ -211,12 +233,19 @@ promises no tracking.
   after completion or failure), with a transport stub in CI and one real
   end-to-end send before the first real broadcast.
 - **S3, dashboard.** The human UI over the same API.
+- **S4, the platform features.** Contacts managed in the service: CSV import, tags,
+  custom properties, hosted signup form and embed with double opt-in; segments;
+  scheduling and A/B testing on mailings; campaign analytics with open and click
+  tracking opt-in per workspace (rewiring the analytics package). ŌPUNTIA does not
+  need any of this to send, so it follows S3.
+- **S5, billing.** Plans and limits per workspace (Stripe, the pattern from
+  Lumitra QR), usage metering on the worker, the free tier the API-key code already
+  sketches. ŌPUNTIA stays a design partner outside billing.
 - **Later, in their own plans:** automations (the existing engine detached from the
   contacts and campaigns packages behind `ContactSource` and `Sender` interfaces,
   plus a visual flow canvas over the existing step schema), AI-assisted editing (a
   prompt beside the canvas, the model returns a document in the same schema,
-  applied as a reviewed diff), billing, custom domains per workspace, analytics
-  reports.
+  applied as a reviewed diff), custom domains per workspace.
 
 ## Legal shape
 
