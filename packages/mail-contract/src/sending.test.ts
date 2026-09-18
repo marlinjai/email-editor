@@ -50,7 +50,9 @@ describe('providers', () => {
   });
 
   it('accepts only a Resend signing secret for the events', () => {
-    expect(ProviderEventsSecret.safeParse({ signing_secret: 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw' }).success).toBe(true);
+    // Built at run time: no secret-shaped literal lives in the repository.
+    const minted = `whsec_${Buffer.from(Array.from({ length: 24 }, (_, i) => i)).toString('base64')}`;
+    expect(ProviderEventsSecret.safeParse({ signing_secret: minted }).success).toBe(true);
     expect(ProviderEventsSecret.safeParse({ signing_secret: 're_123456789012345678' }).success).toBe(false);
     expect(ProviderEventsSecret.safeParse({ signing_secret: 'whsec_short' }).success).toBe(false);
     expect(ProviderEventsSecret.safeParse({}).success).toBe(false);
