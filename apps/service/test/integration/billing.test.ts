@@ -281,7 +281,7 @@ describe('the Stripe webhook', () => {
     const event = stripe.event('customer.subscription.updated', { id: 'sub_x', customer: 'cus_x', metadata: { product: 'mail' } });
     const body = JSON.stringify(event);
     expect((await app.call({ method: 'POST', path: '/stripe/webhook', rawBody: body })).status).toBe(400);
-    expect((await deliver(event, { secret: 'whsec_somebodyelsesendpointsecret' })).status).toBe(400);
+    expect((await deliver(event, { secret: `whsec_${crypto.randomUUID().replace(/-/g, '')}` })).status).toBe(400);
     expect((await deliver(event, { timestamp: Math.floor(Date.now() / 1000) - 301 })).status).toBe(400);
     const signed = signedDelivery(event);
     const tampered = await app.call({ method: 'POST', path: '/stripe/webhook', rawBody: body.replace('sub_x', 'sub_y'), headers: signed.headers });

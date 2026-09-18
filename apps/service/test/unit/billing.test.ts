@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Plan, Usage } from '@marlinjai/mail-contract';
 import { describe, expect, it } from 'vitest';
@@ -21,7 +22,9 @@ import type { BillingRow } from '../../src/repo/billing.js';
 import { STRIPE_WEBHOOK_EVENTS } from '../../src/routes/stripe-webhook.js';
 import { STRIPE_API_VERSION } from '../../src/billing/plans.js';
 
-const SECRET = 'whsec_unitsecretunitsecret';
+/** Made per run, never written out: see test/support/fake-stripe.ts. */
+const fake = (prefix: string) => `${prefix}_${randomBytes(12).toString('hex')}`;
+const SECRET = fake('whsec');
 const WS = '0b8f6a3e-4c1d-4e2f-9a7b-1c2d3e4f5a6b';
 const config = { prices: { starter: 'price_S', growth: 'price_G' } };
 
@@ -49,7 +52,7 @@ describe('Stripe signature', () => {
   });
 
   it('refuses another secret, another body, a missing header and malformed ones', () => {
-    expect(verifyStripeSignature(body, signStripePayload(body, 'whsec_other', now), SECRET, now)).toBe(false);
+    expect(verifyStripeSignature(body, signStripePayload(body, fake('whsec'), now), SECRET, now)).toBe(false);
     expect(verifyStripeSignature(`${body} `, signStripePayload(body, SECRET, now), SECRET, now)).toBe(false);
     expect(verifyStripeSignature(body, undefined, SECRET, now)).toBe(false);
     expect(verifyStripeSignature(body, 'garbage', SECRET, now)).toBe(false);
@@ -180,15 +183,16 @@ describe('plans and periods', () => {
 
 describe('the Stripe client', () => {
   it('maps a network failure to status 0 and a Stripe error to its status and code, without the key in the message', async () => {
-    const down = createStripeApi('sk_test_secretvalue0000000', { fetch: async () => { throw new TypeError('fetch failed'); } });
+    const down = createStripeApi(fake('sk_test'), { fetch: async () => { throw new TypeError('fetch failed'); } });
     await expect(down.getSubscription('sub_1')).rejects.toMatchObject({ status: 0 });
-    const refusing = createStripeApi('sk_test_secretvalue0000000', {
+    const key = fake('sk_test');
+    const refusing = createStripeApi(key, {
       fetch: async () => new Response(JSON.stringify({ error: { message: 'No such price', code: 'resource_missing' } }), { status: 400 }),
     });
     const err = await refusing.createPortalSession({ customerId: 'cus_1', returnUrl: 'https://x.test' }).catch((e) => e);
     expect(err).toBeInstanceOf(StripeRequestError);
     expect(err).toMatchObject({ status: 400, stripeCode: 'resource_missing' });
-    expect(String(err.message)).not.toContain('secretvalue');
+    expect(String(err.message)).not.toContain(key);
     // A 404 on a subscription read is "no such subscription", not an error.
     const missing = createStripeApi('sk_test_x', { fetch: async () => new Response('{"error":{"message":"gone"}}', { status: 404 }) });
     expect(await missing.getSubscription('sub_gone')).toBeNull();
@@ -214,29 +218,33 @@ describe('billing configuration', () => {
   });
 
   it('reads real values and names a malformed one without echoing it', () => {
+    const secretKey = fake('sk_test');
+    const webhookSecret = fake('whsec');
     const full = loadConfig({
       ...base,
-      STRIPE_SECRET_KEY: 'sk_test_abcdefghijklmnop1234',
-      STRIPE_WEBHOOK_SECRET: 'whsec_abcdefghijklmnop1234',
+      STRIPE_SECRET_KEY: secretKey,
+      STRIPE_WEBHOOK_SECRET: webhookSecret,
       STRIPE_PRICE_STARTER_ID: 'price_1Abc',
       STRIPE_PRICE_GROWTH_ID: 'price_1Def',
       STRIPE_PORTAL_CONFIGURATION_ID: 'bpc_1Ghi',
     });
     expect(full.billing).toEqual({
-      secretKey: 'sk_test_abcdefghijklmnop1234',
-      webhookSecret: 'whsec_abcdefghijklmnop1234',
+      secretKey,
+      webhookSecret,
       prices: { starter: 'price_1Abc', growth: 'price_1Def' },
       portalConfigurationId: 'bpc_1Ghi',
     });
+    // A publishable key in the secret's place: refused, and never echoed.
+    const publishable = fake('pk_live');
     try {
-      loadConfig({ ...base, STRIPE_SECRET_KEY: 'pk_live_publishablekeynotsecret', STRIPE_PRICE_GROWTH_ID: 'prod_123' });
+      loadConfig({ ...base, STRIPE_SECRET_KEY: publishable, STRIPE_PRICE_GROWTH_ID: 'prod_123' });
       expect.unreachable();
     } catch (err) {
       expect(err).toBeInstanceOf(ConfigError);
       const problems = (err as ConfigError).problems.join('\n');
       expect(problems).toContain('STRIPE_SECRET_KEY');
       expect(problems).toContain('STRIPE_PRICE_GROWTH_ID');
-      expect(problems).not.toContain('publishablekeynotsecret');
+      expect(problems).not.toContain(publishable);
     }
   });
 });
