@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { Provider, WebhookEvent } from '@marlinjai/mail-contract';
+import { Provider, WebhookEvent, type WebhookEventOf } from '@marlinjai/mail-contract';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { repos } from '../../src/repo/index.js';
 import { svixSign } from '../../src/provider-events/svix.js';
@@ -35,7 +35,9 @@ async function suppressionsOf(workspaceId: string) {
 }
 
 async function bouncedEvents(workspaceId: string) {
-  return (await eventsOf(h, workspaceId, 'contact.bounced')).map((e) => WebhookEvent.parse(e.payload));
+  return (await eventsOf(h, workspaceId, 'contact.bounced'))
+    .map((e) => WebhookEvent.parse(e.payload))
+    .filter((e): e is WebhookEventOf<'contact.bounced'> => e.type === 'contact.bounced');
 }
 
 async function mailingTo(s: Awaited<ReturnType<typeof seedSending>>, contactIds: string[]) {
