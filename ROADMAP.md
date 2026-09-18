@@ -18,6 +18,10 @@
       `marlinjai/email-editor`, workflow `publish.yml`) and push the two tags
       it prints; needs Marlin's npm account, details in the
       [plan](docs/plans/2026-09-18-mail-service.md) under question 4 (2026-09-18)
+- [ ] Mail service: add a `topics.delete` route to the contract and the service
+      (refused with `conflict` while a mailing uses the topic, which the schema
+      already enforces) once a client needs to remove a topic; S2 ships without
+      it [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 - [ ] Decide whether hosts may add new block types (not only redefine the 14
       standard ones): it needs an open block type in the store and schema, a
       renderer hook for the canvas and a compile hook the server can trust.

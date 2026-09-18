@@ -1,5 +1,5 @@
 import { LIST_UNSUBSCRIBE_POST_VALUE, UNSUBSCRIBE_PATH_PREFIX, WebhookEvent } from '@marlinjai/mail-contract';
-import { JSDOM } from 'jsdom';
+import { JSDOM, type DomDocument, type DomElement } from 'jsdom';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { emitEvent } from '../../src/events.js';
 import { repos } from '../../src/repo/index.js';
@@ -29,7 +29,7 @@ beforeAll(async () => {
 });
 afterAll(() => h?.drop());
 
-type Page = { status: number; html: string; doc: Document; headers: Headers };
+type Page = { status: number; html: string; doc: DomDocument; headers: Headers };
 
 async function get(token: string, headers: Record<string, string> = {}, query = ''): Promise<Page> {
   const res = await h.app.request(`${UNSUBSCRIBE_PATH_PREFIX}${token}${query}`, { headers: { host: HOST, ...headers } });
@@ -53,9 +53,9 @@ async function post(
 }
 
 /** Submits a form found on a rendered page, the way a browser would. */
-function submit(page: Page, form: Element, token: string) {
+function submit(page: Page, form: DomElement, token: string) {
   const fields = Object.fromEntries(
-    [...form.querySelectorAll('input')].map((i) => [(i as HTMLInputElement).name, (i as HTMLInputElement).value]),
+    [...form.querySelectorAll('input')].map((i) => [i.name, i.value]),
   );
   expect(form.getAttribute('action')).toBe(`${UNSUBSCRIBE_PATH_PREFIX}${token}`);
   return post(token, fields);

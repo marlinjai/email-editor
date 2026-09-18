@@ -91,7 +91,7 @@ describe('idempotency: backtrack and revise', () => {
 describe('idempotency: resume from persistence', () => {
   it('a second service instance replays what the first one stored', async () => {
     const first = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, idempotencyKey: 'res-1', body: { name: 'restart' } });
-    const restarted = createApp({ sql: h.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS });
+    const restarted = createApp({ sql: h.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, ...h.appDeps });
     const res = await restarted.request('/v1/api-keys', {
       method: 'POST',
       headers: { authorization: `Bearer ${W.key}`, 'idempotency-key': 'res-1', 'content-type': 'application/json' },

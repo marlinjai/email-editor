@@ -158,7 +158,7 @@ describe('rendering', () => {
   it('offers the undo on the confirmation', () => {
     const dom = new JSDOM(renderPreferences(view('en', { outcome: { kind: 'unsubscribed', topic: topics[0]! } })));
     const undo = dom.window.document.querySelector('[role=status] form')!;
-    const field = (n: string) => (undo.querySelector(`input[name=${n}]`) as HTMLInputElement | null)?.value;
+    const field = (n: string) => undo.querySelector(`input[name=${n}]`)?.value;
     expect([field('action'), field('scope'), field('topic')]).toEqual(['resubscribe', 'topic', topics[0]!.id]);
   });
 });
@@ -168,7 +168,7 @@ describe('accessibility (axe-core, WCAG 2.2 A and AA rules)', () => {
   // checked separately below.
   async function violations(html: string) {
     const dom = new JSDOM(html, { pretendToBeVisual: true });
-    const result = await axe.run(dom.window.document.documentElement as unknown as Element, {
+    const result = await axe.run(dom.window.document.documentElement as never, {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'] },
       rules: { 'color-contrast': { enabled: false } },
     });

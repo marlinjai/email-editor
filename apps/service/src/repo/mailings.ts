@@ -67,6 +67,18 @@ export function mailingsRepo(db: Db) {
       return (await selectOne(workspaceId, rows[0]!.id, false))!;
     },
 
+    /**
+     * How many of the workspace's mailings still need this provider to send:
+     * scheduled, sending or paused. Deleting a provider is refused while any do.
+     */
+    async countActiveForProvider(workspaceId: string, providerId: string): Promise<number> {
+      const rows = await db<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM mailings
+        WHERE workspace_id = ${workspaceId} AND provider_id = ${providerId}
+          AND status IN ('scheduled', 'sending', 'paused')`;
+      return rows[0]!.n;
+    },
+
     async get(workspaceId: string, mailingId: string): Promise<MailingRow | null> {
       return selectOne(workspaceId, mailingId, false);
     },
