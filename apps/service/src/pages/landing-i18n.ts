@@ -18,7 +18,7 @@ const en = {
   language_label: 'Language',
   meta_title: 'Lumitra Mail: newsletters and product mail through your own provider',
   meta_description:
-    'A mail service and marketing platform with a visual editor. Send from your app through the API, or from the dashboard without one. Hosted in the EU, tracking off by default.',
+    'A mail service and marketing platform with a visual editor. Send from your app through the API, or from the dashboard without one. Contacts and mail stay on servers in Germany, tracking is off by default.',
   skip_link: 'Skip to content',
   nav_label: 'Main',
   nav_features: 'Features',
@@ -28,7 +28,7 @@ const en = {
   hero_title_a: 'Newsletters and product mail,',
   hero_title_b: 'sent through your own provider.',
   hero_lead:
-    'Lumitra Mail is a mail service and marketing platform with a visual editor. Connect your app through the API, or run everything from the dashboard if you don’t have one. It’s hosted in the EU, and nothing gets tracked unless you switch it on.',
+    'Lumitra Mail is a mail service and marketing platform with a visual editor. Connect your app through the API, or run everything from the dashboard if you don’t have one. Your contacts and mail stay on servers in Germany, and nothing gets tracked unless you switch it on.',
   cta_signin: 'Sign in',
   cta_docs: 'Read the docs',
   hero_note: 'Free for up to {messages} messages a month.',
@@ -41,7 +41,7 @@ const en = {
   paths_title: 'Two ways in',
   app_title: 'You have an app',
   app_text:
-    'Your app keeps its users, Lumitra Mail keeps the mail. Send and sync contacts through the REST API or the TypeScript SDK, and get signed webhooks back when a message goes out, fails, bounces or someone unsubscribes.',
+    'Your app keeps its users, Lumitra Mail keeps the mail. Send and sync contacts through the REST API or the TypeScript SDK, and get signed webhooks back when a message is sent or fails and when someone subscribes, unsubscribes or resubscribes.',
   noapp_title: 'You don’t have an app',
   noapp_text:
     'Use the dashboard. Design templates in the visual editor, import your list from a CSV file, put the hosted signup form on your site and schedule the mailing. No code needed.',
@@ -53,9 +53,9 @@ const en = {
   f_editor_text: 'Drag blocks into place, preview on desktop and mobile, and get HTML that holds up in real inboxes.',
   f_unsub_title: 'Unsubscribe built in',
   f_unsub_text:
-    'Every mail has one-click unsubscribe and a hosted page where people pick their topics. Bounces and complaints block the address automatically.',
+    'Every mail has one-click unsubscribe and a hosted page where people pick their topics. An unsubscribe blocks the address for that sender straight away.',
   f_webhooks_title: 'Webhooks',
-  f_webhooks_text: 'Signed events for sends, failures, bounces, opens, clicks and unsubscribes, so your app always knows what happened.',
+  f_webhooks_text: 'Signed events when a message is sent or fails, when someone subscribes, unsubscribes or resubscribes, and when a mailing or an import moves along. Your app always knows what happened.',
   f_signup_title: 'Signup form with double opt-in',
   f_signup_text: 'A hosted page or an embed on your own site. Nobody lands on your list before confirming their address.',
   f_segments_title: 'Segments',
@@ -68,7 +68,7 @@ const en = {
   privacy_lead: 'You decide what happens with your list. We process it on your behalf and for nothing else.',
   privacy_processor:
     'We are your processor under Art. 28 of the General Data Protection Regulation (GDPR): we act on your instructions, you stay the controller.',
-  privacy_eu: 'Hosted in the EU, on servers we run ourselves at Hetzner in Germany.',
+  privacy_eu: 'Contacts, mail content and the archive live on servers we run ourselves at Hetzner in Germany. Images you upload are stored with Cloudflare R2 through Storage Brain, our file service.',
   privacy_tracking: 'No tracking unless you switch it on. This page sets no cookies and loads nothing from anyone else.',
   pricing_title: 'Pricing',
   pricing_lead: 'Start free, move up when your list grows.',
@@ -95,7 +95,7 @@ const en = {
   legal_label: 'Legal',
   legal_imprint: 'Imprint',
   legal_privacy: 'Privacy',
-  footer_line: 'Lumitra, Berlin. Built and hosted in the EU.',
+  footer_line: 'Lumitra, Berlin. Contacts and mail on servers in Germany.',
 };
 
 export type LandingKey = keyof typeof en;
@@ -106,7 +106,7 @@ const de: LandingMessages = {
   language_label: 'Sprache',
   meta_title: 'Lumitra Mail: Newsletter und Produkt-Mails über Ihren eigenen Anbieter',
   meta_description:
-    'Ein Mail-Dienst und eine Marketing-Plattform mit visuellem Editor. Versand aus Ihrer App über die API oder ohne App über das Dashboard. Gehostet in der EU, Tracking standardmäßig aus.',
+    'Ein Mail-Dienst und eine Marketing-Plattform mit visuellem Editor. Versand aus Ihrer App über die API oder ohne App über das Dashboard. Kontakte und Mails bleiben auf Servern in Deutschland, Tracking ist standardmäßig aus.',
   skip_link: 'Zum Inhalt springen',
   nav_label: 'Hauptnavigation',
   nav_features: 'Funktionen',
@@ -116,7 +116,7 @@ const de: LandingMessages = {
   hero_title_a: 'Newsletter und Produkt-Mails,',
   hero_title_b: 'verschickt über Ihren eigenen Anbieter.',
   hero_lead:
-    'Lumitra Mail ist ein Mail-Dienst und eine Marketing-Plattform mit visuellem Editor. Binden Sie Ihre App über die API an, oder erledigen Sie alles im Dashboard, wenn Sie keine App haben. Gehostet in der EU, und getrackt wird nur, wenn Sie es einschalten.',
+    'Lumitra Mail ist ein Mail-Dienst und eine Marketing-Plattform mit visuellem Editor. Binden Sie Ihre App über die API an, oder erledigen Sie alles im Dashboard, wenn Sie keine App haben. Ihre Kontakte und Mails bleiben auf Servern in Deutschland, und getrackt wird nur, wenn Sie es einschalten.',
   cta_signin: 'Anmelden',
   cta_docs: 'Zur Doku',
   hero_note: 'Kostenlos bis {messages} Mails im Monat.',
@@ -129,7 +129,7 @@ const de: LandingMessages = {
   paths_title: 'Zwei Wege zum Start',
   app_title: 'Sie haben eine App',
   app_text:
-    'Ihre App behält ihre Nutzer, Lumitra Mail kümmert sich um die Mails. Sie verschicken Mails und gleichen Kontakte über die REST-API oder das TypeScript-SDK ab und bekommen signierte Webhooks zurück, wenn eine Mail rausgeht, fehlschlägt, zurückkommt oder sich jemand abmeldet.',
+    'Ihre App behält ihre Nutzer, Lumitra Mail kümmert sich um die Mails. Sie verschicken Mails und gleichen Kontakte über die REST-API oder das TypeScript-SDK ab und bekommen signierte Webhooks zurück, wenn eine Mail verschickt wird oder fehlschlägt und wenn sich jemand anmeldet, abmeldet oder wieder anmeldet.',
   noapp_title: 'Sie haben keine App',
   noapp_text:
     'Nutzen Sie das Dashboard. Gestalten Sie Vorlagen im visuellen Editor, importieren Sie Ihre Liste aus einer CSV-Datei, binden Sie das gehostete Anmeldeformular auf Ihrer Website ein und planen Sie den Versand. Ganz ohne Code.',
@@ -141,10 +141,10 @@ const de: LandingMessages = {
   f_editor_text: 'Blöcke per Drag-and-drop anordnen, auf Desktop und Mobil prüfen und HTML bekommen, das in echten Postfächern hält.',
   f_unsub_title: 'Abmeldung eingebaut',
   f_unsub_text:
-    'Jede Mail hat eine Abmeldung mit einem Klick und eine gehostete Seite, auf der Empfänger ihre Themen wählen. Bounces und Beschwerden sperren die Adresse automatisch.',
+    'Jede Mail hat eine Abmeldung mit einem Klick und eine gehostete Seite, auf der Empfänger ihre Themen wählen. Eine Abmeldung sperrt die Adresse für diesen Absender sofort.',
   f_webhooks_title: 'Webhooks',
   f_webhooks_text:
-    'Signierte Ereignisse für Versand, Fehler, Bounces, Öffnungen, Klicks und Abmeldungen, damit Ihre App immer weiß, was passiert ist.',
+    'Signierte Ereignisse, wenn eine Mail verschickt wird oder fehlschlägt, wenn sich jemand anmeldet, abmeldet oder wieder anmeldet und wenn ein Versand oder ein Import vorankommt. Ihre App weiß immer, was passiert ist.',
   f_signup_title: 'Anmeldeformular mit Double-Opt-in',
   f_signup_text: 'Als gehostete Seite oder eingebettet in Ihre Website. Niemand landet auf Ihrer Liste, bevor er seine Adresse bestätigt hat.',
   f_segments_title: 'Segmente',
@@ -158,7 +158,7 @@ const de: LandingMessages = {
   privacy_lead: 'Sie entscheiden, was mit Ihrer Liste passiert. Wir verarbeiten sie in Ihrem Auftrag und für nichts anderes.',
   privacy_processor:
     'Wir sind Ihr Auftragsverarbeiter nach Art. 28 der Datenschutz-Grundverordnung (DSGVO): Wir handeln nach Ihren Weisungen, Sie bleiben Verantwortlicher.',
-  privacy_eu: 'Gehostet in der EU, auf Servern bei Hetzner in Deutschland, die wir selbst betreiben.',
+  privacy_eu: 'Kontakte, Mail-Inhalte und das Archiv liegen auf Servern bei Hetzner in Deutschland, die wir selbst betreiben. Hochgeladene Bilder speichern wir bei Cloudflare R2 über Storage Brain, unseren Dateidienst.',
   privacy_tracking: 'Kein Tracking, außer Sie schalten es ein. Diese Seite setzt keine Cookies und lädt nichts von Dritten.',
   pricing_title: 'Preise',
   pricing_lead: 'Kostenlos starten, aufsteigen, wenn Ihre Liste wächst.',
@@ -185,7 +185,7 @@ const de: LandingMessages = {
   legal_label: 'Rechtliches',
   legal_imprint: 'Impressum',
   legal_privacy: 'Datenschutz',
-  footer_line: 'Lumitra, Berlin. Gebaut und gehostet in der EU.',
+  footer_line: 'Lumitra, Berlin. Kontakte und Mails auf Servern in Deutschland.',
 };
 
 const it: LandingMessages = {
@@ -193,7 +193,7 @@ const it: LandingMessages = {
   language_label: 'Lingua',
   meta_title: 'Lumitra Mail: newsletter e mail di prodotto tramite il Suo provider',
   meta_description:
-    'Un servizio di posta e una piattaforma di marketing con editor visuale. Invii dalla Sua app tramite l’API, o dalla dashboard se non ne ha una. Ospitato nell’UE, tracciamento disattivato di default.',
+    'Un servizio di posta e una piattaforma di marketing con editor visuale. Invii dalla Sua app tramite l’API, o dalla dashboard se non ne ha una. Contatti e mail restano su server in Germania, tracciamento disattivato di default.',
   skip_link: 'Vai al contenuto',
   nav_label: 'Principale',
   nav_features: 'Funzioni',
@@ -203,7 +203,7 @@ const it: LandingMessages = {
   hero_title_a: 'Newsletter e mail di prodotto,',
   hero_title_b: 'inviate tramite il Suo provider.',
   hero_lead:
-    'Lumitra Mail è un servizio di posta e una piattaforma di marketing con editor visuale. Colleghi la Sua app tramite l’API, oppure gestisca tutto dalla dashboard se non ha un’app. È ospitato nell’UE e non traccia nulla finché non lo attiva Lei.',
+    'Lumitra Mail è un servizio di posta e una piattaforma di marketing con editor visuale. Colleghi la Sua app tramite l’API, oppure gestisca tutto dalla dashboard se non ha un’app. I Suoi contatti e le Sue mail restano su server in Germania, e non si traccia nulla finché non lo attiva Lei.',
   cta_signin: 'Accedi',
   cta_docs: 'Leggi la documentazione',
   hero_note: 'Gratis fino a {messages} messaggi al mese.',
@@ -216,7 +216,7 @@ const it: LandingMessages = {
   paths_title: 'Due strade',
   app_title: 'Ha un’app',
   app_text:
-    'La Sua app tiene i suoi utenti, Lumitra Mail si occupa della posta. Invii e sincronizzi i contatti tramite l’API REST o l’SDK TypeScript, e riceva webhook firmati quando un messaggio parte, fallisce, rimbalza o qualcuno si disiscrive.',
+    'La Sua app tiene i suoi utenti, Lumitra Mail si occupa della posta. Invii e sincronizzi i contatti tramite l’API REST o l’SDK TypeScript, e riceva webhook firmati quando un messaggio viene inviato o fallisce e quando qualcuno si iscrive, si disiscrive o si iscrive di nuovo.',
   noapp_title: 'Non ha un’app',
   noapp_text:
     'Usi la dashboard. Crei i modelli nell’editor visuale, importi la Sua lista da un file CSV, inserisca il modulo di iscrizione ospitato sul Suo sito e programmi l’invio. Senza scrivere codice.',
@@ -228,9 +228,9 @@ const it: LandingMessages = {
   f_editor_text: 'Trascini i blocchi, controlli l’anteprima su desktop e mobile e ottenga HTML che regge nelle caselle reali.',
   f_unsub_title: 'Disiscrizione integrata',
   f_unsub_text:
-    'Ogni mail ha la disiscrizione con un clic e una pagina ospitata dove le persone scelgono i loro argomenti. Rimbalzi e segnalazioni bloccano l’indirizzo in automatico.',
+    'Ogni mail ha la disiscrizione con un clic e una pagina ospitata dove le persone scelgono i loro argomenti. Una disiscrizione blocca subito l’indirizzo per quel mittente.',
   f_webhooks_title: 'Webhook',
-  f_webhooks_text: 'Eventi firmati per invii, errori, rimbalzi, aperture, clic e disiscrizioni, così la Sua app sa sempre cosa è successo.',
+  f_webhooks_text: 'Eventi firmati quando un messaggio viene inviato o fallisce, quando qualcuno si iscrive, si disiscrive o si iscrive di nuovo, e quando un invio o un’importazione va avanti. La Sua app sa sempre cosa è successo.',
   f_signup_title: 'Modulo di iscrizione con doppio opt-in',
   f_signup_text: 'Una pagina ospitata o un embed sul Suo sito. Nessuno entra nella lista prima di aver confermato il proprio indirizzo.',
   f_segments_title: 'Segmenti',
@@ -244,7 +244,7 @@ const it: LandingMessages = {
   privacy_lead: 'Decide Lei cosa succede alla Sua lista. La trattiamo per Suo conto e per nient’altro.',
   privacy_processor:
     'Siamo il Suo responsabile del trattamento ai sensi dell’art. 28 del Regolamento generale sulla protezione dei dati (GDPR): agiamo secondo le Sue istruzioni, Lei resta il titolare.',
-  privacy_eu: 'Ospitato nell’UE, su server che gestiamo noi presso Hetzner in Germania.',
+  privacy_eu: 'Contatti, contenuti delle mail e archivio stanno su server che gestiamo noi presso Hetzner in Germania. Le immagini caricate sono conservate su Cloudflare R2 tramite Storage Brain, il nostro servizio per i file.',
   privacy_tracking: 'Nessun tracciamento, a meno che non lo attivi Lei. Questa pagina non imposta cookie e non carica nulla da terzi.',
   pricing_title: 'Prezzi',
   pricing_lead: 'Inizi gratis, passi a un piano superiore quando la lista cresce.',
@@ -271,7 +271,7 @@ const it: LandingMessages = {
   legal_label: 'Note legali',
   legal_imprint: 'Impressum',
   legal_privacy: 'Privacy',
-  footer_line: 'Lumitra, Berlino. Sviluppato e ospitato nell’UE.',
+  footer_line: 'Lumitra, Berlino. Contatti e mail su server in Germania.',
 };
 
 const fr: LandingMessages = {
@@ -279,7 +279,7 @@ const fr: LandingMessages = {
   language_label: 'Langue',
   meta_title: 'Lumitra Mail : newsletters et e-mails produit via votre propre fournisseur',
   meta_description:
-    'Un service d’e-mail et une plateforme marketing avec un éditeur visuel. Envoyez depuis votre application via l’API, ou depuis le tableau de bord sans application. Hébergé dans l’UE, suivi désactivé par défaut.',
+    'Un service d’e-mail et une plateforme marketing avec un éditeur visuel. Envoyez depuis votre application via l’API, ou depuis le tableau de bord sans application. Contacts et e-mails restent sur des serveurs en Allemagne, suivi désactivé par défaut.',
   skip_link: 'Aller au contenu',
   nav_label: 'Principal',
   nav_features: 'Fonctions',
@@ -289,7 +289,7 @@ const fr: LandingMessages = {
   hero_title_a: 'Newsletters et e-mails produit,',
   hero_title_b: 'envoyés via votre propre fournisseur.',
   hero_lead:
-    'Lumitra Mail est un service d’e-mail et une plateforme marketing avec un éditeur visuel. Connectez votre application via l’API, ou gérez tout depuis le tableau de bord si vous n’en avez pas. Le service est hébergé dans l’UE, et rien n’est suivi tant que vous ne l’activez pas.',
+    'Lumitra Mail est un service d’e-mail et une plateforme marketing avec un éditeur visuel. Connectez votre application via l’API, ou gérez tout depuis le tableau de bord si vous n’en avez pas. Vos contacts et vos e-mails restent sur des serveurs en Allemagne, et rien n’est suivi tant que vous ne l’activez pas.',
   cta_signin: 'Se connecter',
   cta_docs: 'Lire la documentation',
   hero_note: 'Gratuit jusqu’à {messages} messages par mois.',
@@ -302,7 +302,7 @@ const fr: LandingMessages = {
   paths_title: 'Deux façons de commencer',
   app_title: 'Vous avez une application',
   app_text:
-    'Votre application garde ses utilisateurs, Lumitra Mail s’occupe du courrier. Envoyez et synchronisez vos contacts via l’API REST ou le SDK TypeScript, et recevez des webhooks signés quand un message part, échoue, rebondit ou quand quelqu’un se désabonne.',
+    'Votre application garde ses utilisateurs, Lumitra Mail s’occupe du courrier. Envoyez et synchronisez vos contacts via l’API REST ou le SDK TypeScript, et recevez des webhooks signés quand un message est envoyé ou échoue et quand quelqu’un s’inscrit, se désabonne ou se réabonne.',
   noapp_title: 'Vous n’avez pas d’application',
   noapp_text:
     'Utilisez le tableau de bord. Créez vos modèles dans l’éditeur visuel, importez votre liste depuis un fichier CSV, placez le formulaire d’inscription hébergé sur votre site et planifiez l’envoi. Sans une ligne de code.',
@@ -314,10 +314,10 @@ const fr: LandingMessages = {
   f_editor_text: 'Placez les blocs par glisser-déposer, prévisualisez sur ordinateur et mobile, et obtenez un HTML qui tient dans les vraies boîtes de réception.',
   f_unsub_title: 'Désabonnement intégré',
   f_unsub_text:
-    'Chaque e-mail propose le désabonnement en un clic et une page hébergée où chacun choisit ses sujets. Les rebonds et les plaintes bloquent l’adresse automatiquement.',
+    'Chaque e-mail propose le désabonnement en un clic et une page hébergée où chacun choisit ses sujets. Un désabonnement bloque l’adresse pour cet expéditeur immédiatement.',
   f_webhooks_title: 'Webhooks',
   f_webhooks_text:
-    'Des événements signés pour les envois, échecs, rebonds, ouvertures, clics et désabonnements, pour que votre application sache toujours ce qui s’est passé.',
+    'Des événements signés quand un message est envoyé ou échoue, quand quelqu’un s’inscrit, se désabonne ou se réabonne, et quand un envoi ou un import avance. Votre application sait toujours ce qui s’est passé.',
   f_signup_title: 'Formulaire d’inscription avec double opt-in',
   f_signup_text: 'Une page hébergée ou une intégration sur votre site. Personne n’entre dans votre liste avant d’avoir confirmé son adresse.',
   f_segments_title: 'Segments',
@@ -331,7 +331,7 @@ const fr: LandingMessages = {
   privacy_lead: 'Vous décidez de ce qui arrive à votre liste. Nous la traitons pour votre compte et pour rien d’autre.',
   privacy_processor:
     'Nous sommes votre sous-traitant au sens de l’art. 28 du Règlement général sur la protection des données (RGPD) : nous agissons sur vos instructions, vous restez responsable du traitement.',
-  privacy_eu: 'Hébergé dans l’UE, sur des serveurs que nous exploitons nous-mêmes chez Hetzner en Allemagne.',
+  privacy_eu: 'Les contacts, le contenu des e-mails et l’archive sont sur des serveurs que nous exploitons nous-mêmes chez Hetzner en Allemagne. Les images que vous téléversez sont stockées chez Cloudflare R2 via Storage Brain, notre service de fichiers.',
   privacy_tracking: 'Aucun suivi sauf si vous l’activez. Cette page ne dépose aucun cookie et ne charge rien depuis des tiers.',
   pricing_title: 'Tarifs',
   pricing_lead: 'Commencez gratuitement, passez à la suite quand votre liste grandit.',
@@ -358,7 +358,7 @@ const fr: LandingMessages = {
   legal_label: 'Mentions légales',
   legal_imprint: 'Mentions légales',
   legal_privacy: 'Confidentialité',
-  footer_line: 'Lumitra, Berlin. Conçu et hébergé dans l’UE.',
+  footer_line: 'Lumitra, Berlin. Contacts et e-mails sur des serveurs en Allemagne.',
 };
 
 const es: LandingMessages = {
@@ -366,7 +366,7 @@ const es: LandingMessages = {
   language_label: 'Idioma',
   meta_title: 'Lumitra Mail: newsletters y correos de producto a través de su propio proveedor',
   meta_description:
-    'Un servicio de correo y una plataforma de marketing con editor visual. Envíe desde su aplicación a través de la API, o desde el panel si no tiene una. Alojado en la UE, seguimiento desactivado por defecto.',
+    'Un servicio de correo y una plataforma de marketing con editor visual. Envíe desde su aplicación a través de la API, o desde el panel si no tiene una. Contactos y correos se quedan en servidores en Alemania, seguimiento desactivado por defecto.',
   skip_link: 'Ir al contenido',
   nav_label: 'Principal',
   nav_features: 'Funciones',
@@ -376,7 +376,7 @@ const es: LandingMessages = {
   hero_title_a: 'Newsletters y correos de producto,',
   hero_title_b: 'enviados a través de su propio proveedor.',
   hero_lead:
-    'Lumitra Mail es un servicio de correo y una plataforma de marketing con editor visual. Conecte su aplicación a través de la API, o gestione todo desde el panel si no tiene una. Está alojado en la UE y no se rastrea nada hasta que usted lo active.',
+    'Lumitra Mail es un servicio de correo y una plataforma de marketing con editor visual. Conecte su aplicación a través de la API, o gestione todo desde el panel si no tiene una. Sus contactos y correos se quedan en servidores en Alemania y no se rastrea nada hasta que usted lo active.',
   cta_signin: 'Iniciar sesión',
   cta_docs: 'Leer la documentación',
   hero_note: 'Gratis hasta {messages} mensajes al mes.',
@@ -389,7 +389,7 @@ const es: LandingMessages = {
   paths_title: 'Dos formas de empezar',
   app_title: 'Tiene una aplicación',
   app_text:
-    'Su aplicación conserva a sus usuarios, Lumitra Mail se ocupa del correo. Envíe y sincronice contactos a través de la API REST o el SDK de TypeScript, y reciba webhooks firmados cuando un mensaje sale, falla, rebota o alguien se da de baja.',
+    'Su aplicación conserva a sus usuarios, Lumitra Mail se ocupa del correo. Envíe y sincronice contactos a través de la API REST o el SDK de TypeScript, y reciba webhooks firmados cuando un mensaje se envía o falla y cuando alguien se suscribe, se da de baja o vuelve a suscribirse.',
   noapp_title: 'No tiene una aplicación',
   noapp_text:
     'Use el panel. Diseñe plantillas en el editor visual, importe su lista desde un archivo CSV, ponga el formulario de suscripción alojado en su web y programe el envío. Sin código.',
@@ -401,10 +401,10 @@ const es: LandingMessages = {
   f_editor_text: 'Arrastre bloques, previsualice en escritorio y móvil, y obtenga HTML que aguanta en bandejas de entrada reales.',
   f_unsub_title: 'Baja integrada',
   f_unsub_text:
-    'Cada correo tiene baja con un clic y una página alojada donde cada persona elige sus temas. Los rebotes y las quejas bloquean la dirección automáticamente.',
+    'Cada correo tiene baja con un clic y una página alojada donde cada persona elige sus temas. Una baja bloquea la dirección para ese remitente al momento.',
   f_webhooks_title: 'Webhooks',
   f_webhooks_text:
-    'Eventos firmados para envíos, fallos, rebotes, aperturas, clics y bajas, para que su aplicación sepa siempre qué ha pasado.',
+    'Eventos firmados cuando un mensaje se envía o falla, cuando alguien se suscribe, se da de baja o vuelve a suscribirse, y cuando un envío o una importación avanza. Su aplicación sabe siempre qué ha pasado.',
   f_signup_title: 'Formulario de suscripción con doble opt-in',
   f_signup_text: 'Una página alojada o un formulario integrado en su web. Nadie entra en su lista sin confirmar antes su dirección.',
   f_segments_title: 'Segmentos',
@@ -418,7 +418,7 @@ const es: LandingMessages = {
   privacy_lead: 'Usted decide qué pasa con su lista. La tratamos por encargo suyo y para nada más.',
   privacy_processor:
     'Somos su encargado del tratamiento según el art. 28 del Reglamento General de Protección de Datos (RGPD): actuamos según sus instrucciones y usted sigue siendo el responsable.',
-  privacy_eu: 'Alojado en la UE, en servidores que gestionamos nosotros mismos en Hetzner, Alemania.',
+  privacy_eu: 'Los contactos, el contenido de los correos y el archivo están en servidores que gestionamos nosotros mismos en Hetzner, Alemania. Las imágenes que sube se guardan en Cloudflare R2 a través de Storage Brain, nuestro servicio de archivos.',
   privacy_tracking: 'Ningún seguimiento salvo que usted lo active. Esta página no usa cookies y no carga nada de terceros.',
   pricing_title: 'Precios',
   pricing_lead: 'Empiece gratis y suba de plan cuando crezca su lista.',
@@ -445,7 +445,7 @@ const es: LandingMessages = {
   legal_label: 'Legal',
   legal_imprint: 'Aviso legal',
   legal_privacy: 'Privacidad',
-  footer_line: 'Lumitra, Berlín. Creado y alojado en la UE.',
+  footer_line: 'Lumitra, Berlín. Contactos y correos en servidores en Alemania.',
 };
 
 export const LANDING_MESSAGES: Record<PageLocale, LandingMessages> = { en, de, it, fr, es };

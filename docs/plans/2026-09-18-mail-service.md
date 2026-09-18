@@ -737,7 +737,8 @@ every unsubscribe link and image URL points at this host.
 - `GET /` and `/en`, `/de`, `/it`, `/fr`, `/es`: a server-rendered page, no script,
   one stylesheet allowed by hash in its own CSP (Content-Security-Policy). What
   Lumitra Mail is, the two ways in (API and SDK for apps, the dashboard without
-  one), the features, the privacy stance (processor, EU hosting at Hetzner,
+  one), the features, the privacy stance (processor; contacts, mail and archive on our servers at
+  Hetzner in Germany; uploaded images on Cloudflare R2 through Storage Brain;
   tracking off by default), pricing, a note for recipients, and the cross-link
   to email-mcp. Copy in Marlin's public voice, four translations in the formal
   register of the hosted pages. `robots.txt`, `sitemap.xml`, icon and Open Graph

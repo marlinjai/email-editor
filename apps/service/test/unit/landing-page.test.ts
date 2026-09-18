@@ -55,6 +55,21 @@ describe('translations', () => {
     expect(joined('es')).not.toMatch(/\b(tú|te has)\b/i);
   });
 
+  it('claims only what the service does today', () => {
+    // Bounce handling and open/click webhooks are not built yet; the images are
+    // on Cloudflare R2, so nothing may say the whole service is hosted in the EU.
+    const en = Object.values(LANDING_MESSAGES.en).join(' ');
+    expect(en).not.toMatch(/bounce|complaint/i);
+    expect(LANDING_MESSAGES.en.f_webhooks_text).not.toMatch(/open|click/i);
+    expect(en).not.toMatch(/hosted in the EU/i);
+    expect(LANDING_MESSAGES.en.privacy_eu).toMatch(/Hetzner/);
+    expect(LANDING_MESSAGES.en.privacy_eu).toMatch(/Cloudflare R2/);
+    for (const locale of PAGE_LOCALES) {
+      expect(LANDING_MESSAGES[locale].privacy_eu, locale).toMatch(/Cloudflare R2/);
+      expect(Object.values(LANDING_MESSAGES[locale]).join(' '), locale).not.toMatch(/\b(EU|UE)\b/);
+    }
+  });
+
   it.each(PAGE_LOCALES)('%s renders with no unfilled placeholder and no stray key name', (locale) => {
     const html = page(locale);
     const text = dom(html).querySelector('body')?.textContent ?? '';
