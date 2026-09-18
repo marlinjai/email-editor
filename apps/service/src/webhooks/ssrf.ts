@@ -22,7 +22,14 @@ import { ApiError } from '../api-error.js';
  *   HTTP receiver integration tests use).
  */
 
-export type SsrfPolicy = { allowInsecureHttp?: boolean; allowPrivateTargets?: boolean };
+export type ResolvedAddress = { address: string; family: number };
+
+export type SsrfPolicy = {
+  allowInsecureHttp?: boolean;
+  allowPrivateTargets?: boolean;
+  /** Replaces DNS resolution; tests use it to make a hostname change its answer between create and send. */
+  resolve?: (hostname: string) => Promise<ResolvedAddress[]>;
+};
 
 export function assertHttpsUnlessDev(url: string, policy: SsrfPolicy = {}): void {
   const parsed = new URL(url);
@@ -79,9 +86,9 @@ export async function assertResolvesToPublicAddress(hostname: string, policy: Ss
     }
     return;
   }
-  let answers: { address: string; family: number }[];
+  let answers: ResolvedAddress[];
   try {
-    answers = await lookup(hostname, { all: true, verbatim: true });
+    answers = await (policy.resolve ?? ((h) => lookup(h, { all: true, verbatim: true })))(hostname);
   } catch {
     throw new SsrfBlockedError(`could not resolve ${hostname}`);
   }

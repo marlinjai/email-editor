@@ -281,6 +281,37 @@ describe('the delivery loop', () => {
     expect(row!.last_error).toMatch(/private|loopback|link-local/);
   });
 
+  it('DNS rebinding: a hostname public at creation and private at send time is refused and recorded as a failed attempt', async () => {
+    let answer = '93.184.216.34'; // public when the endpoint is created
+    const rebinding = { resolve: async () => [{ address: answer, family: 4 }] };
+    const guarded = await startHarness({ webhookUrlPolicy: rebinding });
+    const g = await guarded.seedWorkspace('rebind');
+    const created = await guarded.call({
+      method: 'POST',
+      path: '/v1/webhooks',
+      key: g.key,
+      body: { url: 'https://hook.example.test/in', events: ['contact.unsubscribed'] },
+    });
+    expect(created.status).toBe(201);
+
+    await guarded.sql.begin((tx) => emitEvent(tx, g.id, unsubscribed('rebind@example.com')));
+    const due = (await repos(guarded.sql).webhookDeliveries.claimDueForWorker(50, 60)).find((d) => d.workspace_id === g.id)!;
+    let fetched = 0;
+    const fetchImpl = (async () => {
+      fetched++;
+      return new Response('ok');
+    }) as typeof fetch;
+
+    answer = '169.254.169.254'; // the attacker's DNS now answers with a private address
+    const result = await attemptDelivery(guarded.sql, due, { sealer: guarded.sealer, policy: rebinding, fetchImpl });
+    expect(result).toBe('retrying');
+    expect(fetched).toBe(0);
+    const [row] = await guarded.sql`SELECT status, attempts, last_error FROM webhook_deliveries WHERE id = ${due.id}`;
+    expect(row).toMatchObject({ status: 'pending', attempts: 1 });
+    expect(row!.last_error).toMatch(/169\.254\.169\.254/);
+    await guarded.drop();
+  });
+
   it('backtrack: revising the endpoint to disabled stops further attempts; re-enabling resumes', async () => {
     const created = await createEndpoint();
     const due = await queueOne(created.endpoint.id);
