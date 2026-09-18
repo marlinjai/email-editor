@@ -179,3 +179,14 @@ transports are passed in through `createApp` options where a route needs them, t
 way `secretsKeys` is today. A change to the migration or a repository signature
 goes in a new migration file or a coordinated commit, never silently in a team's
 branch.
+
+## Webhooks (F4)
+
+Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` access. Events reach them through the outbox (`emitEvent`, `src/events.ts`) and the delivery loop (`src/webhooks/loop.ts`, started in `main.ts`, stopped on SIGTERM after the in-flight batch).
+
+- **Secret.** `whsec_` plus 32 random bytes. Returned once, by `webhooks.create` and `webhooks.rotateSecret`; stored only sealed (`Sealer`); never in a get or list.
+- **Signing.** Each request carries `x-mail-signature: v1=<hex>`, `x-mail-timestamp` and `x-mail-event-id`, from the contract's `signWebhook`. A receiver verifies with `verifyWebhook` over the raw body.
+- **Rotation window.** `rotateSecret` keeps the old secret for 24 hours (`WEBHOOK_SECRET_ROTATION_WINDOW_MS`, migration 0007). Until then every request carries two comma-separated `v1=` signatures, so a receiver holding either secret verifies. After the window only the new secret signs.
+- **Delivery.** A 2xx reply means delivered. A non-2xx reply, a timeout (10 seconds) or a network error retries on `WEBHOOK_RETRY_DELAYS_SECONDS` up to `WEBHOOK_MAX_ATTEMPTS`, then the delivery is `failed`. Redirects are never followed (a 3xx is a failed attempt). An endpoint disabled while a delivery is waiting is skipped without consuming an attempt, and resumes when re-enabled. `webhooks.redeliver` resets one delivery to pending, due now. The last status code, a response snippet (500 characters) and the duration are kept in `webhook_deliveries` for operators, not returned by the API.
+- **Ordering and duplicates.** Order is not guaranteed and a delivery can repeat (a retry after a lost reply). **Receivers must deduplicate on the event id** (`id` in the body, `x-mail-event-id` in the headers).
+- **Server-side request forgery (SSRF) guard.** Only `https` endpoints are accepted, and a hostname that resolves to a private, loopback or link-local address is refused, at create and update and again immediately before every send (so a DNS rebinding cannot slip through). Setting `WEBHOOK_ALLOW_INSECURE_TARGETS=true` lifts both, for local development only; never in production.
