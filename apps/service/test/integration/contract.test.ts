@@ -240,3 +240,39 @@ describe('contract conformance, phase S2 webhooks', () => {
     await wh.drop();
   });
 });
+
+describe('contract conformance, phase S4: imports', () => {
+  it('every imports.* operation answers with its declared status and response schema', async () => {
+    const { createImportJob } = await import('../../src/imports/job.js');
+    const { PlatformWorker } = await import('../../src/platform/worker.js');
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+    const drain = () =>
+      new PlatformWorker({ jobs: [createImportJob({ sql: h.sql, log: { error: () => {} } })], log: { error: () => {}, log: () => {} } }).drain();
+    const form = new FormData();
+    form.set('file', new File(['Email,Name\nconform@example.com,Con\nbad,Bad\n'], 'conform.csv', { type: 'text/csv' }));
+    const created = await run('imports.create', await h.call({ method: 'POST', path: '/v1/imports', key: W.key, form }));
+    const id = created.body.id;
+    await run('imports.list', await h.call({ path: '/v1/imports', key: W.key }));
+    const mapping = { mapping: { Email: 'email', Name: 'first_name' }, topics: [], tags: [], consent_confirmed: true };
+    await run('imports.setMapping', await h.call({ method: 'PUT', path: `/v1/imports/${id}/mapping`, key: W.key, body: mapping }));
+    await drain();
+    await run('imports.get', await h.call({ path: `/v1/imports/${id}`, key: W.key }));
+    await run('imports.rows', await h.call({ path: `/v1/imports/${id}/rows`, key: W.key }));
+    await run('imports.commit', await h.call({ method: 'POST', path: `/v1/imports/${id}/commit`, key: W.key, body: { mapping_version: 1 } }));
+    const second = new FormData();
+    second.set('file', new File(['Email\nlater@example.com\n'], 'later.csv', { type: 'text/csv' }));
+    const other = await h.call({ method: 'POST', path: '/v1/imports', key: W.key, form: second });
+    await run('imports.cancel', await h.call({ method: 'POST', path: `/v1/imports/${other.body.id}/cancel`, key: W.key, body: {} }));
+    await drain();
+    const done = await h.call({ path: `/v1/imports/${id}`, key: W.key });
+    expect(done.body.status).toBe('completed');
+
+    const imports = Object.keys(routes).filter((k) => k.startsWith('imports.'));
+    expect([...covered].sort()).toEqual(imports.sort());
+  });
+});
