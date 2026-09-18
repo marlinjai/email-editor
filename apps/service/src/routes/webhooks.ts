@@ -168,11 +168,11 @@ export function webhookRoutes(sql: Sql, deps: MountDeps, urlPolicy: SsrfPolicy =
       const reset = await r.webhookDeliveries.resetForRedelivery(access.workspaceId, validEndpointId, validDeliveryId);
       if (!reset) throw new ApiError('not_found', 'No such delivery for this webhook endpoint.');
       await r.audit.record(access.workspaceId, {
-        action: 'webhook.updated',
+        action: 'webhook.redelivered',
         actor: actorOf(access),
         targetType: 'webhook_delivery',
         targetId: validDeliveryId,
-        details: { action: 'redeliver', endpoint_id: validEndpointId },
+        details: { endpoint_id: validEndpointId },
       });
       return reset;
     });

@@ -377,6 +377,9 @@ describe('the delivery loop', () => {
     });
     expect(redelivered.status).toBe(202);
     expect(redelivered.body).toMatchObject({ status: 'pending', attempts: 0 });
+    const audit = await h.call({ path: `/v1/audit-log?action=webhook.redelivered&target_id=${due.id}`, key: W.key });
+    expect(audit.body.data).toHaveLength(1);
+    expect(audit.body.data[0].details).toEqual({ endpoint_id: created.endpoint.id });
 
     receiver.setDefault({ status: 200 });
     const reclaimed = (await repos(h.sql).webhookDeliveries.claimDueForWorker(50, 60)).find((d) => d.id === due.id)!;
