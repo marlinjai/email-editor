@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { BillingConfig } from './billing/plans.js';
 
 /**
  * The service's whole runtime configuration, read once at boot from the
@@ -9,6 +10,18 @@ import { z } from 'zod';
 const hex64 = z
   .string()
   .regex(/^[0-9a-f]{64}$/i, 'must be 64 hex characters (32 random bytes), as minted by copy_secret op=generate');
+
+/** Infisical's placeholder for a value a human still has to supply. */
+export const PLACEHOLDER = 'PLACEHOLDER_REPLACE_ME';
+
+/** An optional value: unset, empty or the placeholder all mean "not configured". */
+function optionalSecret(pattern: RegExp, message: string) {
+  return z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v === '' || v === PLACEHOLDER ? undefined : v))
+    .refine((v) => v === undefined || pattern.test(v), message);
+}
 
 const EnvSchema = z.object({
   DATABASE_URL: z.string().url().refine((v) => /^postgres(ql)?:\/\//.test(v), 'must be a postgres:// URL'),
@@ -64,6 +77,16 @@ const EnvSchema = z.object({
   COMPILE_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(10_000),
   /** Compiles allowed to wait for a free worker before new ones get 503. */
   COMPILE_MAX_QUEUE: z.coerce.number().int().min(0).max(1000).default(32),
+  /*
+   * S5, billing (Stripe, the shared Lumitra account). All optional: without
+   * them plans, usage and limits still work, while checkout, the portal and the
+   * Stripe webhook fail closed (503). PLACEHOLDER_REPLACE_ME counts as unset.
+   */
+  STRIPE_SECRET_KEY: optionalSecret(/^(sk|rk)_(test|live)_[A-Za-z0-9]{16,}$/, 'must be a Stripe secret key (sk_test_..., sk_live_... or a restricted rk_ key)'),
+  STRIPE_WEBHOOK_SECRET: optionalSecret(/^whsec_[A-Za-z0-9+/=]{16,}$/, 'must be a Stripe webhook signing secret (whsec_...)'),
+  STRIPE_PRICE_STARTER_ID: optionalSecret(/^price_[A-Za-z0-9]+$/, 'must be a Stripe Price id (price_...)'),
+  STRIPE_PRICE_GROWTH_ID: optionalSecret(/^price_[A-Za-z0-9]+$/, 'must be a Stripe Price id (price_...)'),
+  STRIPE_PORTAL_CONFIGURATION_ID: optionalSecret(/^bpc_[A-Za-z0-9]+$/, 'must be a Stripe portal configuration id (bpc_...)'),
 });
 
 export type Config = {
@@ -78,6 +101,7 @@ export type Config = {
   publicBaseUrl: string;
   storageBrain: { apiKey: string; baseUrl?: string };
   compile: { workers: number; timeoutMs: number; maxQueue: number };
+  billing: BillingConfig;
 };
 
 export class ConfigError extends Error {
@@ -111,6 +135,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     publicBaseUrl: e.PUBLIC_BASE_URL,
     storageBrain: { apiKey: e.STORAGE_BRAIN_API_KEY, baseUrl: e.STORAGE_BRAIN_URL },
     compile: { workers: e.COMPILE_WORKERS, timeoutMs: e.COMPILE_TIMEOUT_MS, maxQueue: e.COMPILE_MAX_QUEUE },
+    billing: {
+      secretKey: e.STRIPE_SECRET_KEY,
+      webhookSecret: e.STRIPE_WEBHOOK_SECRET,
+      prices: { starter: e.STRIPE_PRICE_STARTER_ID, growth: e.STRIPE_PRICE_GROWTH_ID },
+      portalConfigurationId: e.STRIPE_PORTAL_CONFIGURATION_ID,
+    },
   };
 }
 

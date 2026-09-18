@@ -511,6 +511,87 @@ Defaults taken in S3 (each can be overturned later):
    does; a hard crash leaves a row `sending` that the worker settles only after its
    15-minute stuck window, which the service's own sending-flow suite covers.
 
+### S5, billing, service side (built 2026-09-18, branch `feat/s5-billing`)
+
+Built and verified (details in `apps/service/README.md`, section "Billing (S5)"):
+
+- **Migration `0015_billing`**: `workspace_billing` (one row per workspace,
+  backfilled and created by a trigger on insert: plan, status, the Stripe
+  customer and subscription it mirrors, the period, `billing_exempt`), and
+  `stripe_events` (one row per applied Stripe event), plus an index on the send
+  ledger per workspace for metering.
+- **Routes** `billing.plans`, `billing.subscription`, `billing.usage`,
+  `billing.checkout` and the new `billing.portal`, all through `mount()` from the
+  contract; the Stripe webhook at `POST /stripe/webhook`, outside `/v1`.
+- **Enforcement** of the plan's limits on `mailings.send` (the whole audience or
+  nothing), `mailings.test`, contact creation (upsert and recipient batches),
+  `members.add`, `providers.create`, `webhooks.create`, and turning tracking on;
+  a soft warning at 80 percent in `billing.usage` and the
+  `x-mail-usage-warning` header.
+- **Reconciliation**: a loop in `serve` and every stale read of
+  `billing.subscription` re-read the subscription from Stripe.
+- **The operator command** `main.js billing-exempt <workspace> on|off "<reason>"`,
+  the only writer of `billing_exempt`.
+- **Scripts** `apps/service/scripts/stripe-catalogue.mjs` and
+  `stripe-webhook-endpoint.mjs`, run through the secrets proxy; the webhook
+  secret goes only to the proxy's capture.
+- **Tests**: 33 billing integration tests over a stateful Stripe stand-in at the
+  fetch level (so the real client runs), 5 against stripe-mock (in CI as a
+  service container), 17 unit tests. The four paths of the subscription
+  lifecycle: forward (checkout, payment, webhook); backtrack and revise (up to
+  growth and down again in the portal, events out of order, a downgrade below
+  the current member count); resume (a missed webhook healed by the read, by the
+  loop and after a restart; Stripe unreachable on a read); re-entry (dunning,
+  cancel at period end, cancel, subscribe again, a late event of the old
+  subscription).
+
+Defaults taken in S5 (each can be overturned later):
+
+1. **Plans and prices**: free (EUR 0; 1,000 messages a month, 500 contacts, 2
+   members, 1 provider, 1 webhook endpoint), starter (EUR 9; 10,000, 5,000, 5,
+   2, 3; tracking), growth (EUR 29; 50,000, 25,000, 20, 5, 10; tracking and A/B
+   tests). Monthly only, EUR, final prices under paragraph 19 UStG as for
+   Lumitra QR. Custom domains are in no sold plan yet (a later phase). These are
+   Marlin's to change: the limits in `src/billing/plans.ts`, the amounts there
+   and in `scripts/stripe-catalogue.mjs`.
+2. **"Messages a month" counts recipients handed to a provider**, from the send
+   ledger (`provider_sends`), test sends included, per Stripe period (paid) or
+   calendar month in UTC (free, exempt). The contract's metric name stays
+   `messages`.
+3. **No usage is reported to Stripe.** The plans are flat prices with hard
+   limits, so there is nothing to meter there; metered billing returns only
+   with an overage price, which is a pricing decision.
+4. **The limit is decided at `mailings.send` for the whole audience**, counting
+   what started mailings still hold; the worker never checks it, and pause,
+   resume and retry-failed are never refused, so an accepted mailing always
+   finishes. A downgrade deletes nothing: new rows are refused until the counts
+   fit.
+5. **Plan changes go through the Stripe customer portal**: checkout starts a
+   subscription only, and answers `conflict` for a workspace that has one. The
+   portal configuration (from the catalogue script) allows switching between the
+   two Prices with proration and cancelling at the period's end.
+6. **The webhook re-reads the subscription from Stripe** rather than trusting the
+   event payload (Lumitra QR reads the payload), so out-of-order and duplicate
+   deliveries converge; an event is applied exactly once through
+   `stripe_events`. The product tag is `mail` on the customer, the session and
+   the subscription.
+7. **Status mapping**: `past_due` and `unpaid` keep the paid plan while Stripe
+   retries; `canceled` drops to free with status `cancelled`; `paused` to free.
+8. **The exemption is an operator command**, not an HTTP route: the service has
+   no operator role, and a command run where `migrate` runs needs the database
+   itself, which no API key, member or Stripe event has. Lifting it drops to
+   free and lets reconciliation restore a paid plan.
+9. **Stripe is optional at boot.** Without a key or a Price id, plans, usage and
+   limits still work; checkout, the portal and the webhook fail closed (503).
+10. **Test-mode Stripe waits on a key.** No Infisical project holds a Stripe
+    test key (Lumitra QR and Ultra Power hold only the live one), so
+    `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are `PLACEHOLDER_REPLACE_ME`
+    in "Lumitra Mail" dev, and the test catalogue and endpoint are not created
+    yet; the live key was deliberately not copied. Both are ROADMAP lines with
+    exact steps.
+11. **The suites of earlier phases seed design-partner workspaces**, so they stay
+    about their own features; the billing suites seed free ones.
+
 ## Legal shape
 
 The service is a data processor for each workspace's controller. It ships with a

@@ -178,6 +178,9 @@ export const AUDIT_ACTIONS = [
   'webhook.secret_rotated',
   'webhook.redelivered',
   'contact.unsubscribed',
+  'billing.checkout_started',
+  'billing.subscription_changed',
+  'billing.exemption_changed',
 ] as const;
 export const AuditAction = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof AuditAction>;
