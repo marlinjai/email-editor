@@ -15,12 +15,16 @@ export type RecipientRow = {
   claimed_at: string | null;
   message_id: string | null;
   last_error: string | null;
+  /** S4: the A/B variant this recipient gets; null without a test, or while held. */
+  variant: string | null;
+  /** S4: in the remainder of an A/B test, waiting for the winner; never claimed while true. */
+  held: boolean;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS = `id, mailing_id, contact_id, email, merge, status, skip_reason, attempts, next_attempt_at, claimed_at,
-  message_id, last_error, created_at, updated_at`;
+  message_id, last_error, variant, held, created_at, updated_at`;
 
 export function recipientsRepo(db: Db) {
   return {
@@ -86,7 +90,8 @@ export function recipientsRepo(db: Db) {
         UPDATE mailing_recipients SET status = 'sending', claimed_at = now(), attempts = attempts + 1, updated_at = now()
         WHERE id = (
           SELECT id FROM mailing_recipients
-          WHERE workspace_id = ${workspaceId} AND mailing_id = ${mailingId} AND status = 'queued' AND next_attempt_at <= now()
+          WHERE workspace_id = ${workspaceId} AND mailing_id = ${mailingId} AND status = 'queued' AND NOT held
+            AND next_attempt_at <= now()
           ORDER BY next_attempt_at, created_at, id
           LIMIT 1
           FOR UPDATE SKIP LOCKED)
@@ -103,7 +108,8 @@ export function recipientsRepo(db: Db) {
         | { status: 'sent'; messageId: string }
         | { status: 'failed'; messageId: string | null; error: string }
         | { status: 'skipped'; reason: SkipReason; error?: string }
-        | { status: 'queued'; retryAt: Date; error: string },
+        /** Back to the queue, due `retryInMs` from now on the database's clock (the clock the claim compares with). */
+        | { status: 'queued'; retryInMs: number; error: string },
     ): Promise<RecipientRow | null> {
       const rows = await db<RecipientRow[]>`
         UPDATE mailing_recipients SET
@@ -111,7 +117,7 @@ export function recipientsRepo(db: Db) {
           skip_reason = ${to.status === 'skipped' ? to.reason : null},
           message_id = ${'messageId' in to ? to.messageId : db`message_id`},
           last_error = ${'error' in to ? (to.error ?? null) : db`last_error`},
-          next_attempt_at = ${to.status === 'queued' ? to.retryAt : db`next_attempt_at`},
+          next_attempt_at = ${to.status === 'queued' ? db`now() + make_interval(secs => ${to.retryInMs / 1000})` : db`next_attempt_at`},
           claimed_at = ${to.status === 'queued' ? null : db`claimed_at`},
           updated_at = now()
         WHERE workspace_id = ${workspaceId} AND id = ${recipientId} AND status = ANY(${from as RecipientStatus[]})

@@ -24,6 +24,7 @@ export const mailing = {
   counts,
   metadata: { sent_by: 'person_1' },
   scheduled_at: null,
+  ab_test: null,
   started_at: TS,
   finished_at: null,
   created_at: TS,
@@ -39,6 +40,7 @@ export const contact = {
   locale: 'de',
   properties: { gathering: 'autumn', nested: { a: [1, true, null] } },
   topics: ['programme-updates'],
+  tags: ['founders'],
   created_at: TS,
   updated_at: TS,
 };

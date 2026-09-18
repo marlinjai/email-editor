@@ -254,3 +254,161 @@ describe('contract conformance, S5 billing routes are mounted', () => {
     }
   });
 });
+
+describe('contract conformance, phase S4: tags, properties, segments', () => {
+  it('every tags, contactProperties and segments operation, and mailings.addSegment, conforms', async () => {
+    const { seedSending, createMailing } = await import('../support/sending.js');
+    const w = await h.seedWorkspace('conform-s4-segments');
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+    const { provider } = await seedSending(h, w.id, { topic: 'news' });
+    const person = await h.call({ method: 'POST', path: '/v1/contacts', key: w.key, body: { email: 'seg@conform.io', topics: ['news'] } });
+    const contactId = person.body.contact.id as string;
+
+    const tag = await run('tags.create', await h.call({ method: 'POST', path: '/v1/tags', key: w.key, body: { slug: 'vip', name: 'VIP' } }));
+    await run('tags.list', await h.call({ path: '/v1/tags', key: w.key }));
+    await run('tags.assign', await h.call({ method: 'POST', path: `/v1/tags/${tag.body.id}/contacts`, key: w.key, body: { contact_ids: [contactId] } }));
+
+    const property = { key: 'plan', label: 'Plan', type: 'string' };
+    await run('contactProperties.create', await h.call({ method: 'POST', path: '/v1/contact-properties', key: w.key, body: property }));
+    await run('contactProperties.list', await h.call({ path: '/v1/contact-properties', key: w.key }));
+
+    const filter = { field: 'tag', op: 'eq', value: 'vip' };
+    await run('segments.preview', await h.call({ method: 'POST', path: '/v1/segments/preview', key: w.key, body: { filter } }));
+    const seg = await run('segments.create', await h.call({ method: 'POST', path: '/v1/segments', key: w.key, body: { name: 'VIPs', filter } }));
+    await run('segments.list', await h.call({ path: '/v1/segments', key: w.key }));
+    await run('segments.get', await h.call({ path: `/v1/segments/${seg.body.id}`, key: w.key }));
+    await run('segments.update', await h.call({ method: 'PUT', path: `/v1/segments/${seg.body.id}`, key: w.key, body: { name: 'VIP', filter } }));
+    const mailing = await createMailing(h, w, { topic: 'news', provider_id: provider.id });
+    const added = await run(
+      'mailings.addSegment',
+      await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/recipients/segment`, key: w.key, body: { segment_id: seg.body.id } }),
+    );
+    expect(added.body.added).toBe(1);
+
+    await run('segments.delete', await h.call({ method: 'DELETE', path: `/v1/segments/${seg.body.id}`, key: w.key }));
+    await run('contactProperties.delete', await h.call({ method: 'DELETE', path: '/v1/contact-properties/plan', key: w.key }));
+    await run('tags.unassign', await h.call({ method: 'DELETE', path: `/v1/tags/${tag.body.id}/contacts`, key: w.key, body: { contact_ids: [contactId] } }));
+    await run('tags.delete', await h.call({ method: 'DELETE', path: `/v1/tags/${tag.body.id}`, key: w.key }));
+
+    const mine = (Object.keys(routes) as OperationId[]).filter(
+      (id) => id.startsWith('tags.') || id.startsWith('contactProperties.') || id.startsWith('segments.') || id === 'mailings.addSegment',
+    );
+    expect([...covered].sort()).toEqual(mine.sort());
+  });
+});
+
+describe('contract conformance, phase S4: scheduling, A/B tests and tracking', () => {
+  it('every scheduling, A/B and tracking operation answers with its declared status and response schema', async () => {
+    const { seedContact, seedSending, createMailing, addRecipients } = await import('../support/sending.js');
+    const ops: OperationId[] = [
+      'mailings.schedule',
+      'mailings.unschedule',
+      'mailings.setAbTest',
+      'mailings.clearAbTest',
+      'mailings.pickAbWinner',
+      'mailings.analytics',
+      'tracking.get',
+      'tracking.update',
+    ];
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+    const S = await h.seedWorkspace('contract-s4-mailings');
+    const s = await seedSending(h, S.id);
+    const contact = await seedContact(h, S.id, s.topic.id, { email: 'conform@example.com' });
+    const mailing = await createMailing(h, S, { topic: s.topic.slug, provider_id: s.provider.id });
+    await addRecipients(h, S, mailing.id, [{ contact_id: contact.id }]);
+    const at = new Date(Date.now() + 3_600_000).toISOString();
+
+    await run('tracking.get', await h.call({ path: '/v1/workspace/tracking', key: S.key }));
+    await run('tracking.update', await h.call({ method: 'PUT', path: '/v1/workspace/tracking', key: S.key, body: { opens: false, clicks: false } }));
+    await run('mailings.schedule', await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/schedule`, key: S.key, body: { send_at: at } }));
+    await run('mailings.unschedule', await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/unschedule`, key: S.key, body: {} }));
+    const ab = { variants: [{ key: 'a', subject: 'A' }, { key: 'b', subject: 'B' }], test_fraction: 1, winner_metric: 'manual' };
+    await run('mailings.setAbTest', await h.call({ method: 'PUT', path: `/v1/mailings/${mailing.id}/ab-test`, key: S.key, body: ab }));
+    await run('mailings.clearAbTest', await h.call({ method: 'DELETE', path: `/v1/mailings/${mailing.id}/ab-test`, key: S.key }));
+    await h.call({ method: 'PUT', path: `/v1/mailings/${mailing.id}/ab-test`, key: S.key, body: ab });
+    expect((await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/send`, key: S.key, body: {} })).status).toBe(202);
+    await run('mailings.pickAbWinner', await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/ab-test/winner`, key: S.key, body: { variant: 'a' } }));
+    await run('mailings.analytics', await h.call({ path: `/v1/mailings/${mailing.id}/analytics`, key: S.key }));
+
+    expect([...covered].sort()).toEqual([...ops].sort());
+  });
+});
+
+describe('contract conformance, phase S4: imports', () => {
+  it('every imports.* operation answers with its declared status and response schema', async () => {
+    const { createImportJob } = await import('../../src/imports/job.js');
+    const { PlatformWorker } = await import('../../src/platform/worker.js');
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+    const drain = () =>
+      new PlatformWorker({ jobs: [createImportJob({ sql: h.sql, log: { error: () => {} } })], log: { error: () => {}, log: () => {} } }).drain();
+    const form = new FormData();
+    form.set('file', new File(['Email,Name\nconform@example.com,Con\nbad,Bad\n'], 'conform.csv', { type: 'text/csv' }));
+    const created = await run('imports.create', await h.call({ method: 'POST', path: '/v1/imports', key: W.key, form }));
+    const id = created.body.id;
+    await run('imports.list', await h.call({ path: '/v1/imports', key: W.key }));
+    const mapping = { mapping: { Email: 'email', Name: 'first_name' }, topics: [], tags: [], consent_confirmed: true };
+    await run('imports.setMapping', await h.call({ method: 'PUT', path: `/v1/imports/${id}/mapping`, key: W.key, body: mapping }));
+    await drain();
+    await run('imports.get', await h.call({ path: `/v1/imports/${id}`, key: W.key }));
+    await run('imports.rows', await h.call({ path: `/v1/imports/${id}/rows`, key: W.key }));
+    await run('imports.commit', await h.call({ method: 'POST', path: `/v1/imports/${id}/commit`, key: W.key, body: { mapping_version: 1 } }));
+    const second = new FormData();
+    second.set('file', new File(['Email\nlater@example.com\n'], 'later.csv', { type: 'text/csv' }));
+    const other = await h.call({ method: 'POST', path: '/v1/imports', key: W.key, form: second });
+    await run('imports.cancel', await h.call({ method: 'POST', path: `/v1/imports/${other.body.id}/cancel`, key: W.key, body: {} }));
+    await drain();
+    const done = await h.call({ path: `/v1/imports/${id}`, key: W.key });
+    expect(done.body.status).toBe('completed');
+
+    const imports = Object.keys(routes).filter((k) => k.startsWith('imports.'));
+    expect([...covered].sort()).toEqual(imports.sort());
+  });
+});
+
+describe('contract conformance, phase S4: signup forms', () => {
+  it('every signupForms.* operation answers with its declared status and response schema', async () => {
+    const { repos } = await import('../../src/repo/index.js');
+    const { createPurposeSigner } = await import('../../src/platform/tokens.js');
+    const { UNSUBSCRIBE_KEYS } = await import('../support/harness.js');
+    const { seedSending } = await import('../support/sending.js');
+    const w = await h.seedWorkspace('contract-signup');
+    const { provider } = await seedSending(h, w.id, { topic: 'signup-news' });
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+    const input = { name: 'Newsletter', title: 'Stay in touch', consent_text: 'I agree.', topics: ['signup-news'], provider_id: provider.id };
+    const form = await run('signupForms.create', await h.call({ method: 'POST', path: '/v1/signup-forms', key: w.key, body: input }));
+    await run('signupForms.list', await h.call({ path: '/v1/signup-forms', key: w.key }));
+    await run('signupForms.get', await h.call({ path: `/v1/signup-forms/${form.body.id}`, key: w.key }));
+    await run('signupForms.update', await h.call({ method: 'PUT', path: `/v1/signup-forms/${form.body.id}`, key: w.key, body: { ...input, fields: ['first_name'] } }));
+    await run('signupForms.embed', await h.call({ path: `/v1/signup-forms/${form.body.id}/embed`, key: w.key }));
+    const token = createPurposeSigner(UNSUBSCRIBE_KEYS, 'signup-render').sign(`${form.body.id}.${Date.now() - 10_000}`);
+    await run(
+      'signupForms.submit',
+      await h.call({ method: 'POST', path: `/v1/signup-forms/${form.body.id}/submit`, body: { email: 'conform@example.com', form_token: token } }),
+    );
+    await run('signupForms.delete', await h.call({ method: 'DELETE', path: `/v1/signup-forms/${form.body.id}`, key: w.key }));
+    expect(await repos(h.sql).signup.getForm(w.id, form.body.id)).toBeNull();
+
+    const ops = Object.keys(routes).filter((id) => id.startsWith('signupForms.')) as OperationId[];
+    expect([...covered].sort()).toEqual(ops.sort());
+  });
+});

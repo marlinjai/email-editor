@@ -6,6 +6,7 @@ import { MemoryTransport } from '../../src/transport/index.js';
 import { createUnsubscribeSigner, type UnsubscribeSigner } from '../../src/unsubscribe.js';
 import { createSealer, type Sealer } from '../../src/sealing.js';
 import type { SsrfPolicy } from '../../src/webhooks/ssrf.js';
+import type { SignupOptions } from '../../src/signup/service.js';
 import { freshDatabase } from './db.js';
 import { setExemption } from '../../src/billing/exempt.js';
 import { MemoryAssetStorage } from './fakes.js';
@@ -38,7 +39,9 @@ export type Call = {
 export type Result = { status: number; body: Json; headers: Headers };
 
 /** A migrated database and the app over it, driven in-process through app.request. */
-export async function startHarness(options: { webhookUrlPolicy?: SsrfPolicy; unsubscribeSigner?: UnsubscribeSigner } = {}) {
+export async function startHarness(
+  options: { webhookUrlPolicy?: SsrfPolicy; unsubscribeSigner?: UnsubscribeSigner; signup?: SignupOptions } = {},
+) {
   const db = await freshDatabase();
   await migrate(db.sql, { log: () => {} });
   const errors: unknown[] = [];
@@ -62,6 +65,8 @@ export async function startHarness(options: { webhookUrlPolicy?: SsrfPolicy; uns
       ...appDeps,
       unsubscribeSigner: options.unsubscribeSigner ?? signer,
       transportFor: () => transport,
+      platformKeys: UNSUBSCRIBE_KEYS,
+      signup: options.signup,
     });
   let app = restart();
   const sealer: Sealer = createSealer(SECRETS_KEYS);

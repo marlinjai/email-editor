@@ -17,6 +17,12 @@ import { suppressionsRepo } from './suppressions.js';
 import { topicsRepo } from './topics.js';
 import { webhookDeliveriesRepo, webhookEndpointsRepo, webhookEventsRepo } from './webhooks.js';
 import { workspacesRepo } from './workspaces.js';
+import { tagsRepo } from './tags.js';
+import { contactPropertiesRepo } from './contact-properties.js';
+import { mailingPlatformRepo, workspaceTrackingRepo } from './mailing-platform.js';
+import { segmentsRepo } from './segments.js';
+import { importsRepo } from './imports.js';
+import { signupRepo } from './signup.js';
 
 /**
  * Every query the service runs against workspace-owned data lives behind these
@@ -59,6 +65,14 @@ export function repos(db: Db) {
     webhookEndpoints: webhookEndpointsRepo(db),
     webhookEvents: webhookEventsRepo(db),
     webhookDeliveries: webhookDeliveriesRepo(db),
+    // S4
+    tags: tagsRepo(db),
+    contactProperties: contactPropertiesRepo(db),
+    mailingPlatform: mailingPlatformRepo(db),
+    workspaceTracking: workspaceTrackingRepo(db),
+    segments: segmentsRepo(db),
+    imports: importsRepo(db),
+    signup: signupRepo(db),
     billing: billingRepo(db),
     stripeEvents: stripeEventsRepo(db),
     erasure: erasureRepo(db),

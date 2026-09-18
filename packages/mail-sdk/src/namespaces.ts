@@ -1,4 +1,4 @@
-import type { ImportJobCreate, RouteBody, RouteParams, RouteQuery } from '@marlinjai/mail-contract';
+import type { RouteBody, RouteParams, RouteQuery } from '@marlinjai/mail-contract';
 import { execute, executeMultipart, type CoreConfig, type RequestOpts } from './core';
 
 /**
@@ -134,8 +134,12 @@ export function createNamespaces(config: CoreConfig) {
         execute(config, 'mailings.addSegment', { params: { id }, body }, opts),
       schedule: (id: string, body: RouteBody<'mailings.schedule'>, opts?: RequestOpts) =>
         execute(config, 'mailings.schedule', { params: { id }, body }, opts),
+      unschedule: (id: string, opts?: RequestOpts) => execute(config, 'mailings.unschedule', { params: { id }, body: {} }, opts),
       setAbTest: (id: string, body: RouteBody<'mailings.setAbTest'>, opts?: RequestOpts) =>
         execute(config, 'mailings.setAbTest', { params: { id }, body }, opts),
+      clearAbTest: (id: string, opts?: RequestOpts) => execute(config, 'mailings.clearAbTest', { params: { id } }, opts),
+      pickAbWinner: (id: string, body: RouteBody<'mailings.pickAbWinner'>, opts?: RequestOpts) =>
+        execute(config, 'mailings.pickAbWinner', { params: { id }, body }, opts),
       analytics: (id: string, opts?: RequestOpts) => execute(config, 'mailings.analytics', { params: { id } }, opts),
     },
 
@@ -158,8 +162,7 @@ export function createNamespaces(config: CoreConfig) {
         execute(config, 'webhooks.redeliver', { params: { id, delivery_id: deliveryId } as RouteParams<'webhooks.redeliver'> }, opts),
     },
 
-    // S4: the platform features. Typed against the contract; the service answers
-    // `not_found` until S4 ships.
+    // S4: the platform features.
     tags: {
       list: (query?: RouteQuery<'tags.list'>, opts?: RequestOpts) => execute(config, 'tags.list', { query }, opts),
       create: (body: RouteBody<'tags.create'>, opts?: RequestOpts) => execute(config, 'tags.create', { body }, opts),
@@ -172,6 +175,8 @@ export function createNamespaces(config: CoreConfig) {
     segments: {
       list: (query?: RouteQuery<'segments.list'>, opts?: RequestOpts) => execute(config, 'segments.list', { query }, opts),
       create: (body: RouteBody<'segments.create'>, opts?: RequestOpts) => execute(config, 'segments.create', { body }, opts),
+      /** Counts what a filter matches, without saving it. */
+      preview: (body: RouteBody<'segments.preview'>, opts?: RequestOpts) => execute(config, 'segments.preview', { body }, opts),
       get: (id: string, opts?: RequestOpts) => execute(config, 'segments.get', { params: { id } }, opts),
       update: (id: string, body: RouteBody<'segments.update'>, opts?: RequestOpts) =>
         execute(config, 'segments.update', { params: { id }, body }, opts),
@@ -181,6 +186,8 @@ export function createNamespaces(config: CoreConfig) {
     signupForms: {
       list: (query?: RouteQuery<'signupForms.list'>, opts?: RequestOpts) => execute(config, 'signupForms.list', { query }, opts),
       create: (body: RouteBody<'signupForms.create'>, opts?: RequestOpts) => execute(config, 'signupForms.create', { body }, opts),
+      get: (id: string, opts?: RequestOpts) => execute(config, 'signupForms.get', { params: { id } }, opts),
+      embed: (id: string, opts?: RequestOpts) => execute(config, 'signupForms.embed', { params: { id } }, opts),
       update: (id: string, body: RouteBody<'signupForms.update'>, opts?: RequestOpts) =>
         execute(config, 'signupForms.update', { params: { id }, body }, opts),
       delete: (id: string, opts?: RequestOpts) => execute(config, 'signupForms.delete', { params: { id } }, opts),
@@ -190,13 +197,24 @@ export function createNamespaces(config: CoreConfig) {
     },
 
     imports: {
-      create: (file: Blob, options: ImportJobCreate, opts?: RequestOpts) =>
-        executeMultipart(config, 'imports.create', { file, json: options }, opts),
+      /** Step 1: upload the CSV. The answer carries its columns, a sample and a suggested mapping. */
+      create: (file: Blob, filename?: string, opts?: RequestOpts) =>
+        executeMultipart(config, 'imports.create', { file, filename }, opts),
       list: (query?: RouteQuery<'imports.list'>, opts?: RequestOpts) => execute(config, 'imports.list', { query }, opts),
       get: (id: string, opts?: RequestOpts) => execute(config, 'imports.get', { params: { id } }, opts),
+      /** Step 2: set (or revise) the mapping; the dry run starts, and any earlier one is discarded. */
+      setMapping: (id: string, body: RouteBody<'imports.setMapping'>, opts?: RequestOpts) =>
+        execute(config, 'imports.setMapping', { params: { id }, body }, opts),
+      /** Step 3: commit the dry run of `mapping_version`. */
+      commit: (id: string, body: RouteBody<'imports.commit'>, opts?: RequestOpts) =>
+        execute(config, 'imports.commit', { params: { id }, body }, opts),
+      cancel: (id: string, opts?: RequestOpts) => execute(config, 'imports.cancel', { params: { id }, body: {} }, opts),
+      rows: (id: string, query?: RouteQuery<'imports.rows'>, opts?: RequestOpts) =>
+        execute(config, 'imports.rows', { params: { id }, query }, opts),
     },
 
     tracking: {
+      get: (opts?: RequestOpts) => execute(config, 'tracking.get', {}, opts),
       update: (body: RouteBody<'tracking.update'>, opts?: RequestOpts) => execute(config, 'tracking.update', { body }, opts),
     },
 
@@ -204,6 +222,7 @@ export function createNamespaces(config: CoreConfig) {
       list: (opts?: RequestOpts) => execute(config, 'contactProperties.list', {}, opts),
       create: (body: RouteBody<'contactProperties.create'>, opts?: RequestOpts) =>
         execute(config, 'contactProperties.create', { body }, opts),
+      delete: (key: string, opts?: RequestOpts) => execute(config, 'contactProperties.delete', { params: { key } }, opts),
     },
 
     // S5: billing.

@@ -39,7 +39,7 @@ export function erasureRepo(db: Db) {
     /**
      * Deletes a workspace and every row it owns. The tables that point at a
      * provider or a topic with ON DELETE RESTRICT (mailings, messages, the
-     * recipient rows between them) go first, explicitly, because a cascade
+     * recipient rows between them, signup forms) go first, explicitly, because a cascade
      * from the workspace reaches sibling tables in no guaranteed order; the
      * rest cascade from the workspace row.
      */
@@ -47,6 +47,7 @@ export function erasureRepo(db: Db) {
       await db`DELETE FROM mailing_recipients WHERE workspace_id = ${workspaceId}`;
       await db`DELETE FROM messages WHERE workspace_id = ${workspaceId}`;
       await db`DELETE FROM mailings WHERE workspace_id = ${workspaceId}`;
+      await db`DELETE FROM signup_forms WHERE workspace_id = ${workspaceId}`;
       await db`DELETE FROM workspaces WHERE id = ${workspaceId}`;
     },
   };

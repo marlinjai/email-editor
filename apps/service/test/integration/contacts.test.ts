@@ -273,7 +273,7 @@ describe('contacts: erasure', () => {
     const kept = await h.call({ path: `/v1/suppressions?email=${encodeURIComponent(email)}`, key: A.key });
     expect(kept.body.data).toHaveLength(2);
     const [audit] = await h.sql`SELECT details FROM audit_log WHERE action = 'contact.erased' AND target_id = ${contactId}`;
-    expect(audit!.details).toEqual({ erased_messages: 1, erased_recipients: 1, suppressions_kept: 2 });
+    expect(audit!.details).toEqual({ erased_messages: 1, erased_recipients: 1, erased_signups: 0, suppressions_kept: 2 });
     expect(JSON.stringify(audit)).not.toContain(email);
 
     const twice = await h.call({ method: 'DELETE', path: `/v1/contacts/${contactId}`, key: A.key });

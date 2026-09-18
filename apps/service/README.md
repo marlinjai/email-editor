@@ -337,6 +337,186 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
   `NODE_TLS_REJECT_UNAUTHORIZED=0`); `test/integration/contacts.test.ts` covers the
   upsert matrix, erasure and the contact lifecycle on the four paths.
 
+## S4, the platform features
+
+Phase S4 turns the service into a marketing platform for customers without an
+application of their own: contacts managed in the service (tags, typed
+properties, CSV import, hosted signup forms with double opt-in), segments,
+scheduling and A/B tests on mailings, and campaign analytics with open and click
+tracking, opt-in per workspace and **off by default**. Every route is mounted from
+the contract's `platformRoutes`; the hosted pages (`/f/...`, `/t/...`) live outside
+`/v1` like `/u/`. Migrations `0010` (tags, properties, consent records,
+segments, the new event types), `0011` (imports), `0012` (signup forms) and `0013`
+(scheduling, A/B, tracking).
+
+**The platform worker** (`src/platform/worker.ts`, started in `main.ts`, stopped on
+SIGTERM) runs the S4 background jobs listed in `src/platform/jobs.ts`: releasing
+scheduled mailings, deciding A/B tests, the import dry runs and commits, and the
+signup confirmation mails. Each job keeps its state in Postgres and does one unit
+of work per transaction under a row lock (`FOR UPDATE SKIP LOCKED`), so a crash
+loses nothing and several processes can run it. Jobs take the loop's clock as
+`now`, which the tests drive instead of sleeping.
+
+**Tokens** for the S4 endpoints (form render time, confirmation link, open pixel,
+click link) and the address hashes come from `src/platform/tokens.ts`: one key per
+purpose, derived from `MAIL_UNSUBSCRIBE_KEY`, so no new secret is needed and a
+token minted for one purpose never verifies for another.
+
+### Tags and typed properties
+
+- `tags.*`: a tag's `contact_count` is counted on read; `Contact.tags` lists the
+  slugs. Assigning ignores ids that name no contact of the workspace (so nothing
+  is disclosed about other ids); audit rows carry counts, never addresses.
+- `contactProperties.*`: defining a key makes every later write of it
+  type-checked (`string`, `number`, `boolean`, `date` as ISO 8601; `null` removes
+  a value). A definition that stored values already break is `conflict` with up
+  to five example contact ids. Definitions and contact writes serialise on a
+  per-workspace advisory lock, so a wrong type cannot slip in between. Keys
+  without a definition stay free-form, as in S2.
+
+### Segments
+
+`segments.*`, `segments.preview` and `mailings.addSegment`. The filter tree
+(`and`, `or`, `not` over conditions, at most `MAX_FILTER_DEPTH` deep) is compiled
+by `src/segments/compile.ts` into one parameterised SQL fragment: field names
+come from a fixed switch, and every value and every property key is a bound
+parameter, never string-built (the injection battery in
+`test/integration/segments.test.ts` runs hostile values and keys against the
+database and checks the tables afterwards). Each field accepts the operators of
+the contract's `FILTER_FIELD_OPERATORS`. Text compares case-insensitively,
+`contains` and `starts_with` match `%`, `_` and backslashes literally, and a
+missing value never matches (and so matches under `not`). A defined property is
+compared by its type; an undefined one by JSON equality, text for
+`contains`/`starts_with`, and numbers only for number values. Engagement fields
+(`engagement:opened|clicked`, "within N days") need tracking on
+(`tracking_disabled` otherwise) and never count machine events or Apple Mail
+Privacy Protection opens. `mailings.addSegment` queues, in one statement, every
+matching contact subscribed to the mailing's topic.
+
+### CSV import
+
+A resumable job in four steps: `imports.create` (upload: parsed per RFC 4180,
+comma or semicolon, UTF-8, every row stored, answering the columns, a sample and
+a suggested mapping that knows English and German headers), `imports.setMapping`
+(starts a dry run in the worker; a revision discards the previous one and bumps
+`mapping_version`), `imports.commit` with the `mapping_version` the caller saw
+(anything else is `conflict`), and `imports.cancel`. The commit writes batches of
+500 rows, each batch and its row outcomes in one transaction, so a crash resumes
+at the first unwritten row and never applies a row twice. Every row ends
+`created`, `updated`, `unchanged`, `suppressed` or `skipped` with a reason
+(`imports.rows`); importing the same file again gives only `unchanged`. An
+address blocked for every topic is `suppressed` and nothing is written; a block
+on some topics withholds just those. An import never lifts a suppression and
+never changes a contact's email. Each new subscription gets a consent record
+naming who confirmed consent and when. Five failed batches in a row end the
+import `failed`. `import.finished` reports the end.
+
+### Signup forms with double opt-in
+
+`signupForms.*` manage a form: its topics and tags, the provider the
+confirmation goes through, the consent text (with translations), a version
+bumped on every change, and optionally a template for the confirmation mail,
+compiled when the form is saved and required to contain `{{confirm_url}}`.
+Deleting is soft: pending links then show "no longer available".
+
+- **Hosted page and embed.** `/f/<id>` is the form in the five languages of the
+  hosted pages (`src/pages/signup-i18n.ts`), chosen by `?lang` or the browser's
+  languages among the workspace's. `signupForms.embed` gives a no-JavaScript
+  HTML form posting to the hosted page, and the optional `/f/<id>/embed.js`,
+  which fetches a fresh token from `/f/<id>/token`. The JSON
+  `signupForms.submit` is the one public `/v1` route (the authentication
+  middleware skips routes the contract marks public) and answers CORS only for
+  the form's `allowed_origins`.
+- **Bot protection.** A honeypot field; a time trap (the signed `form_token` must
+  be 3 seconds to 24 hours old; a post without a valid one, like the static
+  embed's, gets the form back prefilled with a fresh token and one more button);
+  and fixed-window rate limits in Postgres, 5 per client address per 10 minutes
+  and 300 per workspace per hour, so they hold across restarts and instances.
+  Every accepted-looking submission gets the same answer, so the form never
+  discloses whether an address is known.
+- **Double opt-in.** Nothing is subscribed and no contact is created until the
+  person confirms. The confirmation mail goes out from an outbox the platform
+  worker drains through the form's provider (counted against its daily budget,
+  honouring `min_interval_ms`, archived, retried on transient failures). The link
+  `/f/confirm/<token>` lasts 72 hours; GET only shows a button (link scanners
+  confirm nobody), POST confirms. A resubmission of the same address supersedes
+  its earlier link; a different address has its own. Confirming twice is a
+  no-op, an expired link says so and points back to the form, and an address
+  already subscribed to every topic gets no mail at all.
+- **What confirming writes**, in one transaction: the contact (names and locale
+  only where empty), the subscriptions and tags, one consent record per topic
+  (the consent text as shown, the form version, keyed hashes of the submitting
+  and confirming addresses, both timestamps), the audit row and
+  `contact.subscribed`. A suppressed address can opt in again only this way: an
+  `unsubscribed` block on the form's topics is lifted (an all-topics block becomes
+  per-topic blocks on every topic not on the form), with `contact.resubscribed`
+  for each; bounced, complained and manual blocks are never lifted.
+- Erasing a contact deletes its signup submissions too, pending links included,
+  and its consent records go with the contact.
+
+### Scheduling
+
+`mailings.schedule` (from `draft`, or again from `scheduled` to move it) runs
+the checks `send` runs, now, and accepts a time in the future and within a year;
+`mailings.unschedule` returns it to `draft`; `send` and `cancel` work as before.
+The schedule job releases a due mailing through the same start as `send`
+(`src/platform/start-mailing.ts`), with trigger `schedule`; state lives in the
+mailing row, so a restart releases whatever came due meanwhile on its first tick.
+A mailing edited while scheduled into one that cannot start goes back to `draft`
+at its time with `mailing.schedule_failed` and an audit row; a passing problem
+(the compile pool full) leaves it scheduled for the next tick. Every start emits
+`mailing.started`.
+
+### A/B tests
+
+`mailings.setAbTest` (while editable), `clearAbTest`, `pickAbWinner`. When sending
+starts, the queued recipients are ordered by a hash of their row id; the first
+`test_fraction` (at least one per variant) go round-robin to the variants, the
+rest are **held** (never claimed, and the mailing cannot finish while they wait).
+A variant replaces the subject, the document or both. `opens` and `clicks` tests
+need that tracking on (`tracking_disabled`, which says to use `manual`); after
+`decide_after_minutes` the variant with the most unique human opens or clicks
+wins (a tie to the earlier key) and the held recipients get it. If the metric
+stopped being tracked meanwhile, the test waits for a person (`awaiting_pick`).
+`pickAbWinner` decides any running test by hand, once. Both emit
+`mailing.ab_winner_selected`. `mailings.duplicate` copies the base content
+only, never the A/B test.
+
+### Plan limits (S5)
+
+A/B tests and tracking are plan features (`plan_limit_reached` without them; a
+mailing started on a plan without tracking goes out untracked). Every start,
+scheduled or not, checks the period's message budget. The contacts an import
+batch or a signup confirmation adds must fit the plan's contact limit: the
+import then stops `failed` at that batch, and the confirmation rolls back with
+a "not possible right now" page whose link keeps working.
+
+### Tracking and analytics
+
+Off by default. `tracking.update` sets opens and clicks and keeps the workspace's
+`settings.tracking_enabled` equal to `opens || clicks`; that flag stays the master
+switch (off through `workspace.update`, nothing is tracked). A mailing snapshots
+what is tracked when it starts (`MailingAnalytics.tracking`). With tracking off
+the worker adds no pixel and rewrites no link, and a token for such a mailing is
+refused; ŌPUNTIA's workspace stays off, and `test/integration/mailing-platform.test.ts`
+proves the HTML is untouched and nothing is recorded.
+
+With tracking on, `/t/o/<token>` answers a 1x1 GIF and `/t/c/<token>` a 302 to
+the link's stored destination. The token binds workspace, mailing, recipient
+and the link's number; the destination comes from `mailing_links`, never from
+the request, so it is not an open redirect. Links with a merge field (the
+unsubscribe link, personalised links) are never rewritten. Only flags are
+stored, never the address or the user agent: known scanners and prefetchers,
+and clicks within 5 seconds of delivery, are machine events; a bare
+`Mozilla/5.0` or an address in Apple's 17.0.0.0/8 is Apple Mail Privacy
+Protection, counted apart (`apple_mpp_opens`) and never as a human open. HEAD
+requests are never recorded. After tracking is turned off, opens are refused
+and clicks still lead to their destination without being recorded, so a
+recipient's link never breaks. `mailings.analytics` aggregates per mailing and
+per variant; unsubscribes come from the `contact.unsubscribed` events naming
+the mailing, bounces and complaints from suppressions whose source message
+belongs to it.
+
 ## Billing (S5)
 
 Plans, limits and Stripe, on the shared Lumitra Stripe account and the pattern
@@ -441,20 +621,37 @@ workspace to `free` and marks the mirror stale, so the next read or
 reconciliation restores any plan it still pays for. An exempt workspace that
 still has a subscription keeps being charged by Stripe: cancel that in Stripe.
 
-**Stripe setup** (`scripts/`, run through the secrets proxy's
-`execute_with_secrets` with the Infisical project "Lumitra Mail", the file
-passed as a heredoc to `node --input-type=module`):
+**Stripe setup: one command.** `scripts/stripe-setup.mjs` does the whole
+setup on the shared account in one run: the two Products and their monthly
+Prices (lookup keys `mail-starter-monthly`, `mail-growth-monthly`), a portal
+configuration that switches between them or cancels at the period's end, and
+the webhook endpoint `https://mail.lumitra.co/stripe/webhook` for exactly
+`STRIPE_WEBHOOK_EVENTS`, pinned to the API version. It writes the three ids and
+the endpoint's `whsec_` secret only to the secrets proxy's capture directory,
+never to stdout. It is idempotent (a re-run creates nothing and captures the
+same ids; an existing endpoint's secret cannot be read back, so none is
+captured unless `--recreate` replaces the endpoint), refuses a live key
+without `--live`, and stops on a Price that exists with another amount.
 
-- `stripe-catalogue.mjs`: the two Products, their monthly Prices (lookup keys
-  `mail-starter-monthly`, `mail-growth-monthly`) and a portal configuration
-  allowing switches between them and cancelling at the period's end.
-  Idempotent; refuses a live key without `--live`. Prints the three ids to store
-  as `STRIPE_PRICE_STARTER_ID`, `STRIPE_PRICE_GROWTH_ID`,
-  `STRIPE_PORTAL_CONFIGURATION_ID`.
-- `stripe-webhook-endpoint.mjs <https://host/stripe/webhook>`: registers the
-  endpoint for exactly `STRIPE_WEBHOOK_EVENTS`, pinned to the API version, and
-  writes the `whsec_` secret only to the proxy's capture
-  (`$SECRETS_CAPTURE_DIR/STRIPE_WEBHOOK_SECRET`), never to stdout.
+Once the shared account's `sk_test_` key is in Infisical "Lumitra Mail" dev and
+prod, the one command is a single `execute_with_secrets` call:
+
+- `projectId` `f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4`, `env` `dev`, `workingDir` `/tmp`;
+- `command`: `node --input-type=module - <<'EOF_STRIPE_SETUP'`, then the file's
+  content, then `EOF_STRIPE_SETUP` (the proxy host runs Node 22);
+- `captures`: `STRIPE_PRICE_STARTER_ID`, `STRIPE_PRICE_GROWTH_ID`,
+  `STRIPE_PORTAL_CONFIGURATION_ID` and `STRIPE_WEBHOOK_SECRET`, each with two
+  destinations (the project, envs `dev` and `production`, path `/`, same key);
+  `STRIPE_WEBHOOK_SECRET` with `overwrite: true` (it replaces the
+  placeholder) and `required: false` (a re-run that keeps the endpoint writes
+  none).
+
+Captures are stored only when the command exits 0, so a failed run changes
+nothing in Infisical; run it again. Then redeploy. Until launch, production
+runs in Stripe test mode, which lets the whole flow be tried on the real
+deployment without real money. Going live (Marlin's decision) repeats the
+command with the live key in prod, `--live` appended to the `node` line, and
+destinations in `production` only.
 
 **Tests.** `test/integration/billing.test.ts` drives the real Stripe client
 against a stateful fake at the fetch level (`test/support/fake-stripe.ts`):
@@ -465,7 +662,11 @@ read, the loop and a restart; cancel and subscribe again, with dunning and a
 late event), limits with the mid-mailing rule, the free tier, the exemption and
 tenancy. `test/integration/stripe-mock.test.ts` runs the same client against
 stripe-mock (Stripe's own mock, which validates every request against Stripe's
-API description): `STRIPE_MOCK_URL` in CI, Testcontainers locally. The suites
+API description): `STRIPE_MOCK_URL` in CI, Testcontainers locally.
+`test/integration/stripe-setup.test.ts` runs the setup script exactly as the
+proxy does (the file on stdin, a capture directory) against stripe-mock and
+against a stateful fake: every request valid, a re-run creating nothing,
+`--recreate` rotating the secret, and every refusal made before any request. The suites
 of earlier phases seed design-partner workspaces
 (`seedWorkspace(slug, { billing: 'free' })` opts into the free plan).
 

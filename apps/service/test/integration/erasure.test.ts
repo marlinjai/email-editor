@@ -80,6 +80,13 @@ async function seedCompanyWorkspace(slug: string, companyId: string | undefined)
     },
   });
   expect(provider.status, JSON.stringify(provider.body)).toBe(201);
+  const signupForm = await h.call({
+    method: 'POST',
+    path: '/v1/signup-forms',
+    ...as,
+    body: { name: 'N', title: 'Join', consent_text: 'I agree.', topics: ['news'], provider_id: provider.body.id },
+  });
+  expect(signupForm.status, JSON.stringify(signupForm.body)).toBe(201);
   const contact = await h.call({ method: 'POST', path: '/v1/contacts', body: { email: `person@${slug}.io` }, ...as });
   expect(contact.status).toBeLessThan(300);
   const suppression = await h.call({ method: 'POST', path: '/v1/suppressions', body: { email: `blocked@${slug}.io`, reason: 'manual' }, ...as });
@@ -139,7 +146,7 @@ async function seedCompanyWorkspace(slug: string, companyId: string | undefined)
 }
 
 async function rowsOf(workspaceId: string): Promise<number> {
-  const tables = ['workspace_members', 'api_keys', 'audit_log', 'templates', 'template_versions', 'assets', 'providers', 'topics', 'contacts', 'suppressions', 'mailings', 'mailing_recipients', 'messages', 'webhook_endpoints', 'webhook_events', 'webhook_deliveries'];
+  const tables = ['workspace_members', 'api_keys', 'audit_log', 'templates', 'template_versions', 'assets', 'providers', 'topics', 'contacts', 'suppressions', 'mailings', 'mailing_recipients', 'messages', 'webhook_endpoints', 'webhook_events', 'webhook_deliveries', 'signup_forms'];
   let total = 0;
   for (const t of tables) {
     const [row] = await h.sql.unsafe(`SELECT count(*)::int AS n FROM ${t} WHERE workspace_id = $1`, [workspaceId]);
