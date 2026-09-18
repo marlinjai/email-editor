@@ -26,16 +26,24 @@ function schemaOf(id: OperationId, field: 'body' | 'query' | 'params'): z.ZodTyp
   return schema;
 }
 
-/** The JSON body of operation `id`, validated against the contract. Malformed JSON is `invalid_request`. */
-export async function body<K extends OperationId>(c: Context, id: K): Promise<z.infer<SchemaOf<K, 'body'>>> {
+/** The request body parsed as JSON, not yet validated. Malformed JSON is `invalid_request`. */
+export async function rawJson(c: Context): Promise<unknown> {
   const raw = await c.req.text();
-  let value: unknown;
   try {
-    value = raw.length === 0 ? undefined : JSON.parse(raw);
+    return raw.length === 0 ? undefined : JSON.parse(raw);
   } catch {
     throw new ApiError('invalid_request', 'The request body is not valid JSON.');
   }
+}
+
+/** An already parsed body of operation `id`, validated against the contract. */
+export function checkBody<K extends OperationId>(id: K, value: unknown): z.infer<SchemaOf<K, 'body'>> {
   return check(schemaOf(id, 'body'), value, 'request body');
+}
+
+/** The JSON body of operation `id`, validated against the contract. Malformed JSON is `invalid_request`. */
+export async function body<K extends OperationId>(c: Context, id: K): Promise<z.infer<SchemaOf<K, 'body'>>> {
+  return checkBody(id, await rawJson(c));
 }
 
 export function query<K extends OperationId>(c: Context, id: K): z.infer<SchemaOf<K, 'query'>> {

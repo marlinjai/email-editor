@@ -25,3 +25,8 @@ export function actorOf(access: WorkspaceAccess): AuditActor {
     ? { type: 'api_key', api_key_id: access.apiKeyId }
     : { type: 'member', member_id: access.member.id, subject: access.member.subject };
 }
+
+/** The actor as one string, for columns that record who wrote a row (`created_by`). */
+export function actorLabel(access: WorkspaceAccess): string {
+  return access.via === 'api_key' ? `api_key:${access.apiKeyId}` : `member:${access.member.id}`;
+}

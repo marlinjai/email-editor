@@ -1,5 +1,7 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
+import { StorageBrainAssetStorage } from './assets/storage.js';
+import { CompilePool } from './compile/pool.js';
 import { ConfigError, loadConfig, loadMigrateConfig } from './config.js';
 import { createSql } from './db.js';
 import { migrate, MigrationError } from './migrate.js';
@@ -18,6 +20,12 @@ import { startWebhookDeliveryLoop } from './webhooks/loop.js';
 
 const IDEMPOTENCY_PURGE_INTERVAL_MS = 60 * 60 * 1000;
 
+/**
+ * The compile worker sits next to this file: src/compile-worker.js under tsx,
+ * dist/compile-worker.js once built (tsup emits both entries side by side).
+ */
+const COMPILE_WORKER_URL = new URL('./compile-worker.js', import.meta.url);
+
 async function runMigrate(): Promise<void> {
   const { databaseUrl } = loadMigrateConfig();
   const sql = createSql(databaseUrl, { max: 1 });
@@ -35,11 +43,21 @@ async function runServe(): Promise<void> {
     allowInsecureHttp: config.webhookAllowInsecureTargets,
     allowPrivateTargets: config.webhookAllowInsecureTargets,
   };
+  const compiler = new CompilePool({
+    workerUrl: COMPILE_WORKER_URL,
+    size: config.compile.workers,
+    timeoutMs: config.compile.timeoutMs,
+    maxQueue: config.compile.maxQueue,
+    log: console,
+  });
   const app = createApp({
     sql,
     dashboardServiceToken: config.dashboardServiceToken,
     secretsKeys: config.secretsKeys,
     webhookUrlPolicy,
+    compiler,
+    assetStorage: new StorageBrainAssetStorage(config.storageBrain),
+    publicBaseUrl: config.publicBaseUrl,
   });
 
   const webhookLoop = startWebhookDeliveryLoop(sql, createSealer(config.secretsKeys), { policy: webhookUrlPolicy });
@@ -65,10 +83,10 @@ async function runServe(): Promise<void> {
     console.log(`[serve] ${signal}: draining`);
     clearInterval(purge);
     server.close(() => {
-      webhookLoop
-        .stop()
-        .catch((err) => console.error('[webhooks] loop failed to stop cleanly:', err))
-        .finally(() => sql.end({ timeout: 5 }).finally(() => process.exit(0)));
+      Promise.allSettled([webhookLoop.stop(), compiler.close()])
+        .then(() => sql.end({ timeout: 5 }))
+        .catch((err) => console.error('[serve] shutdown failed:', err))
+        .finally(() => process.exit(0));
     });
     setTimeout(() => process.exit(1), 10_000).unref();
   };
