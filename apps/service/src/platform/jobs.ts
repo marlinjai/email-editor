@@ -1,4 +1,5 @@
 import type { Compiler } from '../compile/pool.js';
+import { createImportJob } from '../imports/job.js';
 import type { Sql } from '../db.js';
 import type { UnsubscribeSigner } from '../unsubscribe.js';
 import type { TransportFor } from '../worker/transports.js';
@@ -18,6 +19,6 @@ export type PlatformDeps = {
 };
 
 /** Every job the platform worker runs, in the order of one round. */
-export function platformJobs(_deps: PlatformDeps): PlatformJob[] {
-  return [];
+export function platformJobs(deps: PlatformDeps): PlatformJob[] {
+  return [createImportJob({ sql: deps.sql, log: deps.log })];
 }
