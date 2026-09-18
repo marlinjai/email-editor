@@ -38,9 +38,18 @@ export type Call = {
 
 export type Result = { status: number; body: Json; headers: Headers };
 
+/**
+ * The provider routes' HTTP client in tests unless a test passes its own: never
+ * the network (creating a Resend provider registers its events endpoint at
+ * Resend), always "unreachable".
+ */
+export const offlineFetch = (async () => {
+  throw new TypeError('fetch failed: tests are offline');
+}) as unknown as typeof fetch;
+
 /** A migrated database and the app over it, driven in-process through app.request. */
 export async function startHarness(
-  options: { webhookUrlPolicy?: SsrfPolicy; unsubscribeSigner?: UnsubscribeSigner; signup?: SignupOptions } = {},
+  options: { webhookUrlPolicy?: SsrfPolicy; unsubscribeSigner?: UnsubscribeSigner; signup?: SignupOptions; providerFetch?: typeof fetch } = {},
 ) {
   const db = await freshDatabase();
   await migrate(db.sql, { log: () => {} });
@@ -51,7 +60,7 @@ export async function startHarness(
   const compiler = new CompilePool({ workerUrl: COMPILE_WORKER_URL, size: 2, timeoutMs: 20_000, maxQueue: 16 });
   const storage = new MemoryAssetStorage();
   /** What every app over this database shares: the compile pool and the image store. */
-  const appDeps = { compiler, assetStorage: storage, publicBaseUrl: PUBLIC_BASE_URL };
+  const appDeps = { compiler, assetStorage: storage, publicBaseUrl: PUBLIC_BASE_URL, providerFetch: options.providerFetch ?? offlineFetch };
   const log = { error: (...a: unknown[]) => errors.push(a) };
   /** A second, independent app over the same database: a service restart. */
   const restart = () =>
