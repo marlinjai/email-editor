@@ -22,6 +22,26 @@ const EnvSchema = z.object({
    */
   MAIL_SECRETS_KEY: hex64,
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  /**
+   * The service's public origin, e.g. https://mail.lumitra.co. Asset URLs put
+   * into mail are built on it, so it is configured, never guessed from a Host
+   * header a client controls.
+   */
+  PUBLIC_BASE_URL: z
+    .string()
+    .url()
+    .refine((v) => /^https:\/\//.test(v) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(v), 'must be https (http only for localhost)')
+    .refine((v) => new URL(v).pathname === '/' && !v.endsWith('/'), 'must be an origin without a path or trailing slash'),
+  /** The mail service's Storage Brain tenant key, where uploaded images are stored. */
+  STORAGE_BRAIN_API_KEY: z.string().regex(/^sk_(live|test)_[A-Za-z0-9_-]{16,}$/, 'must be a Storage Brain key (sk_live_... or sk_test_...)'),
+  /** Storage Brain's API origin; the SDK's default (production) when unset. */
+  STORAGE_BRAIN_URL: z.string().url().optional(),
+  /** Worker threads compiling MJML. */
+  COMPILE_WORKERS: z.coerce.number().int().min(1).max(16).default(2),
+  /** Deadline for one compile; a compile past it is stopped and reported in `errors`. */
+  COMPILE_TIMEOUT_MS: z.coerce.number().int().min(100).max(120_000).default(10_000),
+  /** Compiles allowed to wait for a free worker before new ones get 503. */
+  COMPILE_MAX_QUEUE: z.coerce.number().int().min(0).max(1000).default(32),
 });
 
 export type Config = {
@@ -30,6 +50,9 @@ export type Config = {
   dashboardServiceToken: string;
   secretsKeys: ReadonlyMap<number, Buffer>;
   databasePoolMax: number;
+  publicBaseUrl: string;
+  storageBrain: { apiKey: string; baseUrl?: string };
+  compile: { workers: number; timeoutMs: number; maxQueue: number };
 };
 
 export class ConfigError extends Error {
@@ -57,6 +80,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dashboardServiceToken: e.DASHBOARD_SERVICE_TOKEN.toLowerCase(),
     secretsKeys: new Map([[1, Buffer.from(e.MAIL_SECRETS_KEY, 'hex')]]),
     databasePoolMax: e.DATABASE_POOL_MAX,
+    publicBaseUrl: e.PUBLIC_BASE_URL,
+    storageBrain: { apiKey: e.STORAGE_BRAIN_API_KEY, baseUrl: e.STORAGE_BRAIN_URL },
+    compile: { workers: e.COMPILE_WORKERS, timeoutMs: e.COMPILE_TIMEOUT_MS, maxQueue: e.COMPILE_MAX_QUEUE },
   };
 }
 

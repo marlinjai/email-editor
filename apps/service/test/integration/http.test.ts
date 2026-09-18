@@ -21,7 +21,7 @@ describe('health', () => {
 
   it('answers 503 when the database does not', async () => {
     const dead = createSql('postgres://nobody:nothing@127.0.0.1:1/none', { max: 1 });
-    const app = createApp({ sql: dead, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, log: { error: () => {} } });
+    const app = createApp({ sql: dead, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, ...h.appDeps, log: { error: () => {} } });
     const res = await app.request('/healthz');
     expect(res.status).toBe(503);
     expect(((await res.json()) as { database: string }).database).toBe('down');
@@ -72,7 +72,7 @@ describe('the error envelope', () => {
   it('an unexpected failure is internal_error with the request id, and is logged', async () => {
     const broken = createSql('postgres://nobody:nothing@127.0.0.1:1/none', { max: 1 });
     const logged: unknown[] = [];
-    const app = createApp({ sql: broken, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, log: { error: (...a: unknown[]) => logged.push(a) } });
+    const app = createApp({ sql: broken, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, ...h.appDeps, log: { error: (...a: unknown[]) => logged.push(a) } });
     const res = await app.request('/v1/workspace', { headers: { authorization: `Bearer ${W.key}` } });
     const body = (await res.json()) as { error: { code: string; details: { request_id: string } } };
     expect(res.status).toBe(500);
