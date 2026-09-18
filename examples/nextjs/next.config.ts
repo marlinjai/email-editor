@@ -4,18 +4,9 @@ import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
-  transpilePackages: [
-    "@marlinjai/email-editor",
-    "@marlinjai/email-editor-core",
-    "@marlinjai/email-editor-ui",
-    "@marlinjai/email-editor-blocks",
-    "@marlinjai/email-templates",
-    "@marlinjai/email-contacts",
-    "@marlinjai/email-campaigns",
-    "@marlinjai/email-analytics",
-    "@marlinjai/email-teams",
-    "@marlinjai/email-automation",
-  ],
+  // The editor packages ship compiled ESM and CommonJS, so they need no
+  // transpilePackages entry. MJML is Node-only and resolves files at runtime:
+  // keep it out of the server bundle.
   serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
 };
 
