@@ -255,10 +255,11 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
         });
       }
       const rejected: RecipientBatchResult['rejected'] = [];
+      const created = { count: 0 };
       const seen = new Set<string>();
       const items: Array<{ email: string; contactId: string; merge: Record<string, unknown> }> = [];
       for (const [index, item] of input.recipients.entries()) {
-        const contact = await findOrCreateContact(tx, r, access.workspaceId, mailing.topic_id, item);
+        const contact = await findOrCreateContact(created, r, access.workspaceId, mailing.topic_id, item);
         if (!contact) {
           rejected.push({ index, reason: 'unknown_contact' });
           continue;
@@ -270,6 +271,9 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
         seen.add(contact.email);
         items.push({ email: contact.email, contactId: contact.id, merge: item.merge ?? {} });
       }
+      // S5: new contacts count against the plan, checked once for the batch; a
+      // batch that does not fit rolls back whole, contacts included.
+      if (created.count > 0) await assertWithinLimit(tx, access.workspaceId, 'contacts');
       const { added, alreadyPresent } = await r.recipients.addMany(access.workspaceId, id, items);
       return { added: added.length, already_present: alreadyPresent.length, rejected };
     });
@@ -510,7 +514,7 @@ async function audit(
  * a person who left the topic stays out (the worker checks at claim time).
  */
 async function findOrCreateContact(
-  tx: Db,
+  created: { count: number },
   r: Repos,
   workspaceId: string,
   topicId: string,
@@ -529,8 +533,7 @@ async function findOrCreateContact(
   if (existing) return existing;
   const inserted = await r.contacts.insert(workspaceId, { email, externalId: item.external_id ?? null });
   if (!inserted) return r.contacts.byEmail(workspaceId, email);
-  // S5: a new contact counts against the plan; the whole batch rolls back when it does not fit.
-  await assertWithinLimit(tx, workspaceId, 'contacts');
   await r.contacts.subscribe(workspaceId, inserted.id, topicId);
+  created.count++;
   return inserted;
 }
