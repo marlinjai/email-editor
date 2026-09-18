@@ -99,9 +99,7 @@
 
 ## Future
 
-- [ ] Live database integration via `@marlinjai/data-table-core` `DatabaseAdapter` (replace mock adapters)
-- [ ] User authentication flow (login, signup, password reset)
-- [ ] Billing and subscription management
-- [ ] Custom domain support per workspace
-- [ ] Email preview rendering service
-- [ ] Webhook management UI for automation triggers
+The former open items here (a live database instead of the mock adapters, user
+authentication, billing, custom domains, a preview rendering service, webhook
+management) are now phases of the mail-service plan under "Now" and are tracked
+there.

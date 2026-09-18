@@ -218,6 +218,46 @@ is in scope for the service; the repository already holds first versions of all 
 it over mock adapters, and the phases below sequence them behind the parts ŌPUNTIA
 needs first.
 
+## Service architecture (decided 2026-09-18, binding for every phase)
+
+Written once so the phases built in parallel cannot drift apart:
+
+- **Layout.** The service is `apps/service` (`@email-editor/service`, private), the
+  dashboard `apps/dashboard` (`@email-editor/dashboard`, private). `apps/*` joins
+  `pnpm-workspace.yaml`. The v1 API contract (TypeScript types and zod schemas for
+  every request, response, error and webhook payload) is `packages/mail-contract`
+  (`@marlinjai/mail-contract`, published), and the typed client is
+  `packages/mail-sdk` (`@marlinjai/mail-sdk`, published). The service, the SDK and
+  the dashboard all import the contract, never their own copies of the shapes.
+- **Runtime.** Node 22, Hono on `@hono/node-server`, zod validation at the edge
+  of every route, JSON errors of the shape `{ error: { code, message, details? } }`
+  with the codes enumerated in the contract.
+- **Database.** Postgres 17 through `postgres` (porsager, as in auth-brain's app
+  package). Ordered, additive SQL files in `apps/service/migrations/NNNN_name.sql`
+  tracked in a `_migrations` table, applied by an explicit `migrate` command (the
+  container runs it before the server starts, never on build). Every
+  workspace-owned query goes through a repository function that takes
+  `workspaceId` as its first argument; there is no unscoped query helper.
+- **API keys.** `@marlinjai/brain-core` (`generateApiKey`, `hashApiKey`,
+  `verifyApiKey`, `timingSafeEqual`), shown once, stored as a hash with a display
+  prefix, `last_used_at` and `revoked_at`. The old `ek_{tier}_{random}` in-memory
+  counting in `packages/core/src/api/validation.ts` is retired.
+- **Humans.** The dashboard signs people in with `@marlinjai/auth-brain-nextjs`
+  (the pattern ŌPUNTIA's Studio uses) and calls the service server-side with a
+  dashboard service token plus the signed-in user's auth-brain subject; the service
+  checks that subject's workspace membership and role on every call. The browser
+  never holds a workspace API key.
+- **Secrets.** Infisical project for the service; the provider-credential
+  encryption key (`MAIL_SECRETS_KEY`, AES-256-GCM, versioned so it can rotate) is
+  minted with `copy_secret op=generate`, never typed.
+- **Tests.** vitest; integration suites on `@testcontainers/postgresql` (on this
+  machine run with `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock`, or they
+  skip silently); an in-process SMTP transport stub for the worker; the four paths
+  of the stateful-flow standard for every flow with state.
+- **CI.** GitHub Actions: typecheck, unit, integration against a Postgres service
+  container, build, and `roadmap-check`. Packages publish through Trusted
+  Publishing (OpenID Connect) from a tag workflow.
+
 ## Phases
 
 - **S0, foundation.** Name and domain decided; Coolify app, Postgres, Infisical
