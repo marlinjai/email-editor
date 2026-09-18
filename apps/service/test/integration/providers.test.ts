@@ -6,7 +6,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import { createServer, type AddressInfo } from 'node:net';
 import { ICLOUD_SMTP_POLICY, routes } from '@marlinjai/mail-contract';
 import { generate } from 'selfsigned';
-import { SMTPServer } from 'smtp-server';
+import { SMTPServer, type SMTPServerOptions } from 'smtp-server';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { repos } from '../../src/repo/index.js';
 import { appOver } from '../support/app-call.js';
@@ -52,7 +52,7 @@ beforeAll(async () => {
   B = await h.seedWorkspace('prov-b');
 
   const pems = await generate([{ name: 'commonName', value: 'localhost' }], { keySize: 2048 });
-  const onAuth: ConstructorParameters<typeof SMTPServer>[0]['onAuth'] = (auth, _session, cb) => {
+  const onAuth: SMTPServerOptions['onAuth'] = (auth, _session, cb) => {
     if (auth.username === USER && auth.password === PASSWORD) return cb(null, { user: auth.username });
     return cb(new Error('Invalid username or password'));
   };

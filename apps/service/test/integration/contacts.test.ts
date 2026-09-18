@@ -213,7 +213,8 @@ describe('contacts: list, get and messages', () => {
       seen.push(...page.body.data.map((c: any) => c.id));
       cursor = page.body.next_cursor;
     } while (cursor);
-    const [{ count }] = await h.sql`SELECT count(*)::int AS count FROM contacts WHERE workspace_id = ${A.id}`;
+    const [row] = await h.sql<{ count: number }[]>`SELECT count(*)::int AS count FROM contacts WHERE workspace_id = ${A.id}`;
+    const count = row!.count;
     expect(new Set(seen).size).toBe(count);
     expect(seen).toHaveLength(count);
   });
@@ -265,9 +266,9 @@ describe('contacts: erasure', () => {
 
     expect((await h.call({ path: `/v1/contacts/${contactId}`, key: A.key })).status).toBe(404);
     expect((await h.call({ path: `/v1/contacts/${contactId}/messages`, key: A.key })).status).toBe(404);
-    const [{ html }] = await h.sql`SELECT count(*)::int AS html FROM messages WHERE html LIKE ${`%${marker}%`}`;
+    const html = (await h.sql<{ html: number }[]>`SELECT count(*)::int AS html FROM messages WHERE html LIKE ${`%${marker}%`}`)[0]!.html;
     expect(html).toBe(0);
-    const [{ rcpt }] = await h.sql`SELECT count(*)::int AS rcpt FROM mailing_recipients WHERE email = ${email}`;
+    const rcpt = (await h.sql<{ rcpt: number }[]>`SELECT count(*)::int AS rcpt FROM mailing_recipients WHERE email = ${email}`)[0]!.rcpt;
     expect(rcpt).toBe(0);
     const kept = await h.call({ path: `/v1/suppressions?email=${encodeURIComponent(email)}`, key: A.key });
     expect(kept.body.data).toHaveLength(2);
