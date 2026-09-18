@@ -13,7 +13,7 @@ export function useAction() {
   const [error, setError] = useState<ActionError | null>(null);
 
   const run = useCallback(
-    <T,>(action: () => Promise<ActionResult<T>>, onSuccess?: (data: T) => void) =>
+    <T>(action: () => Promise<ActionResult<T>>, onSuccess?: (data: T) => void) =>
       new Promise<ActionResult<T>>((resolve) => {
         setError(null);
         start(async () => {

@@ -14,7 +14,12 @@ export default async function WorkspaceLayout({ children, params }: { children: 
   if (!ctx.ok) {
     return (
       <main className="mx-auto max-w-[560px] px-6 py-24">
-        <ErrorPanel title="Your workspaces could not be loaded" message={ctx.error.message} requestId={ctx.error.requestId} action={<LinkButton href={`/w/${ws}`}>Try again</LinkButton>} />
+        <ErrorPanel
+          title="Your workspaces could not be loaded"
+          message={ctx.error.message}
+          requestId={ctx.error.requestId}
+          action={<LinkButton href={`/w/${ws}`}>Try again</LinkButton>}
+        />
       </main>
     );
   }
@@ -23,7 +28,8 @@ export default async function WorkspaceLayout({ children, params }: { children: 
       <main className="mx-auto max-w-[560px] px-6 py-24">
         <h1 className="text-[20px] font-semibold">Not a workspace of yours</h1>
         <p className="mt-2 text-[14px] text-muted">
-          This workspace does not exist, or you are not a member of it. If someone invited you, open the invitation link they sent while signed in as {viewer.email}.
+          This workspace does not exist, or you are not a member of it. If someone invited you, open the invitation link they sent while
+          signed in as {viewer.email}.
         </p>
         <LinkButton href="/" variant="primary" className="mt-6">
           Go to my workspaces

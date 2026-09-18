@@ -18,4 +18,4 @@ export type ActionError = {
 
 export type ActionResult<T = null> = { ok: true; data: T } | { ok: false; error: ActionError };
 
-export const ok = <T,>(data: T): ActionResult<T> => ({ ok: true, data });
+export const ok = <T>(data: T): ActionResult<T> => ({ ok: true, data });

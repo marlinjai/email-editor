@@ -12,7 +12,7 @@
     "dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4 --domain=https://infisical.lumitra.co --env=dev --path=/dashboard -- next dev --port 3100",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit",
+    "lint": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "clean": "rm -rf .next"

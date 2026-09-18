@@ -16,9 +16,12 @@ export default async function NewWorkspacePage({ searchParams }: { searchParams:
   return (
     <main className="mx-auto flex min-h-dvh max-w-[480px] flex-col justify-center px-6 py-16">
       <BrandMark size={40} />
-      <h1 className="mt-8 text-[24px] font-semibold tracking-[-0.025em]">{first && !hasAny ? 'Create your first workspace' : 'New workspace'}</h1>
+      <h1 className="mt-8 text-[24px] font-semibold tracking-[-0.025em]">
+        {first && !hasAny ? 'Create your first workspace' : 'New workspace'}
+      </h1>
       <p className="mt-2 text-[14px] text-muted">
-        A workspace holds one sender&apos;s templates, contacts, mailings and settings. You will be its owner and can invite others afterwards.
+        A workspace holds one sender&apos;s templates, contacts, mailings and settings. You will be its owner and can invite others
+        afterwards.
       </p>
       <div className="mt-8">
         <CreateWorkspaceForm companies={viewer.companies} defaultCompanyId={viewer.activeCompanyId} />

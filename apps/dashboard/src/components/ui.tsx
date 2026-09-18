@@ -45,7 +45,14 @@ export function LinkButton({ variant = 'secondary', className = '', ...rest }: C
 
 export function Spinner({ label }: { label?: string }) {
   return (
-    <svg className="size-3.5 animate-spin" viewBox="0 0 16 16" fill="none" aria-hidden={label ? undefined : true} role={label ? 'img' : undefined} aria-label={label}>
+    <svg
+      className="size-3.5 animate-spin"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden={label ? undefined : true}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+    >
       <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
       <path d="M14.5 8A6.5 6.5 0 0 0 8 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
@@ -65,7 +72,7 @@ export function Textarea({ className = '', ...rest }: ComponentProps<'textarea'>
 
 export function Select({ className = '', children, ...rest }: ComponentProps<'select'>) {
   return (
-    <select {...rest} className={`${CONTROL} appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><path d=%22M4 6l4 4 4-4%22 fill=%22none%22 stroke=%22%23a89f8c%22 stroke-width=%221.5%22/></svg>')] bg-[length:14px] bg-[right_10px_center] bg-no-repeat pr-8 ${className}`}>
+    <select {...rest} className={`${CONTROL} select-chevron appearance-none pr-8 ${className}`}>
       {children}
     </select>
   );
@@ -127,7 +134,9 @@ const TONES: Record<Tone, string> = {
 
 export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-px text-[11.5px] font-medium ${TONES[tone]}`}>{children}</span>
+    <span className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-px text-[11.5px] font-medium ${TONES[tone]}`}>
+      {children}
+    </span>
   );
 }
 
@@ -143,7 +152,17 @@ export function PageHeader({ title, description, actions }: { title: ReactNode; 
   );
 }
 
-export function Section({ title, description, actions, children }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+export function Section({
+  title,
+  description,
+  actions,
+  children,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="border-t border-line pt-6 pb-8">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -174,7 +193,17 @@ export function EmptyState({ title, children, action }: { title: ReactNode; chil
 }
 
 /** A failure the person can read, with the service's request id for support. */
-export function ErrorPanel({ title = 'This could not be loaded', message, requestId, action }: { title?: string; message: string; requestId?: string | null; action?: ReactNode }) {
+export function ErrorPanel({
+  title = 'This could not be loaded',
+  message,
+  requestId,
+  action,
+}: {
+  title?: string;
+  message: string;
+  requestId?: string | null;
+  action?: ReactNode;
+}) {
   return (
     <div role="alert" className="rounded-xl border border-[rgba(255,138,128,0.3)] bg-danger-wash px-5 py-4">
       <p className="text-[14px] font-semibold text-danger">{title}</p>
@@ -218,7 +247,14 @@ export function Table({ children, label }: { children: ReactNode; label: string 
 }
 
 export function Th({ children, className = '' }: { children?: ReactNode; className?: string }) {
-  return <th scope="col" className={`border-b border-line px-4 py-2.5 text-[11.5px] font-medium tracking-wide text-faint uppercase ${className}`}>{children}</th>;
+  return (
+    <th
+      scope="col"
+      className={`border-b border-line px-4 py-2.5 text-[11.5px] font-medium tracking-wide text-faint uppercase ${className}`}
+    >
+      {children}
+    </th>
+  );
 }
 
 export function Td({ children, className = '' }: { children?: ReactNode; className?: string }) {

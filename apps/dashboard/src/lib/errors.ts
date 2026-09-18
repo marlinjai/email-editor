@@ -24,7 +24,8 @@ const MESSAGES: Record<ErrorCode, string> = {
   last_owner: 'A workspace needs at least one owner. Make someone else an owner first.',
   payload_too_large: 'That is too large to upload or save.',
   compile_failed: 'The email does not compile. Fix the errors shown in the preview before sending.',
-  missing_unsubscribe_url: 'The email has no unsubscribe link. Add {{unsubscribe_url}} to the template, usually in the footer, before sending.',
+  missing_unsubscribe_url:
+    'The email has no unsubscribe link. Add {{unsubscribe_url}} to the template, usually in the footer, before sending.',
   mailing_not_ready: 'Add at least one recipient before sending.',
   unknown_topic: 'That topic does not exist in this workspace. Pick one from the list.',
   unknown_provider: 'That provider does not exist in this workspace. Pick one from the list.',
@@ -39,7 +40,14 @@ const MESSAGES: Record<ErrorCode, string> = {
 };
 
 /** Codes whose service message carries the specific reason and is worth showing as is. */
-const SERVICE_MESSAGE_WINS: ReadonlySet<ErrorCode> = new Set(['validation_failed', 'mailing_invalid_state', 'conflict', 'already_exists', 'insufficient_role', 'provider_error']);
+const SERVICE_MESSAGE_WINS: ReadonlySet<ErrorCode> = new Set([
+  'validation_failed',
+  'mailing_invalid_state',
+  'conflict',
+  'already_exists',
+  'insufficient_role',
+  'provider_error',
+]);
 
 type Issue = { path?: Array<string | number>; message?: string };
 
@@ -68,10 +76,23 @@ export function describeError(err: unknown): ActionError {
     };
   }
   if (err instanceof MailTimeoutError || err instanceof MailNetworkError) {
-    return { code: 'network', message: 'The mail service could not be reached. Check back in a moment; nothing was changed unless the page says so.' };
+    return {
+      code: 'network',
+      message: 'The mail service could not be reached. Check back in a moment; nothing was changed unless the page says so.',
+    };
+  }
+  if (err instanceof Error && err.name === 'DashboardConfigError') {
+    return {
+      code: 'service_unavailable',
+      message: 'The dashboard is not configured to reach the mail service. This is on our side; nothing was changed.',
+    };
   }
   if (err instanceof MailResponseValidationError) {
-    return { code: 'internal_error', message: 'The mail service answered in a shape this dashboard does not expect. Reload; if it persists, the two are out of step after a deploy.' };
+    return {
+      code: 'internal_error',
+      message:
+        'The mail service answered in a shape this dashboard does not expect. Reload; if it persists, the two are out of step after a deploy.',
+    };
   }
   return { code: 'internal_error', message: MESSAGES.internal_error };
 }

@@ -9,13 +9,14 @@ import type { ActionResult } from './result';
 export const LAST_WORKSPACE_COOKIE = 'mail_last_ws';
 
 /** Every mail workspace the signed-in person belongs to, all pages of it. */
-export const listMyWorkspaces = cache(async (): Promise<ActionResult<WorkspaceMembership[]>> =>
-  act('workspaces.list', async () => {
-    const { api } = await mail();
-    const all: WorkspaceMembership[] = [];
-    for await (const w of api.paginate('workspaces.list', { query: { limit: 100 } })) all.push(w);
-    return all;
-  }),
+export const listMyWorkspaces = cache(
+  async (): Promise<ActionResult<WorkspaceMembership[]>> =>
+    act('workspaces.list', async () => {
+      const { api } = await mail();
+      const all: WorkspaceMembership[] = [];
+      for await (const w of api.paginate('workspaces.list', { query: { limit: 100 } })) all.push(w);
+      return all;
+    }),
 );
 
 export type WorkspaceContext = {

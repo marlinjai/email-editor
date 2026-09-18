@@ -18,7 +18,8 @@ export default function NoAccessPage() {
         <BrandMark size={44} />
         <h1 className="mt-8 text-[24px] font-semibold tracking-[-0.025em]">No access to Lumitra Mail</h1>
         <p className="mt-2 text-[14.5px] text-muted">
-          You are signed in, but none of your companies has Lumitra Mail enabled. If you have another Lumitra account that does, sign out and sign in with that one. Otherwise ask your company&apos;s owner to enable Lumitra Mail.
+          You are signed in, but none of your companies has Lumitra Mail enabled. If you have another Lumitra account that does, sign out
+          and sign in with that one. Otherwise ask your company&apos;s owner to enable Lumitra Mail.
         </p>
         <a href={auth.logoutUrl('/')} className={buttonClass('primary', 'mt-8')}>
           Sign out

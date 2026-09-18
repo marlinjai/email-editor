@@ -65,9 +65,7 @@ export function decodeTestIdentity(value: string | undefined): TestIdentity | nu
     if (typeof parsed.subject !== 'string' || parsed.subject.length === 0) return null;
     if (typeof parsed.email !== 'string' || !parsed.email.includes('@')) return null;
     const companies = Array.isArray(parsed.companies)
-      ? parsed.companies.filter(
-          (c): c is { id: string; name: string } => typeof c?.id === 'string' && typeof c?.name === 'string',
-        )
+      ? parsed.companies.filter((c): c is { id: string; name: string } => typeof c?.id === 'string' && typeof c?.name === 'string')
       : [];
     return {
       subject: parsed.subject,

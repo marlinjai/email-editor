@@ -197,7 +197,10 @@ export function SecretOnceDialog({
       }
     >
       <div className="flex items-stretch gap-2">
-        <code data-testid="secret-value" className="min-w-0 flex-1 rounded-lg border border-line-strong bg-bg px-3 py-2 font-mono text-[12.5px] break-all text-ink select-all">
+        <code
+          data-testid="secret-value"
+          className="min-w-0 flex-1 rounded-lg border border-line-strong bg-bg px-3 py-2 font-mono text-[12.5px] break-all text-ink select-all"
+        >
           {secret}
         </code>
         <Button
@@ -214,7 +217,11 @@ export function SecretOnceDialog({
         </Button>
       </div>
       <p aria-live="polite" className="min-h-[18px] text-[12.5px] text-muted">
-        {copied === 'copied' ? 'Copied to the clipboard.' : copied === 'failed' ? 'The clipboard is not available here; select the text and copy it.' : ''}
+        {copied === 'copied'
+          ? 'Copied to the clipboard.'
+          : copied === 'failed'
+            ? 'The clipboard is not available here; select the text and copy it.'
+            : ''}
       </p>
       {children}
     </Dialog>

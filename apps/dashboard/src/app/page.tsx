@@ -16,7 +16,12 @@ export default async function Home() {
   if (!list.ok) {
     return (
       <main className="mx-auto max-w-[560px] px-6 py-24">
-        <ErrorPanel title="Your workspaces could not be loaded" message={list.error.message} requestId={list.error.requestId} action={<LinkButton href="/">Try again</LinkButton>} />
+        <ErrorPanel
+          title="Your workspaces could not be loaded"
+          message={list.error.message}
+          requestId={list.error.requestId}
+          action={<LinkButton href="/">Try again</LinkButton>}
+        />
       </main>
     );
   }

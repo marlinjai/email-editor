@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { Slug } from '@marlinjai/mail-sdk';
-import { act, parseInput } from '@/lib/action';
+import { act, DashboardRefusal, parseInput } from '@/lib/action';
 import { mail } from '@/lib/mail';
 import type { ActionResult } from '@/lib/result';
 
@@ -21,15 +21,13 @@ const CreateWorkspaceInput = z.object({
 export async function createWorkspace(input: z.input<typeof CreateWorkspaceInput>): Promise<ActionResult<{ id: string }>> {
   const parsed = parseInput(CreateWorkspaceInput, input);
   if (!parsed.ok) return parsed;
-  const { api, viewer } = await mail();
-  const company = viewer.companies.find((c) => c.id === parsed.data.companyId);
-  if (!company) {
-    return {
-      ok: false,
-      error: { code: 'forbidden', message: 'You can only create a workspace for a company you belong to.', fields: { companyId: 'Choose one of your companies' } },
-    };
-  }
   return act('workspaces.create', async () => {
+    const { api, viewer } = await mail();
+    const company = viewer.companies.find((c) => c.id === parsed.data.companyId);
+    if (!company)
+      throw new DashboardRefusal('forbidden', 'You can only create a workspace for a company you belong to.', {
+        companyId: 'Choose one of your companies',
+      });
     const ws = await api.workspaces.create({
       name: parsed.data.name,
       slug: parsed.data.slug,

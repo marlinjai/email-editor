@@ -3,7 +3,17 @@ import type { SVGProps } from 'react';
 /** One icon family: 24px grid, 1.6 stroke, round joins. Decorative unless labelled by the caller. */
 function Icon({ children, ...rest }: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="size-4 shrink-0" {...rest}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="size-4 shrink-0"
+      {...rest}
+    >
       {children}
     </svg>
   );
