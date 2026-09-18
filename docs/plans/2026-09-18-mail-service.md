@@ -376,3 +376,11 @@ later decision can overturn:
    package still has to be registered as a trusted publisher on npmjs.com by
    Marlin before the first publish succeeds (a 404 on the upload means it is not
    registered yet). Until then hosts consume the packages from the workspace.
+5. **Contract details the plan left open** (fixed in `@marlinjai/mail-contract`,
+   2026-09-18): a recipient whose outcome is unknown after a crash ends `skipped`
+   with `skip_reason` `outcome_unknown` rather than `failed`, so `retry-failed`
+   never touches it unless called with `include_outcome_unknown: true`; API keys
+   carry a scope (`full`, `send`, `read`) that maps with member roles onto each
+   route's access level; a mailing carries up to 20 string `metadata` values that
+   every message webhook echoes (how ŌPUNTIA learns `sent_by`); webhook signatures
+   are `v1=<hex>` over `${timestamp}.${rawBody}` with a 300 second tolerance.

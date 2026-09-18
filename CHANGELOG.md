@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Mail service API contract (`@marlinjai/mail-contract` 0.1.0)
+- zod schemas and types for every v1 request, response and error of the mail
+  service (workspaces, members, API keys, audit log, templates, compile, assets,
+  providers, topics, contacts, suppressions, mailings, recipients, messages,
+  webhooks), plus typed S4 (platform) and S5 (billing) namespaces.
+- A typed route table (operation id to method, path, schemas, access, phase),
+  the mailing state machine as data, the error-code-to-status map, and webhook
+  signing and verification over Web Crypto.
+- Documentation: `docs/public/mail-contract.md`.
+
 #### Canvas UX (depth-2 nested columns)
 - A column can be split into 2-4 sub-columns via the inspector or merged
   back into a single column. Sub-columns hold leaf blocks only (text, image,
