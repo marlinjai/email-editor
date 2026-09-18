@@ -52,7 +52,7 @@ export function Composer({ initial }: { initial?: TemplateSnapshotOut }) {
 | `onExport` | `(doc) => void` | Shows an Export button; compile the document on your server. |
 | `onNavigateBack` | `() => void` | Shows a back arrow in the toolbar. |
 | `onRequestImage` | `(request) => Promise<{ url, alt? } \| null>` | Your image picker, see below. |
-| `blocks` | `BlockDefinition[]` | Extra block types to register next to the standard ones. |
+| `blocks` | `BlockDefinition[]` | Redefine standard block types (label, icon, category, default props). A new block type is refused with an error. |
 | `theme` | `EditorTheme` | Brand colors and font of the editor chrome, see below. |
 
 ## Next.js (App Router)

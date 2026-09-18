@@ -70,7 +70,7 @@ Template → sections[] → columns[] → blocks[]
 - Zod validation schema
 - MJML compiler function
 
-Register blocks via `BlockRegistry.register()`. `createStandardBlockRegistry()` from the blocks package registers all 14 built-in types. Custom blocks follow the same interface.
+Register blocks via `BlockRegistry.register()`. `createStandardBlockRegistry()` from the blocks package registers all 14 built-in types. Hosts can redefine a standard type through the editor's `blocks` option; a new block type is refused at setup, since the MST `BlockType` enumeration, the canvas renderers and the server compiler only know the 14 standard ones.
 
 ### Client/Server Split
 The MJML compiler lives only in `core/server`. The client bundle must never include it (mjml is a heavy Node.js-only dependency). Template compilation always happens server-side. The pattern in consuming apps:

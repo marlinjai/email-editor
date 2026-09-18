@@ -47,7 +47,7 @@ pnpm run build
 ```
 
 This builds the **editor layer** (4 packages):
-- `packages/core` - Schema, MST store, MJML compiler
+- `packages/core` - Schema, MobX State Tree (MST) store, MJML (Mailjet Markup Language) compiler
 - `packages/ui` - React components
 - `packages/blocks` - 14 block definitions + 35 prebuilt templates
 - `packages/editor` - Public API
@@ -60,13 +60,13 @@ And the **platform layer** (8 packages):
 - `packages/analytics` - Tracking, heatmaps, engagement scoring
 - `packages/teams` - Workspaces, roles, approvals, brand kit
 - `packages/automation` - Trigger sequences, conditional logic
-- `packages/shared` - Cross-package infrastructure
+- `packages/shared` - Cross-package infrastructure (`@email-editor/shared`, private and workspace-only, not published)
 
 ### 3. Run Example App
 
 ```bash
-cd examples/nextjs
-pnpm run dev
+# From the monorepo root
+pnpm -F email-editor-nextjs-example dev
 ```
 
 Open http://localhost:3000 to see the editor.
@@ -75,33 +75,73 @@ Open http://localhost:3000 to see the editor.
 
 ### Basic Integration
 
+```bash
+pnpm add @marlinjai/email-editor @marlinjai/email-editor-core react react-dom
+```
+
 ```tsx
-import { EmailEditorReact } from '@marlinjai/email-editor/react';
+'use client';
+
+import { useState } from 'react';
+import { EmailEditorReact, type TemplateSnapshotOut } from '@marlinjai/email-editor/react';
 import '@marlinjai/email-editor/styles.css';
 
-function App() {
-  const [template, setTemplate] = useState(initialTemplate);
+function App({ initial }: { initial?: TemplateSnapshotOut }) {
+  const [doc, setDoc] = useState(initial);
 
+  // The editor fills its container, so the container needs a height.
   return (
-    <EmailEditorReact
-      value={template}
-      onChange={setTemplate}
-      uploadAsset={uploadFn}
-    />
+    <div style={{ height: '80vh' }}>
+      <EmailEditorReact
+        initialTemplate={initial}
+        onChange={setDoc}
+        onRequestImage={async () => {
+          const picked = await openMyMediaLibrary(); // your own picker
+          return picked ? { url: picked.url, alt: picked.alt } : null;
+        }}
+      />
+    </div>
   );
 }
 ```
 
-### With API Key (Production)
+- The editor is uncontrolled: `initialTemplate` is read once on mount. To load a different document, remount it with a new `key`.
+- `onChange` receives the whole document, debounced by 300 ms. Persist it as JSON.
+- `onRequestImage` is optional: it lets the image block use your own picker or uploader instead of a plain URL field. See `packages/editor/README.md` for its full contract.
+
+### Styles
+
+Import `@marlinjai/email-editor/styles.css` once. Every rule in it is scoped under `.ee-root`, so it is safe beside Tailwind CSS 4 or any other host styles, and nothing in your Tailwind configuration needs to change. Brand the editor chrome with the `theme` prop (it sets the `--ee-*` design tokens), or override `--ee-*` tokens on `.ee-root` in your own CSS.
+
+### Next.js (App Router)
+
+The editor runs in the browser only. Load it with `next/dynamic` and `ssr: false` from a `'use client'` file:
 
 ```tsx
-<EmailEditorReact
-  value={template}
-  onChange={setTemplate}
-  apiKey={process.env.EMAIL_EDITOR_API_KEY}
-  compileEndpoint="/api/compile"
-/>
+'use client';
+
+import dynamic from 'next/dynamic';
+import '@marlinjai/email-editor/styles.css';
+
+const EmailEditorReact = dynamic(
+  () => import('@marlinjai/email-editor/react').then((mod) => mod.EmailEditorReact),
+  { ssr: false, loading: () => <p>Loading editor...</p> }
+);
 ```
+
+In `next.config.ts`, keep MJML out of the server bundle:
+
+```ts
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
+};
+
+export default nextConfig;
+```
+
+`transpilePackages` is not needed: the packages ship compiled ECMAScript modules (ESM) and CommonJS. Compile documents on the server with `migrateTemplate` and `createMJMLCompiler`, as shown in the [Integration](./integration) guide.
 
 ## Installing Platform Packages
 

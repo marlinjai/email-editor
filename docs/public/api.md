@@ -25,40 +25,46 @@ interface EditorOptions {
   container: HTMLElement;          // DOM element to mount editor
   initialValue?: EmailTemplate;    // Starting template
   theme?: EditorTheme;             // Custom theme
-  blocks?: BlockDefinition[];      // Custom blocks
+  blocks?: BlockDefinition[];      // Redefine standard block types; new types are refused
   onChange?: (template: EmailTemplate) => void;
-  onSave?: (template: EmailTemplate) => void;
+  onSave?: (template: EmailTemplate) => void;    // Receives the current template
+  onRequestImage?: OnRequestImage;               // Your image picker, see below
 }
 ```
+
+`createEditor` still needs `react` and `react-dom` installed (the editor is built with React), but your app does not have to use React. Import `@marlinjai/email-editor/styles.css` once.
 
 #### Returns
 
 ```typescript
 interface EditorInstance {
-  getValue(): EmailTemplate;
+  getValue(): EmailTemplate;              // The latest document
   setValue(template: EmailTemplate): void;
-  getHTML(): string;
-  getMJML(): string;
-  undo(): void;
-  redo(): void;
-  destroy(): void;
+  getHTML(): string;                      // Placeholder: returns '' (compile on the server)
+  getMJML(): string;                      // Placeholder: returns '' (compile on the server)
+  undo(): void;                           // Not implemented yet: use the toolbar or Cmd/Ctrl+Z
+  redo(): void;                           // Not implemented yet: use the toolbar or Cmd/Ctrl+Shift+Z
+  destroy(): void;                        // Unmounts the editor
 }
 ```
 
 #### Example
 
 ```javascript
+import { createEditor } from '@marlinjai/email-editor';
+import '@marlinjai/email-editor/styles.css';
+
 const editor = createEditor({
   container: document.getElementById('editor'),
   initialValue: myTemplate,
   onChange: (template) => {
     console.log('Changed:', template);
   },
+  theme: { colors: { primary: '#0f766e' } },
 });
 
-// Get output
-const html = editor.getHTML();
-const mjml = editor.getMJML();
+// Latest document, to send to your server for compilation
+const doc = editor.getValue();
 
 // Clean up
 editor.destroy();
@@ -66,30 +72,70 @@ editor.destroy();
 
 ### EmailEditorReact Component
 
-React wrapper for the editor.
+React wrapper for the editor, imported from `@marlinjai/email-editor/react`. It is uncontrolled: `initialTemplate` is read once, on mount. To load a different document, remount it with a new `key`.
 
 #### Props
 
 ```typescript
 interface EmailEditorReactProps {
-  value: EmailTemplate;
-  onChange: (template: EmailTemplate) => void;
-  theme?: EditorTheme;
-  blocks?: BlockDefinition[];
-  onSave?: () => void;
+  initialTemplate?: TemplateSnapshotIn;                 // Document to open; omit for an empty email
+  onChange?: (template: TemplateSnapshotOut) => void;   // Whole document after edits, debounced by 300 ms
+  onSave?: () => void;                                  // Shows a Save button in the toolbar
+  onExport?: (template: TemplateSnapshotOut) => void;   // Shows an Export button; compile on your server
+  onNavigateBack?: () => void;                          // Shows a back arrow in the toolbar
+  onRequestImage?: OnRequestImage;                      // Your image picker, see below
+  blocks?: BlockDefinition[];                           // Extra block types next to the standard ones
+  theme?: EditorTheme;                                  // Brand colors and font of the editor chrome
 }
 ```
 
 #### Example
 
 ```tsx
-<EmailEditorReact
-  value={template}
-  onChange={setTemplate}
-  theme={customTheme}
-  onSave={handleSave}
-/>
+'use client';
+
+import { useState } from 'react';
+import { EmailEditorReact, type TemplateSnapshotOut } from '@marlinjai/email-editor/react';
+import '@marlinjai/email-editor/styles.css';
+
+function Composer({ initial }: { initial?: TemplateSnapshotOut }) {
+  const [doc, setDoc] = useState(initial);
+
+  // The editor fills its container, so the container needs a height.
+  return (
+    <div style={{ height: '80vh' }}>
+      <EmailEditorReact
+        initialTemplate={initial}
+        onChange={setDoc}
+        theme={customTheme}
+        onSave={() => handleSave(doc)}
+      />
+    </div>
+  );
+}
 ```
+
+In Next.js, load the component with `next/dynamic` and `ssr: false` from a `'use client'` file, and set `serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator']` in `next.config.ts`; `transpilePackages` is not needed. See the [Integration](./integration) guide.
+
+### onRequestImage
+
+```typescript
+type OnRequestImage = (request: ImageRequest) => Promise<RequestedImage | null>;
+
+interface ImageRequest {
+  blockId: string;       // The block the image is for
+  blockType: string;     // The block type asking (today always 'image')
+  currentUrl?: string;
+  currentAlt?: string;
+}
+
+interface RequestedImage {
+  url: string;           // Must be publicly reachable by recipients' mail clients
+  alt?: string;
+}
+```
+
+Without the hook, the image block's inspector shows a plain URL field. With it, the inspector shows a Choose image button that calls your function. Resolve with `null` to cancel, or reject to show the error message inline. The full behavior is documented in `packages/editor/README.md`.
 
 ## Core Types
 
@@ -202,6 +248,8 @@ interface ImageBlock extends BaseBlock {
   borderRadius?: string;
 }
 ```
+
+The host can supply `src` and `alt` from its own image picker through [`onRequestImage`](#onrequestimage).
 
 #### ButtonBlock
 
@@ -377,17 +425,46 @@ import { createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
 const prebuiltRegistry = createStandardPrebuiltRegistry();
 ```
 
+## Document Validation
+
+### migrateTemplate(doc)
+
+Validates a stored or incoming document and returns it at the current schema version. Import it from `@marlinjai/email-editor-core`. Every document carries a schema `version` (today `"1.0"`, exported as `CURRENT_TEMPLATE_VERSION`); for `1.0` it returns the same object, validated. Run documents through it before compiling and when loading them from storage.
+
+```typescript
+import { migrateTemplate, isTemplateMigrationError } from '@marlinjai/email-editor-core';
+
+try {
+  const doc = migrateTemplate(input);
+} catch (error) {
+  if (isTemplateMigrationError(error)) {
+    console.error(error.code, error.message, error.issues);
+  }
+}
+```
+
+It throws a `TemplateMigrationError` whose `code` is one of:
+
+| `code` | Meaning |
+|--------|---------|
+| `INVALID_INPUT` | Not an object, so not a document. |
+| `MISSING_VERSION` | No `version` string. |
+| `UNSUPPORTED_VERSION` | Malformed version, or an older one with no migration. |
+| `NEWER_VERSION` | Written by a newer editor. Upgrade these packages to open it. |
+| `INVALID_DOCUMENT` | The version is known but the document fails its schema; `issues` lists where. |
+
 ## MJML Compiler
 
 ### createMJMLCompiler()
 
-Create a compiler instance. **Server-side only** -- import from the `/server` entry point.
+Create a compiler instance for MJML (Mailjet Markup Language). **Server-side only** -- import from the `/server` entry point, never from client code. Validate the document with `migrateTemplate` first.
 
 ```typescript
+import { migrateTemplate } from '@marlinjai/email-editor-core';
 import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
 
 const compiler = createMJMLCompiler();
-const result = compiler.compile(template);
+const result = compiler.compile(migrateTemplate(template));
 
 console.log(result.html);   // Compiled HTML
 console.log(result.mjml);   // MJML source
@@ -429,17 +506,19 @@ store.template.findBlockById('block-1')?.updateStyle('color', 'red');
 ```typescript
 interface EditorTheme {
   colors?: {
-    primary?: string;
-    surface?: string;
-    text?: string;
-    border?: string;
+    primary?: string;       // --ee-accent: primary buttons, selection, focus rings
+    primaryHover?: string;  // --ee-accent-hover
+    surface?: string;       // --ee-canvas-2: light panel surfaces
+    text?: string;          // --ee-text-dark: text on light surfaces
+    border?: string;        // --ee-border-light: borders on light surfaces
   };
   fonts?: {
-    heading?: string;
-    body?: string;
+    body?: string;          // --ee-font-sans: font stack of the editor chrome
   };
 }
 ```
+
+Each value sets one design token on the editor's root element (`.ee-root`) only. Any `--ee-*` token can also be overridden on `.ee-root` in your own CSS, outside any `@layer`. The stylesheet (`@marlinjai/email-editor/styles.css`) is scoped under `.ee-root` and safe beside Tailwind CSS 4, with no Tailwind configuration change.
 
 ## Platform Package APIs
 
@@ -517,6 +596,8 @@ interface EditorTheme {
 | `SequenceBuilder`, `AutomationList`, `EnrollmentStatusView` | React components |
 
 ### @email-editor/shared
+
+Private, workspace-only package inside this monorepo; not published to npm.
 
 | Export | Description |
 |--------|-------------|

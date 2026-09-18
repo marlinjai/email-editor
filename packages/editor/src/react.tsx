@@ -7,6 +7,7 @@ import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@ma
 import { EmailEditor, type OnRequestImage } from '@marlinjai/email-editor-ui';
 import type { EditorTheme } from './types';
 import { themeToStyle } from './theme';
+import { assertSupportedBlocks } from './blocks';
 
 interface EmailEditorReactProps {
   /** Initial template data (uncontrolled) */
@@ -15,7 +16,7 @@ interface EmailEditorReactProps {
   onChange?: (template: TemplateSnapshotOut) => void;
   /** Editor theme */
   theme?: EditorTheme;
-  /** Additional block definitions */
+  /** Redefine standard block types (label, icon, category, default props). New types are refused. */
   blocks?: BlockDefinition[];
   /** Called when save button is clicked */
   onSave?: () => void;
@@ -47,8 +48,12 @@ export function EmailEditorReact({
   onRequestImage,
 }: EmailEditorReactProps) {
   const [registry] = useState(() => {
+    assertSupportedBlocks(blocks);
     const reg = createStandardBlockRegistry();
-    blocks.forEach((block) => reg.register(block));
+    blocks.forEach((block) => {
+      reg.unregister(block.type); // replace the standard definition quietly
+      reg.register(block);
+    });
     return reg;
   });
 

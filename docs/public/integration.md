@@ -15,34 +15,90 @@ projects: [email-editor]
 ## Installation
 
 ```bash
-pnpm install @marlinjai/email-editor
+pnpm add @marlinjai/email-editor @marlinjai/email-editor-core react react-dom
 ```
+
+`@marlinjai/email-editor-core` is needed directly for validating and compiling documents on your server.
 
 ## Quick Start
 
 ### React Integration
 
 ```tsx
-import { EmailEditorReact } from '@marlinjai/email-editor/react';
-import '@marlinjai/email-editor/styles.css';
+'use client';
+
 import { useState } from 'react';
+import {
+  EmailEditorReact,
+  type TemplateSnapshotIn,
+  type TemplateSnapshotOut,
+} from '@marlinjai/email-editor/react';
+import '@marlinjai/email-editor/styles.css';
+
+const initialTemplate: TemplateSnapshotIn = {
+  id: 'welcome-email',
+  version: '1.0',
+  metadata: { subject: 'My Email' },
+  sections: [],
+};
 
 function App() {
-  const [template, setTemplate] = useState({
-    version: '1.0',
-    metadata: { subject: 'My Email' },
-    sections: [],
-  });
+  const [doc, setDoc] = useState<TemplateSnapshotOut>();
 
+  // The editor fills its container, so the container needs a height.
   return (
-    <EmailEditorReact
-      value={template}
-      onChange={setTemplate}
-      onSave={() => console.log('Saved!', template)}
-    />
+    <div style={{ height: '80vh' }}>
+      <EmailEditorReact
+        initialTemplate={initialTemplate}
+        onChange={setDoc}
+        onSave={() => console.log('Saved!', doc)}
+      />
+    </div>
   );
 }
 ```
+
+The editor is uncontrolled: `initialTemplate` is read once on mount (remount with a new `key` to load a different document), and `onChange` receives the whole document, debounced by 300 ms. Other props: `onExport(doc)` shows an Export button, `onNavigateBack()` shows a back arrow, `onRequestImage` plugs in your image picker, `blocks` registers extra block types and `theme` brands the editor chrome.
+
+### Next.js (App Router)
+
+The editor runs in the browser only, so load it with `next/dynamic` and `ssr: false` from a `'use client'` file:
+
+```tsx
+// app/compose/page.tsx
+'use client';
+
+import dynamic from 'next/dynamic';
+import '@marlinjai/email-editor/styles.css';
+
+const EmailEditorReact = dynamic(
+  () => import('@marlinjai/email-editor/react').then((mod) => mod.EmailEditorReact),
+  { ssr: false, loading: () => <p>Loading editor...</p> }
+);
+
+export default function ComposePage() {
+  return (
+    <div style={{ height: '100vh' }}>
+      <EmailEditorReact onChange={(doc) => console.log(doc)} />
+    </div>
+  );
+}
+```
+
+`next.config.ts` keeps MJML (the Mailjet Markup Language compiler, Node-only) out of the server bundle:
+
+```ts
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  // MJML is Node-only and loads files at runtime: keep it out of the server bundle.
+  serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
+};
+
+export default nextConfig;
+```
+
+`transpilePackages` is not needed: the packages ship compiled ECMAScript modules (ESM) and CommonJS. The repository's `examples/nextjs` app runs this setup on Next.js 16, React 19 and Tailwind CSS 4.
 
 ### Vanilla JavaScript
 
@@ -62,12 +118,11 @@ const editor = createEditor({
   },
 });
 
-// Get compiled HTML
-const html = editor.getHTML();
-
 // Clean up
 editor.destroy();
 ```
+
+`createEditor` still needs `react` and `react-dom` installed, but your app does not have to use React. To get HTML, send the document from `onChange` to your server and compile it there (see [Server-Side Compilation](#server-side-compilation)); `editor.getHTML()` is a placeholder that returns an empty string.
 
 ## Core Concepts
 
@@ -99,6 +154,10 @@ Drag blocks from the left toolbar onto the canvas. The editor ships with **14 bl
 
 Click any block to select it. The right panel shows editable properties like colors, alignment, and text.
 
+### Images
+
+Without further setup, the image block's inspector shows a plain URL field. Pass `onRequestImage` (to `EmailEditorReact` or `createEditor`) to show a Choose image button that opens your own picker or uploader instead. It resolves with `{ url, alt? }`, or `null` to cancel. See the "Your own image picker" section of `packages/editor/README.md` for the full contract.
+
 ### Undo/Redo
 
 - **Cmd+Z** (Mac) or **Ctrl+Z** (Windows) - Undo
@@ -110,63 +169,80 @@ Toggle between desktop and mobile views using the icons in the canvas toolbar.
 
 ## Theming
 
-Customize the editor's appearance:
+Import `@marlinjai/email-editor/styles.css` once. Every rule in it is scoped under the editor's root element (`.ee-root`), so it does not restyle your page and is safe beside Tailwind CSS 4. Nothing in your Tailwind configuration needs to change.
+
+Customize the editor chrome with the `theme` prop:
 
 ```tsx
-const theme = {
+import type { EditorTheme } from '@marlinjai/email-editor/react';
+
+const theme: EditorTheme = {
   colors: {
     primary: '#944923',
+    primaryHover: '#7a3c1d',
     surface: '#ffffff',
     text: '#1a1a1a',
     border: '#e5e5e5',
   },
   fonts: {
-    heading: 'Georgia, serif',
     body: 'Georgia, serif',
   },
 };
 
-<EmailEditorReact theme={theme} ... />
+<EmailEditorReact theme={theme} />
+```
+
+Each value sets an `--ee-*` design token on the editor's root element only. For finer control, override any `--ee-*` token in your own CSS, outside any `@layer` (the editor's stylesheet is unlayered and wins over layered rules):
+
+```css
+.ee-root {
+  --ee-midnight-2: #0b1220; /* toolbar background */
+}
 ```
 
 ## Server-Side Compilation
 
-For production use, compile MJML on the server:
+Compile on the server, never in the browser (MJML is a large Node.js dependency). Validate the document with `migrateTemplate` first:
 
 ```typescript
-// API route (Next.js example)
+// app/api/compile/route.ts
+import { migrateTemplate, isTemplateMigrationError } from '@marlinjai/email-editor-core';
 import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
 
-export async function POST(request) {
-  const template = await request.json();
-  const compiler = createMJMLCompiler();
-  const { html, mjml } = compiler.compile(template);
-
-  return Response.json({ html, mjml });
+export async function POST(request: Request) {
+  try {
+    const doc = migrateTemplate(await request.json());
+    const { html, mjml, errors } = createMJMLCompiler().compile(doc);
+    return Response.json({ html, mjml, errors });
+  } catch (error) {
+    if (isTemplateMigrationError(error)) {
+      const status = error.code === 'NEWER_VERSION' ? 422 : 400;
+      return Response.json({ error: error.message, code: error.code, issues: error.issues }, { status });
+    }
+    throw error;
+  }
 }
 ```
 
-## Custom Blocks
+Never import `@marlinjai/email-editor-core/server` from client code. Run stored documents through `migrateTemplate` when you load them, too.
 
-Register your own custom blocks:
+## Redefining Blocks
+
+The `blocks` option replaces the definition of a standard block type, for example to rename it in the palette or change what a newly dropped block contains:
 
 ```typescript
 import { createEditor } from '@marlinjai/email-editor';
+import { createStandardBlockRegistry } from '@marlinjai/email-editor-blocks';
 
-const customBlock = {
-  type: 'custom',
-  label: 'Custom Block',
-  category: 'text',
-  defaultProps: { content: 'Hello' },
-  propSchema: z.object({ content: z.string() }),
-  toMJML: (block) => `<mj-text>${block.content}</mj-text>`,
-};
+const text = createStandardBlockRegistry().get('text')!;
 
 const editor = createEditor({
-  container: document.getElementById('editor'),
-  blocks: [customBlock],
+  container: document.getElementById('editor')!,
+  blocks: [{ ...text, label: 'Paragraph', defaultProps: { ...text.defaultProps, content: '<p>Write here</p>' } }],
 });
 ```
+
+New block types are not supported yet: the document schema, the canvas and the server compiler only know the 14 standard types, so a definition with any other `type` is refused with an error when the editor is created.
 
 ## Platform Integration
 
@@ -298,6 +374,8 @@ const engine = new AutomationEngine({
 ```
 
 ### Shared Infrastructure
+
+`@email-editor/shared` is a private, workspace-only package inside this monorepo; it is not published to npm.
 
 ```typescript
 import { PlatformProvider, useDatabase, useStorageBrain } from '@email-editor/shared';

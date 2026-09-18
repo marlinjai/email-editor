@@ -7,11 +7,11 @@ You only need it directly to assemble the editor yourself or to start from the s
 ```ts
 import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
 
-const blocks = createStandardBlockRegistry(); // add your own with blocks.register(definition)
+const blocks = createStandardBlockRegistry();
 const sections = createStandardPrebuiltRegistry();
 ```
 
-`@marlinjai/email-editor` already uses both. Custom block types can also be passed to the editor through its `blocks` prop.
+`@marlinjai/email-editor` already uses both. Its `blocks` option redefines a standard block type (label, icon, category, default props); new block types are not supported yet, because the document schema, the canvas and the server compiler only know the 14 standard ones.
 
 ## License
 

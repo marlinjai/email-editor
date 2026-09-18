@@ -12,7 +12,7 @@ projects: [email-editor]
 
 # Email Editor
 
-A visual drag-and-drop email template builder built on MobX State Tree with MJML export, plus a full-featured email marketing platform.
+A visual drag-and-drop email template builder built on MobX State Tree with MJML (Mailjet Markup Language) export, plus a full-featured email marketing platform.
 
 ## Platform Overview
 
@@ -38,7 +38,7 @@ The Email Editor is a **pnpm monorepo** with 12 packages organized into two laye
 | `@marlinjai/email-analytics` | Open/click/bounce tracking, heatmaps, engagement scoring |
 | `@marlinjai/email-teams` | Multi-user workspaces, roles, approval workflows, brand kit |
 | `@marlinjai/email-automation` | Trigger-based sequences, conditional logic, webhooks |
-| `@email-editor/shared` | Cross-package infrastructure: database adapter context, auth, workspace context |
+| `@email-editor/shared` | Cross-package infrastructure: database adapter context, auth, workspace context (private, workspace-only, not published to npm) |
 
 ## Block Types
 
@@ -78,18 +78,39 @@ The platform packages combine to form a complete SaaS email marketing dashboard 
 ## Quick Start
 
 ```bash
-pnpm install @marlinjai/email-editor
+pnpm add @marlinjai/email-editor @marlinjai/email-editor-core react react-dom
 ```
 
 ```tsx
-import { EmailEditorReact } from '@marlinjai/email-editor/react';
+'use client';
+
+import { useState } from 'react';
+import { EmailEditorReact, type TemplateSnapshotOut } from '@marlinjai/email-editor/react';
 import '@marlinjai/email-editor/styles.css';
 
-function App() {
-  const [template, setTemplate] = useState(initialTemplate);
-  return <EmailEditorReact value={template} onChange={setTemplate} />;
+function App({ initial }: { initial?: TemplateSnapshotOut }) {
+  const [doc, setDoc] = useState(initial);
+
+  // The editor fills its container, so the container needs a height.
+  return (
+    <div style={{ height: '80vh' }}>
+      <EmailEditorReact
+        initialTemplate={initial}
+        onChange={setDoc}
+        onSave={() =>
+          fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(doc),
+          })
+        }
+      />
+    </div>
+  );
 }
 ```
+
+The editor is uncontrolled: `initialTemplate` is read once on mount, and `onChange` receives the whole document (debounced by 300 ms). The stylesheet is scoped under `.ee-root`, so it is safe beside Tailwind CSS 4 and needs no Tailwind configuration. Compile the document to HTML on your server; see the [Integration](./integration) guide and `packages/editor/README.md` for Next.js setup, server compilation and the `onRequestImage` image picker hook.
 
 ## Documentation
 

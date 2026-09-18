@@ -112,7 +112,7 @@ graph LR
 |--------|-------------|----------|
 | `RootStore`, `createRootStore` | MST store factory | Create editor state |
 | `TemplateModel`, `SectionModel`, etc. | MST models | Type-safe state management |
-| `BlockType`, `BlockRegistry` | Block definitions | Register custom blocks |
+| `BlockType`, `BlockRegistry` | Block definitions | Redefine standard blocks |
 | `EmailTemplate`, `Section`, `Block` | TypeScript types | Type your templates |
 | `MJMLCompiler`, `createMJMLCompiler` (from `/server`) | MJML compiler | Server-side HTML generation |
 | `MJMLExporter`, `createMJMLExporter` (from `/server`) | MST-aware exporter | Store-integrated export |

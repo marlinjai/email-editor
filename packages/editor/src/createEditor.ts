@@ -8,6 +8,7 @@ import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@ma
 import { EmailEditor } from '@marlinjai/email-editor-ui';
 import type { EditorOptions, EditorInstance } from './types';
 import { themeToStyle } from './theme';
+import { assertSupportedBlocks } from './blocks';
 
 /**
  * Convert EmailTemplate to TemplateSnapshotIn
@@ -49,6 +50,8 @@ export function createEditor(options: EditorOptions): EditorInstance {
     onRequestImage,
   } = options;
 
+  assertSupportedBlocks(blocks);
+
   // Convert to MST-compatible snapshot
   const initialSnapshot = toSnapshotIn(initialValue);
 
@@ -56,7 +59,10 @@ export function createEditor(options: EditorOptions): EditorInstance {
   const registry = createStandardBlockRegistry();
 
   // Register custom blocks
-  blocks.forEach((block) => registry.register(block));
+  blocks.forEach((block) => {
+    registry.unregister(block.type); // replace the standard definition quietly
+    registry.register(block);
+  });
 
   // Pre-built sections, as the React wrapper offers them
   const prebuiltRegistry = createStandardPrebuiltRegistry();

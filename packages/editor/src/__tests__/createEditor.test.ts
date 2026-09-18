@@ -44,6 +44,14 @@ describe('createEditor', () => {
     act(() => editor.destroy());
   });
 
+  it('refuses a block definition with a new type before rendering anything', () => {
+    const container = document.createElement('div');
+    expect(() =>
+      createEditor({ container, blocks: [{ type: 'countdown' } as never] })
+    ).toThrow(/Unsupported block type/);
+    expect(rendered).toHaveLength(0);
+  });
+
   it('renders without onRequestImage (the URL-field fallback)', () => {
     const container = document.createElement('div');
     let editor!: ReturnType<typeof createEditor>;

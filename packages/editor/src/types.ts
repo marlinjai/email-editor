@@ -36,6 +36,7 @@ export interface EditorOptions {
   container: HTMLElement;
   initialValue?: EmailTemplate;
   theme?: EditorTheme;
+  /** Redefine standard block types (label, icon, category, default props). New types are refused. */
   blocks?: BlockDefinition[];
   onChange?: (template: EmailTemplate) => void;
   onSave?: (template: EmailTemplate) => void;
