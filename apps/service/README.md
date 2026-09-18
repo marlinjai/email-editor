@@ -312,3 +312,130 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
   SMTP server (`smtp-server`, self-signed TLS, so that one file sets
   `NODE_TLS_REJECT_UNAUTHORIZED=0`); `test/integration/contacts.test.ts` covers the
   upsert matrix, erasure and the contact lifecycle on the four paths.
+
+## S4, the platform features
+
+Phase S4 turns the service into a marketing platform for customers without an
+application of their own: contacts managed in the service (tags, typed
+properties, CSV import, hosted signup forms with double opt-in), segments,
+scheduling and A/B tests on mailings, and campaign analytics with open and click
+tracking, opt-in per workspace and **off by default**. Every route is mounted from
+the contract's `platformRoutes`; the hosted pages (`/f/...`, `/t/...`) live outside
+`/v1` like `/u/`. Migrations `0010` (tags, properties, consent records,
+segments, the new event types), `0011` (imports), `0012` (signup forms) and `0013`
+(scheduling, A/B, tracking).
+
+**The platform worker** (`src/platform/worker.ts`, started in `main.ts`, stopped on
+SIGTERM) runs the S4 background jobs listed in `src/platform/jobs.ts`: releasing
+scheduled mailings, deciding A/B tests, the import dry runs and commits, and the
+signup confirmation mails. Each job keeps its state in Postgres and does one unit
+of work per transaction under a row lock (`FOR UPDATE SKIP LOCKED`), so a crash
+loses nothing and several processes can run it. Jobs take the loop's clock as
+`now`, which the tests drive instead of sleeping.
+
+**Tokens** for the S4 endpoints (form render time, confirmation link, open pixel,
+click link) and the address hashes come from `src/platform/tokens.ts`: one key per
+purpose, derived from `MAIL_UNSUBSCRIBE_KEY`, so no new secret is needed and a
+token minted for one purpose never verifies for another.
+
+### Tags and typed properties
+
+- `tags.*`: a tag's `contact_count` is counted on read; `Contact.tags` lists the
+  slugs. Assigning ignores ids that name no contact of the workspace (so nothing
+  is disclosed about other ids); audit rows carry counts, never addresses.
+- `contactProperties.*`: defining a key makes every later write of it
+  type-checked (`string`, `number`, `boolean`, `date` as ISO 8601; `null` removes
+  a value). A definition that stored values already break is `conflict` with up
+  to five example contact ids. Definitions and contact writes serialise on a
+  per-workspace advisory lock, so a wrong type cannot slip in between. Keys
+  without a definition stay free-form, as in S2.
+
+### Segments
+
+`segments.*`, `segments.preview` and `mailings.addSegment`. The filter tree
+(`and`, `or`, `not` over conditions, at most `MAX_FILTER_DEPTH` deep) is compiled
+by `src/segments/compile.ts` into one parameterised SQL fragment: field names
+come from a fixed switch, and every value and every property key is a bound
+parameter, never string-built (the injection battery in
+`test/integration/segments.test.ts` runs hostile values and keys against the
+database and checks the tables afterwards). Each field accepts the operators of
+the contract's `FILTER_FIELD_OPERATORS`. Text compares case-insensitively,
+`contains` and `starts_with` match `%`, `_` and backslashes literally, and a
+missing value never matches (and so matches under `not`). A defined property is
+compared by its type; an undefined one by JSON equality, text for
+`contains`/`starts_with`, and numbers only for number values. Engagement fields
+(`engagement:opened|clicked`, "within N days") need tracking on
+(`tracking_disabled` otherwise) and never count machine events or Apple Mail
+Privacy Protection opens. `mailings.addSegment` queues, in one statement, every
+matching contact subscribed to the mailing's topic.
+
+### CSV import
+
+A resumable job in four steps: `imports.create` (upload: parsed per RFC 4180,
+comma or semicolon, UTF-8, every row stored, answering the columns, a sample and
+a suggested mapping that knows English and German headers), `imports.setMapping`
+(starts a dry run in the worker; a revision discards the previous one and bumps
+`mapping_version`), `imports.commit` with the `mapping_version` the caller saw
+(anything else is `conflict`), and `imports.cancel`. The commit writes batches of
+500 rows, each batch and its row outcomes in one transaction, so a crash resumes
+at the first unwritten row and never applies a row twice. Every row ends
+`created`, `updated`, `unchanged`, `suppressed` or `skipped` with a reason
+(`imports.rows`); importing the same file again gives only `unchanged`. An
+address blocked for every topic is `suppressed` and nothing is written; a block
+on some topics withholds just those. An import never lifts a suppression and
+never changes a contact's email. Each new subscription gets a consent record
+naming who confirmed consent and when. Five failed batches in a row end the
+import `failed`. `import.finished` reports the end.
+
+### Scheduling
+
+`mailings.schedule` (from `draft`, or again from `scheduled` to move it) runs
+the checks `send` runs, now, and accepts a time in the future and within a year;
+`mailings.unschedule` returns it to `draft`; `send` and `cancel` work as before.
+The schedule job releases a due mailing through the same start as `send`
+(`src/platform/start-mailing.ts`), with trigger `schedule`; state lives in the
+mailing row, so a restart releases whatever came due meanwhile on its first tick.
+A mailing edited while scheduled into one that cannot start goes back to `draft`
+at its time with `mailing.schedule_failed` and an audit row; a passing problem
+(the compile pool full) leaves it scheduled for the next tick. Every start emits
+`mailing.started`.
+
+### A/B tests
+
+`mailings.setAbTest` (while editable), `clearAbTest`, `pickAbWinner`. When sending
+starts, the queued recipients are ordered by a hash of their row id; the first
+`test_fraction` (at least one per variant) go round-robin to the variants, the
+rest are **held** (never claimed, and the mailing cannot finish while they wait).
+A variant replaces the subject, the document or both. `opens` and `clicks` tests
+need that tracking on (`tracking_disabled`, which says to use `manual`); after
+`decide_after_minutes` the variant with the most unique human opens or clicks
+wins (a tie to the earlier key) and the held recipients get it. If the metric
+stopped being tracked meanwhile, the test waits for a person (`awaiting_pick`).
+`pickAbWinner` decides any running test by hand, once. Both emit
+`mailing.ab_winner_selected`.
+
+### Tracking and analytics
+
+Off by default. `tracking.update` sets opens and clicks and keeps the workspace's
+`settings.tracking_enabled` equal to `opens || clicks`; that flag stays the master
+switch (off through `workspace.update`, nothing is tracked). A mailing snapshots
+what is tracked when it starts (`MailingAnalytics.tracking`). With tracking off
+the worker adds no pixel and rewrites no link, and a token for such a mailing is
+refused; ŌPUNTIA's workspace stays off, and `test/integration/mailing-platform.test.ts`
+proves the HTML is untouched and nothing is recorded.
+
+With tracking on, `/t/o/<token>` answers a 1x1 GIF and `/t/c/<token>` a 302 to
+the link's stored destination. The token binds workspace, mailing, recipient
+and the link's number; the destination comes from `mailing_links`, never from
+the request, so it is not an open redirect. Links with a merge field (the
+unsubscribe link, personalised links) are never rewritten. Only flags are
+stored, never the address or the user agent: known scanners and prefetchers,
+and clicks within 5 seconds of delivery, are machine events; a bare
+`Mozilla/5.0` or an address in Apple's 17.0.0.0/8 is Apple Mail Privacy
+Protection, counted apart (`apple_mpp_opens`) and never as a human open. HEAD
+requests are never recorded. After tracking is turned off, opens are refused
+and clicks still lead to their destination without being recorded, so a
+recipient's link never breaks. `mailings.analytics` aggregates per mailing and
+per variant; unsubscribes come from the `contact.unsubscribed` events naming
+the mailing, bounces and complaints from suppressions whose source message
+belongs to it.
