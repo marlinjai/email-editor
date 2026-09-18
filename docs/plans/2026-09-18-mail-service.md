@@ -481,3 +481,14 @@ later decision can overturn:
    in this phase: it needs the same npm Trusted Publishing registration as
    `@marlinjai/mail-contract` before its first publish succeeds. Add it to the same
    npmjs.com trusted-publisher setup Marlin does for the other packages under item 4.
+7. **S2 providers and topics, contract gaps** (settled with the orchestrator,
+   2026-09-18): a provider's `policy` stays required on create, so there is no
+   default per kind; a provider on `smtp.mail.me.com` is refused
+   (`validation_failed`, pointing at `ICLOUD_SMTP_POLICY`) above Apple's limits of
+   1,000 recipients a day and one recipient per message. The route table has no
+   `topics.delete`: the schema already refuses to delete a topic a mailing uses,
+   and the route waits for a client that needs it (ROADMAP.md). `providers.verify`
+   answers `{ ok: false, error }` with `error` starting with a stable code
+   (`auth_failed`, `tls_failed`, `host_unreachable`, `no_secret`,
+   `provider_rejected`); for Resend it reads `GET /domains` and counts a key
+   restricted to sending as valid.
