@@ -40,6 +40,9 @@ describe('mailing state machine', () => {
     expect(canTransition('paused', 'resume')).toBe(true);
     expect(canTransition('sending', 'cancel')).toBe(true);
     expect(canTransition('partially_failed', 'retry-failed')).toBe(true);
+    expect(canTransition('scheduled', 'schedule')).toBe(true);
+    expect(canTransition('scheduled', 'unschedule')).toBe(true);
+    expect(canTransition('draft', 'unschedule')).toBe(false);
   });
 
   it('refuses re-entry into a finished mailing and nonsense moves', () => {

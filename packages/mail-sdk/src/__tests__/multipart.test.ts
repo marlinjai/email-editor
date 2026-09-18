@@ -21,23 +21,19 @@ describe('multipart routes', () => {
     expect(headers.has('content-type')).toBe(false);
   });
 
-  it('sends the CSV import options as a JSON string in the "options" field', async () => {
+  it('uploads a CSV import as the "file" field only; the mapping is a later step', async () => {
     const { client, fetchMock } = createTestClient({ validateResponses: false });
-    fetchMock.mockResolvedValueOnce(jsonResponse(202, {}));
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, {}));
 
     const csv = new Blob(['email\na@example.com\n'], { type: 'text/csv' });
-    await client.imports.create(csv, {
-      mapping: { email: 'email' },
-      topics: [],
-      tags: [],
-      consent_confirmed: true,
-    });
+    await client.imports.create(csv, 'people.csv');
 
-    const [, init] = fetchMock.mock.calls[0]!;
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe('https://mail.test.internal/v1/imports');
     const body = (init as RequestInit).body as FormData;
-    const options = body.get('options');
-    expect(typeof options).toBe('string');
-    expect(JSON.parse(options as string)).toMatchObject({ consent_confirmed: true });
+    expect(body.get('file')).toBeInstanceOf(Blob);
+    expect((body.get('file') as File).name).toBe('people.csv');
+    expect(body.get('options')).toBeNull();
   });
 
   it('mints and reuses an Idempotency-Key across a retried multipart upload', async () => {

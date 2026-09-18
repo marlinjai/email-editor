@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   AbTestConfig,
   BoundedSegmentFilter,
-  ImportJobCreate,
+  ImportCommitRequest,
+  ImportMappingRequest,
+  ImportReport,
+  SegmentPreviewRequest,
+  SignupFormCreate,
+  TrackingSettings,
   MAX_FILTER_DEPTH,
   MailingScheduleRequest,
   SegmentFilter,
@@ -62,19 +67,52 @@ describe('platform requests', () => {
     expect(TagAssignment.safeParse({ contact_ids: [] }).success).toBe(false);
   });
 
-  it('signup submission rejects a filled honeypot', () => {
-    expect(SignupSubmission.safeParse({ email: 'a@b.de' }).success).toBe(true);
-    expect(SignupSubmission.safeParse({ email: 'a@b.de', website: '' }).success).toBe(true);
-    expect(SignupSubmission.safeParse({ email: 'a@b.de', website: 'spam.example' }).success).toBe(false);
+  it('signup submission needs the form token and rejects a filled honeypot', () => {
+    const ok = { email: 'a@b.de', form_token: 't' };
+    expect(SignupSubmission.safeParse(ok).success).toBe(true);
+    expect(SignupSubmission.safeParse({ email: 'a@b.de' }).success).toBe(false);
+    expect(SignupSubmission.safeParse({ ...ok, website: '' }).success).toBe(true);
+    expect(SignupSubmission.safeParse({ ...ok, website: 'spam.example' }).success).toBe(false);
+  });
+
+  it('a signup form needs a provider, topics and consent text; the rest defaults', () => {
+    const ok = { name: 'Newsletter', title: 'Stay in touch', consent_text: 'I agree.', topics: ['news'], provider_id: 'prv_1' };
+    expect(SignupFormCreate.safeParse(ok).success).toBe(true);
+    expect(SignupFormCreate.safeParse({ ...ok, topics: [] }).success).toBe(false);
+    expect(SignupFormCreate.safeParse({ ...ok, consent_text: '' }).success).toBe(false);
+    expect(SignupFormCreate.safeParse({ ...ok, provider_id: undefined }).success).toBe(false);
+  });
+
+  it('a segment preview takes a bounded filter', () => {
+    expect(SegmentPreviewRequest.safeParse({ filter: { field: 'tag', op: 'eq', value: 'a' } }).success).toBe(true);
+    let f: SegmentFilter = { field: 'tag', op: 'eq', value: 'a' };
+    for (let i = 0; i < MAX_FILTER_DEPTH; i++) f = { not: f };
+    expect(SegmentPreviewRequest.safeParse({ filter: f }).success).toBe(false);
+  });
+
+  it('tracking settings are two booleans', () => {
+    expect(TrackingSettings.safeParse({ opens: true, clicks: false }).success).toBe(true);
+    expect(TrackingSettings.safeParse({ opens: true }).success).toBe(false);
   });
 
   it('an import maps exactly one column to email and needs confirmed consent', () => {
     const ok = { mapping: { Email: 'email', Name: 'first_name', City: 'property:city' }, topics: [], tags: [], consent_confirmed: true };
-    expect(ImportJobCreate.safeParse(ok).success).toBe(true);
-    expect(ImportJobCreate.safeParse({ ...ok, mapping: { Name: 'first_name' } }).success).toBe(false);
-    expect(ImportJobCreate.safeParse({ ...ok, mapping: { A: 'email', B: 'email' } }).success).toBe(false);
-    expect(ImportJobCreate.safeParse({ ...ok, mapping: { A: 'email', B: 'password' } }).success).toBe(false);
-    expect(ImportJobCreate.safeParse({ ...ok, consent_confirmed: false }).success).toBe(false);
+    expect(ImportMappingRequest.safeParse(ok).success).toBe(true);
+    expect(ImportMappingRequest.safeParse({ ...ok, mapping: { Name: 'first_name' } }).success).toBe(false);
+    expect(ImportMappingRequest.safeParse({ ...ok, mapping: { A: 'email', B: 'email' } }).success).toBe(false);
+    expect(ImportMappingRequest.safeParse({ ...ok, mapping: { A: 'email', B: 'password' } }).success).toBe(false);
+    expect(ImportMappingRequest.safeParse({ ...ok, consent_confirmed: false }).success).toBe(false);
+  });
+
+  it('a commit names the mapping version it validated', () => {
+    expect(ImportCommitRequest.safeParse({ mapping_version: 2 }).success).toBe(true);
+    expect(ImportCommitRequest.safeParse({}).success).toBe(false);
+  });
+
+  it('an import report counts skips by known reasons only', () => {
+    const r = { created: 1, updated: 0, unchanged: 0, suppressed: 0, skipped: 1, skipped_by_reason: { invalid_email: 1 }, topics_withheld: 0 };
+    expect(ImportReport.safeParse(r).success).toBe(true);
+    expect(ImportReport.safeParse({ ...r, skipped_by_reason: { bored: 1 } }).success).toBe(false);
   });
 
   it('schedule takes a timestamp', () => {
@@ -94,6 +132,14 @@ describe('platform requests', () => {
     expect(AbTestConfig.safeParse({ ...ok, variants: [ok.variants[0], ok.variants[0]] }).success).toBe(false);
     expect(AbTestConfig.safeParse({ ...ok, test_fraction: 0 }).success).toBe(false);
     expect(AbTestConfig.safeParse({ ...ok, decide_after_minutes: 5 }).success).toBe(false);
+  });
+
+  it('a metric test needs its wait, a manual test takes none, and every variant changes something', () => {
+    const base = { variants: [{ key: 'a', subject: 'One' }, { key: 'b', subject: 'Two' }], test_fraction: 0.5 };
+    expect(AbTestConfig.safeParse({ ...base, winner_metric: 'manual' }).success).toBe(true);
+    expect(AbTestConfig.safeParse({ ...base, winner_metric: 'manual', decide_after_minutes: 60 }).success).toBe(false);
+    expect(AbTestConfig.safeParse({ ...base, winner_metric: 'clicks' }).success).toBe(false);
+    expect(AbTestConfig.safeParse({ ...base, winner_metric: 'manual', variants: [{ key: 'a' }, { key: 'b', subject: 'x' }] }).success).toBe(false);
   });
 });
 
