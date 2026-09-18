@@ -7,9 +7,11 @@ import {
   AuditEntry,
   AuditQuery,
   Member,
-  MemberInvite,
+  MemberCreate,
   MemberUpdate,
   Workspace,
+  WorkspaceCreate,
+  WorkspaceMembership,
   WorkspaceUpdate,
 } from './workspace';
 import {
@@ -94,9 +96,12 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  * - `read`: any API key scope; member role `viewer` or above.
  * - `write`: API key scope `send` or `full`; member role `editor` or above.
  * - `admin`: API key scope `full`; member role `admin` or above.
+ * - `dashboard`: the dashboard service token plus `x-mail-subject`, no
+ *   workspace yet (creating a workspace, listing the person's workspaces). A
+ *   workspace API key is refused with `forbidden`.
  * - `public`: no credentials (hosted pages and signup submissions).
  */
-export type RouteAccess = 'read' | 'write' | 'admin' | 'public';
+export type RouteAccess = 'read' | 'write' | 'admin' | 'dashboard' | 'public';
 
 export type Phase = 'S0' | 'S1' | 'S2' | 'S4' | 'S5';
 
@@ -122,6 +127,24 @@ const list = <T extends z.ZodTypeAny>(item: T) => page(item);
 // S0: foundation
 
 export const foundationRoutes = {
+  'workspaces.create': {
+    method: 'POST',
+    path: '/v1/workspaces',
+    body: WorkspaceCreate,
+    response: Workspace,
+    status: 201,
+    access: 'dashboard',
+    phase: 'S0',
+  },
+  'workspaces.list': {
+    method: 'GET',
+    path: '/v1/workspaces',
+    query: PageQuery,
+    response: list(WorkspaceMembership),
+    status: 200,
+    access: 'dashboard',
+    phase: 'S0',
+  },
   'workspace.get': { method: 'GET', path: '/v1/workspace', response: Workspace, status: 200, access: 'read', phase: 'S0' },
   'workspace.update': {
     method: 'PATCH',
@@ -141,10 +164,10 @@ export const foundationRoutes = {
     access: 'read',
     phase: 'S0',
   },
-  'members.invite': {
+  'members.add': {
     method: 'POST',
     path: '/v1/members',
-    body: MemberInvite,
+    body: MemberCreate,
     response: Member,
     status: 201,
     access: 'admin',
