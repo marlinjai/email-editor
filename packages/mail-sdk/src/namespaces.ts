@@ -103,6 +103,9 @@ export function createNamespaces(config: CoreConfig) {
       delete: (id: string, opts?: RequestOpts) => execute(config, 'providers.delete', { params: { id } }, opts),
       verify: (id: string, opts?: RequestOpts) => execute(config, 'providers.verify', { params: { id } }, opts),
       usage: (id: string, opts?: RequestOpts) => execute(config, 'providers.usage', { params: { id } }, opts),
+      /** Stores the signing secret of a Resend webhook registered by hand, so bounces and complaints are accepted. */
+      setEventsSecret: (id: string, body: RouteBody<'providers.setEventsSecret'>, opts?: RequestOpts) =>
+        execute(config, 'providers.setEventsSecret', { params: { id }, body }, opts),
     },
 
     topics: {

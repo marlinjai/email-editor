@@ -30,6 +30,12 @@
       public in its settings (the API cannot), as the service's is. Marlin's
       own sign-in needs a second factor enrolled at auth.lumitra.co (the dashboard
       requires it) [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Mail service: decide whether to detect bounces that SMTP providers report
+      later by email (iCloud+ reports almost all of them that way), which needs
+      read access to the sender's inbox (IMAP, the Internet Message Access
+      Protocol) and a parser for delivery status notifications; today only the
+      immediate SMTP rejection and Resend's events suppress, and the provider card
+      says so [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
 - [ ] Mail service: decide what `user.erased` means for workspace members (remove the
       person's member rows, and what happens to a workspace whose last owner is
       erased); today the service acknowledges it as a no-op and is subscribed only to

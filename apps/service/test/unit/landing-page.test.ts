@@ -55,15 +55,23 @@ describe('translations', () => {
     expect(joined('es')).not.toMatch(/\b(tú|te has)\b/i);
   });
 
-  // Bounce handling and open/click webhooks are not built yet, and the images
-  // are on Cloudflare R2, so no locale may claim either or say the whole
-  // service is hosted in the EU. Each language's own words are checked.
-  const BOUNCE_WORDS: Record<PageLocale, RegExp> = {
-    en: /bounce|complaint/i,
-    de: /bounce|rückläufer|beschwerde|zurückkommt/i,
-    it: /bounce|rimbalz|reclam|segnalazion/i,
-    fr: /bounce|rebond|plainte/i,
-    es: /bounce|rebot|queja/i,
+  // Hard bounces are blocked for every provider, spam complaints only through
+  // Resend's events; open/click webhooks are not built yet, and the images are
+  // on Cloudflare R2, so no locale may claim more or say the whole service is
+  // hosted in the EU. Each language's own words are checked.
+  const BOUNCE_CLAIM: Record<PageLocale, RegExp> = {
+    en: /Hard bounces are blocked automatically/,
+    de: /Unzustellbare Adressen werden automatisch gesperrt/,
+    it: /Gli indirizzi che non esistono vengono bloccati automaticamente/,
+    fr: /Les adresses qui n’existent pas sont bloquées automatiquement/,
+    es: /Las direcciones que no existen se bloquean automáticamente/,
+  };
+  const COMPLAINT_WORDS: Record<PageLocale, RegExp> = {
+    en: /complaint/i,
+    de: /beschwerde/i,
+    it: /segnalazion|reclam/i,
+    fr: /plainte/i,
+    es: /queja/i,
   };
   const OPEN_CLICK_WORDS: Record<PageLocale, RegExp> = {
     en: /\bopen|\bclick/i,
@@ -76,7 +84,11 @@ describe('translations', () => {
   it.each(PAGE_LOCALES)('%s claims only what the service does today', (locale) => {
     const messages = LANDING_MESSAGES[locale];
     const all = Object.values(messages).join(' ');
-    expect(all).not.toMatch(BOUNCE_WORDS[locale]);
+    expect(messages.f_unsub_text).toMatch(BOUNCE_CLAIM[locale]);
+    // Complaints are claimed only together with Resend, the one provider that reports them.
+    const sentences = all.split(/(?<=[.!?])\s+/);
+    for (const sentence of sentences.filter((x) => COMPLAINT_WORDS[locale].test(x))) expect(sentence).toMatch(/Resend/);
+    expect(sentences.some((x) => COMPLAINT_WORDS[locale].test(x))).toBe(true);
     expect(messages.f_webhooks_text).not.toMatch(OPEN_CLICK_WORDS[locale]);
     expect(messages.app_text).not.toMatch(OPEN_CLICK_WORDS[locale]);
     expect(all).not.toMatch(/\b(EU|UE)\b|hosted in the EU/);

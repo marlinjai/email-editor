@@ -43,6 +43,7 @@ import { segmentRoutes } from './routes/segments.js';
 import { importRoutes } from './routes/imports.js';
 import { billingRoutes } from './routes/billing.js';
 import { stripeWebhookRoutes } from './routes/stripe-webhook.js';
+import { providerEventRoutes } from './routes/provider-events.js';
 import type { BillingConfig } from './billing/plans.js';
 import type { StripeApi } from './billing/stripe.js';
 import { createSmtpTransport, type SmtpSettings } from './transport/smtp.js';
@@ -171,6 +172,8 @@ export function createApp({
   if (signupService) app.route('/', signupPageRoutes(sql, { service: signupService, publicBaseUrl, log: { error: log.error, log: console.log } }));
   // Public and outside /v1 too: Stripe signs its requests, it holds no API key.
   app.route('/', stripeWebhookRoutes(sql, { config: billing, stripe, log: { error: log.error, log: console.log } }));
+  // Public too: Resend signs a provider's events with that provider's secret.
+  app.route('/', providerEventRoutes(sql, { sealer, log: { error: log.error, log: console.log } }));
   app.route('/', erasureRoutes(sql, { secret: erasureWebhookSecret, storage: assetStorage, log: { error: log.error, log: console.log } }));
 
   const limit = (maxSize: number) =>
@@ -221,7 +224,7 @@ export function createApp({
     }),
   );
   app.route('/', webhookRoutes(sql, deps, webhookUrlPolicy));
-  app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch }));
+  app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch, publicBaseUrl, log }));
   app.route('/', topicRoutes(sql, deps));
   app.route('/', contactRoutes(sql, deps));
   app.route('/', suppressionRoutes(sql, deps));

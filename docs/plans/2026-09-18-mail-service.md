@@ -729,6 +729,63 @@ Defaults taken in S5 (each can be overturned later):
   was switched to `asset_policy: service_only` after the deploy; its only
   template (the base template) compiles without errors under it.
 
+### Bounces and complaints (built 2026-09-19, branch `feat/bounce-complaint-handling`)
+
+The plan said suppression of bounces and complaints is the service's, and the
+contract had `contact.bounced`, but nothing created a `bounced` or `complained`
+block: a permanent rejection only recorded `message.failed`. Now:
+
+- **Synchronous hard bounces.** When the receiving SMTP server rejects the
+  recipient while the message is handed over, the worker (and a test send)
+  blocks the address on every topic as `bounced`, with the failed message as
+  `source_message_id`, and emits `contact.bounced`, in the transaction that
+  archives the message. One pure function, `classifyRejection`
+  (`apps/service/src/transport/rejection.ts`, specified by its table test),
+  decides: enhanced status 5.1.x (bad mailbox or address, except 5.1.7 and
+  5.1.8, the sender's address) and 5.2.1 (disabled mailbox) are hard bounces;
+  a classic 550, 551 or 553 without an enhanced code only when the text names
+  the recipient ("no such user", "user unknown"). RFC 5321's stock "mailbox
+  unavailable" is not enough: servers send it for policy blocks too.
+- **The sender's problem is not the recipient's.** 5.7.x (authentication,
+  relaying, content, reputation, rate), 530/534/535, and for Resend an HTTP
+  401 or 403, never block the recipient. They are counted on the provider
+  (`rejections: { count, last_error, last_at }`), which the provider card in
+  the dashboard shows. Mailbox full (5.2.2), size (5.3.4) and routing (5.4.x)
+  only fail the message.
+- **Resend events.** Each Resend provider has its own endpoint,
+  `POST /providers/:id/events/resend` (public, outside `/v1`, like the Stripe
+  webhook), verified with Svix's scheme (`svix-id`, `svix-timestamp`,
+  `svix-signature`, HMAC-SHA256 over `${id}.${timestamp}.${body}` with the
+  endpoint's `whsec_` secret, five minutes of tolerance), exactly once per
+  `svix-id` (`provider_events`, migration 0016). A `Permanent` `email.bounced`
+  blocks as `bounced`, `email.complained` as `complained`; transient and
+  undetermined bounces, `email.delivery_delayed` and every other type are
+  acknowledged and ignored. The message is found by Resend's email id; when it
+  is not (the event can outrun the worker's recording, or the Resend account
+  also sends for something else), the one address the event names is blocked
+  anyway, because a bounce or complaint on the account hurts every sender on
+  it. The contract already had `contact.bounced` with `reason: 'bounced' |
+  'complained'`, so complaints use it; no new event type.
+- **Registration.** Creating a Resend provider, and every successful verify
+  until it works, registers the endpoint at Resend (`POST /webhooks`) and
+  stores the returned signing secret sealed. A sending-only key cannot
+  (Resend answers `restricted_api_key`), and an instance without a public
+  https address cannot either: the provider then shows `events.status:
+  needs_secret`, the reason, and the URL to add at Resend by hand, and
+  `PUT /v1/providers/:id/events-secret` (`providers.setEventsSecret`)
+  stores the pasted secret. A new API key that belongs to another Resend
+  account (the registered endpoint is not found with it) registers anew there;
+  one from the same account keeps the endpoint. Deleting a provider removes an
+  endpoint the service registered itself.
+- **Hardening an existing block.** An `unsubscribed` block the person could
+  lift themselves becomes `bounced` or `complained`, and a `bounced` block that
+  also draws a complaint becomes `complained`. A `manual` block is left alone.
+- **Known limit: asynchronous bounces over SMTP are not detected.** iCloud+
+  (and most SMTP servers) accept the message and report a bounce later as an
+  email to the sender's inbox. Reading it needs access to that inbox, which is
+  out of scope here; the provider card and the docs say so, and the addresses
+  have to be blocked by hand. A dated line on `ROADMAP.md` holds the decision.
+
 ### The landing page at mail.lumitra.co (built 2026-09-19, branch `feat/mail-landing`)
 
 Approved by Marlin on 2026-09-18: the root of the service answered 404, while

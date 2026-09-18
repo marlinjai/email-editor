@@ -1,5 +1,6 @@
 import {
   PermanentSendError,
+  SendError,
   TransientSendError,
   type OutgoingMessage,
   type SendResult,
@@ -27,7 +28,7 @@ export class MemoryTransport implements Transport {
   readonly sent: RecordedSend[] = [];
   /** Every call to send, in order, including failed ones. */
   readonly attempts: OutgoingMessage[] = [];
-  private plan: MemoryFailure[] = [];
+  private plan: Array<MemoryFailure | SendError> = [];
   private hung: Array<(err: Error) => void> = [];
   private counter = 0;
   verifyError: Error | null = null;
@@ -36,6 +37,12 @@ export class MemoryTransport implements Transport {
   /** Queues failures for the next `times` sends (default once), after any already queued. */
   failNext(failure: MemoryFailure, times = 1): this {
     for (let i = 0; i < times; i++) this.plan.push(failure);
+    return this;
+  }
+
+  /** Queues one send that rejects with exactly this error (an SMTP reply the test chose). */
+  failNextWith(error: SendError): this {
+    this.plan.push(error);
     return this;
   }
 
@@ -55,6 +62,7 @@ export class MemoryTransport implements Transport {
     if (this.closed) throw new Error('MemoryTransport: send after close');
     this.attempts.push(message);
     const failure = this.plan.shift();
+    if (failure instanceof SendError) throw failure;
     switch (failure) {
       case 'transient':
         throw new TransientSendError('simulated transient failure', 451);

@@ -78,6 +78,8 @@ test('settings: a provider with a write-only secret, verified against the SMTP s
   await page.getByLabel('Milliseconds between messages').fill('0');
   await page.getByRole('button', { name: 'Add provider' }).click();
   await expect(page.getByText('Credential stored')).toBeVisible();
+  // An SMTP provider says which bounces are detected and which are not.
+  await expect(page.getByText('Only immediate bounces are detected.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page.getByText('Connected and authenticated')).toBeVisible();
@@ -373,6 +375,15 @@ test('people: suppressions, a contact erased for good, and the audit log', async
   await page.getByLabel('Address', { exact: true }).fill('blocked@example.com');
   await page.getByRole('button', { name: 'Block', exact: true }).click();
   await expect(page.getByRole('cell', { name: 'blocked@example.com' })).toBeVisible();
+  // The reason filter narrows the list: no hard bounces here, the manual block under its own reason.
+  await page.getByLabel('Reason').selectOption('bounced');
+  await page.getByRole('button', { name: 'Search' }).click();
+  await expect(page).toHaveURL(/reason=bounced/);
+  await expect(page.getByText('No hard bounce blocks')).toBeVisible();
+  await page.getByLabel('Reason').selectOption('manual');
+  await page.getByRole('button', { name: 'Search' }).click();
+  await expect(page.getByRole('cell', { name: 'blocked@example.com' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Suppressions' }).getByText('Blocked by hand')).toBeVisible();
   await page.getByRole('button', { name: 'Lift' }).click();
   await page.getByRole('button', { name: 'Lift block' }).click();
   await expect(page.getByRole('cell', { name: 'blocked@example.com' })).toHaveCount(0);
