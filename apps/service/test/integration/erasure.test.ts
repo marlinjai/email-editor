@@ -1,5 +1,6 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { emitEvent } from '../../src/events.js';
 import { repos } from '../../src/repo/index.js';
 import { appOver } from '../support/app-call.js';
 import { ERASURE_SECRET, startHarness, type Harness } from '../support/harness.js';
@@ -113,11 +114,32 @@ async function seedCompanyWorkspace(slug: string, companyId: string | undefined)
     isTest: false,
     recipientCount: 1,
   });
+  // A webhook endpoint with one pending delivery, so the cascade through the
+  // outbox and its composite foreign keys is proven, not assumed.
+  await r.webhookEndpoints.create(id, {
+    url: 'https://hooks.example.com/mail',
+    description: null,
+    events: ['mailing.finished'],
+    enabled: true,
+    secretSealed: h.sealer.seal('whsec_test_secret_value_for_the_erasure_test'),
+  });
+  await h.sql.begin((tx) =>
+    emitEvent(tx, id, {
+      type: 'mailing.finished',
+      data: {
+        mailing_id: mailing.id,
+        mailing_metadata: {},
+        status: 'sent',
+        counts: { total: 1, queued: 0, sending: 0, sent: 1, failed: 0, skipped: 0 },
+        finished_at: new Date().toISOString(),
+      },
+    }),
+  );
   return { id, owner, fileCount: 1 };
 }
 
 async function rowsOf(workspaceId: string): Promise<number> {
-  const tables = ['workspace_members', 'api_keys', 'audit_log', 'templates', 'template_versions', 'assets', 'providers', 'topics', 'contacts', 'suppressions', 'mailings', 'mailing_recipients', 'messages'];
+  const tables = ['workspace_members', 'api_keys', 'audit_log', 'templates', 'template_versions', 'assets', 'providers', 'topics', 'contacts', 'suppressions', 'mailings', 'mailing_recipients', 'messages', 'webhook_endpoints', 'webhook_events', 'webhook_deliveries'];
   let total = 0;
   for (const t of tables) {
     const [row] = await h.sql.unsafe(`SELECT count(*)::int AS n FROM ${t} WHERE workspace_id = $1`, [workspaceId]);
