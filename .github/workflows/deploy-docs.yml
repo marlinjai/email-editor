@@ -43,7 +43,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec clearify build
-      # --branch=main publishes to production explicitly: wrangler otherwise
-      # infers the branch from git, and a detached checkout silently deploys a
-      # preview instead.
-      - run: npx wrangler pages deploy docs-dist --project-name=email-editor-docs --branch=main
+      # --branch is explicit: wrangler otherwise infers it from git, and a detached
+      # checkout silently deploys a preview. main (push) is the Pages production
+      # branch; a dispatch from any other ref publishes a preview, never
+      # production.
+      - run: npx wrangler pages deploy docs-dist --project-name=email-editor-docs --branch=${{ github.ref_name }}
