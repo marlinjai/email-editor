@@ -1,5 +1,6 @@
 import { foundationRoutes, matchRoute, routes, type OperationId } from '@marlinjai/mail-contract';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { emitEvent } from '../../src/events.js';
 import { startHarness, type Harness } from '../support/harness.js';
 
 /**
@@ -69,5 +70,63 @@ describe('contract conformance, phase S0', () => {
     ]) {
       expect(ErrorBody.safeParse(res.body).success, JSON.stringify(res.body)).toBe(true);
     }
+  });
+});
+
+/**
+ * S2's webhooks.* operations (F4). The other S2 resources (providers, contacts,
+ * mailings, the unsubscribe page) are conformance-tested by the teams that own
+ * them; this covers only what this branch mounts.
+ */
+describe('contract conformance, phase S2 webhooks', () => {
+  it('every webhooks.* operation answers with its declared status and response schema', async () => {
+    const wh = await startHarness();
+    const w = await wh.seedWorkspace('contract-webhooks');
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+
+    const created = await run(
+      'webhooks.create',
+      await wh.call({
+        method: 'POST',
+        path: '/v1/webhooks',
+        key: w.key,
+        body: { url: 'https://example.com/hook', events: ['contact.unsubscribed'] },
+      }),
+    );
+    const endpointId = created.body.endpoint.id;
+    await run('webhooks.list', await wh.call({ path: '/v1/webhooks', key: w.key }));
+    await run('webhooks.get', await wh.call({ path: `/v1/webhooks/${endpointId}`, key: w.key }));
+    await run('webhooks.update', await wh.call({ method: 'PATCH', path: `/v1/webhooks/${endpointId}`, key: w.key, body: { enabled: false } }));
+    await run('webhooks.rotateSecret', await wh.call({ method: 'POST', path: `/v1/webhooks/${endpointId}/rotate-secret`, key: w.key }));
+    await run('webhooks.deliveries', await wh.call({ path: `/v1/webhooks/${endpointId}/deliveries`, key: w.key }));
+
+    await wh.call({ method: 'PATCH', path: `/v1/webhooks/${endpointId}`, key: w.key, body: { enabled: true } });
+    await wh.sql.begin((tx) =>
+      emitEvent(tx, w.id, {
+        type: 'contact.unsubscribed',
+        data: {
+          contact_id: null,
+          external_id: null,
+          email: 'conformer@example.com',
+          topic: null,
+          mailing_id: null,
+          source: 'api',
+          unsubscribed_at: new Date().toISOString(),
+        },
+      }),
+    );
+    const [delivery] = await wh.sql<{ id: string }[]>`SELECT id FROM webhook_deliveries WHERE endpoint_id = ${endpointId}`;
+    await run('webhooks.redeliver', await wh.call({ method: 'POST', path: `/v1/webhooks/${endpointId}/deliveries/${delivery!.id}/redeliver`, key: w.key }));
+
+    await run('webhooks.delete', await wh.call({ method: 'DELETE', path: `/v1/webhooks/${endpointId}`, key: w.key }));
+
+    const webhookOps = Object.keys(routes).filter((id) => id.startsWith('webhooks.')) as OperationId[];
+    expect([...covered].sort()).toEqual(webhookOps.sort());
+    await wh.drop();
   });
 });

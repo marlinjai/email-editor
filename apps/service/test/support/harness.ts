@@ -1,6 +1,8 @@
 import { createApp } from '../../src/app.js';
 import type { Sql } from '../../src/db.js';
 import { migrate } from '../../src/migrate.js';
+import { createSealer, type Sealer } from '../../src/sealing.js';
+import type { SsrfPolicy } from '../../src/webhooks/ssrf.js';
 import { freshDatabase } from './db.js';
 
 export const DASHBOARD_TOKEN = 'a'.repeat(64);
@@ -24,20 +26,18 @@ export type Call = {
 export type Result = { status: number; body: Json; headers: Headers };
 
 /** A migrated database and the app over it, driven in-process through app.request. */
-export async function startHarness(options: { allowInsecureWebhookTargets?: boolean } = {}) {
+export async function startHarness(options: { webhookUrlPolicy?: SsrfPolicy } = {}) {
   const db = await freshDatabase();
   await migrate(db.sql, { log: () => {} });
   const errors: unknown[] = [];
-  const webhookUrlPolicy = options.allowInsecureWebhookTargets
-    ? { allowInsecureHttp: true, allowPrivateTargets: true }
-    : undefined;
   const app = createApp({
     sql: db.sql,
     dashboardServiceToken: DASHBOARD_TOKEN,
     secretsKeys: SECRETS_KEYS,
-    webhookUrlPolicy,
+    webhookUrlPolicy: options.webhookUrlPolicy,
     log: { error: (...a) => errors.push(a) },
   });
+  const sealer: Sealer = createSealer(SECRETS_KEYS);
 
   async function call(c: Call): Promise<Result> {
     const headers: Record<string, string> = { ...(c.headers ?? {}) };
@@ -78,6 +78,6 @@ export async function startHarness(options: { allowInsecureWebhookTargets?: bool
     return { id: ws.body.id as string, owner, key: key.body.key as string, keyId: key.body.api_key.id as string };
   }
 
-  return { sql: db.sql as Sql, app, call, seedWorkspace, errors, drop: db.drop, url: db.url };
+  return { sql: db.sql as Sql, app, call, seedWorkspace, errors, drop: db.drop, url: db.url, sealer };
 }
 export type Harness = Awaited<ReturnType<typeof startHarness>>;

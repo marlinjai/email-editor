@@ -9,7 +9,13 @@ import { buildWebhookHeaders, validSecretsFor } from './signing.js';
 const SEND_TIMEOUT_MS = 10_000;
 const RESPONSE_SNIPPET_MAX = 500;
 
-export type DeliverDeps = { sealer: Sealer; policy?: SsrfPolicy; fetchImpl?: typeof fetch };
+export type DeliverDeps = {
+  sealer: Sealer;
+  policy?: SsrfPolicy;
+  fetchImpl?: typeof fetch;
+  /** Overrides the 10 second send timeout; tests only. */
+  timeoutMs?: number;
+};
 
 /**
  * Attempts one delivery: signs the event, POSTs it to the endpoint with a 10
@@ -33,6 +39,7 @@ export async function attemptDelivery(db: Db, due: DueDelivery, deps: DeliverDep
 
   const rawBody = JSON.stringify(due.payload);
   const fetchImpl = deps.fetchImpl ?? fetch;
+  const timeoutMs = deps.timeoutMs ?? SEND_TIMEOUT_MS;
   const startedAt = Date.now();
 
   let statusCode: number | null = null;
@@ -49,7 +56,7 @@ export async function attemptDelivery(db: Db, due: DueDelivery, deps: DeliverDep
       headers,
       body: rawBody,
       redirect: 'manual',
-      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     statusCode = response.status;
     const text = await response.text().catch(() => '');
@@ -65,7 +72,7 @@ export async function attemptDelivery(db: Db, due: DueDelivery, deps: DeliverDep
     }
     error = `endpoint replied with HTTP ${statusCode}`;
   } catch (err) {
-    error = err instanceof Error && err.name === 'TimeoutError' ? `timed out after ${SEND_TIMEOUT_MS}ms` : String(err instanceof Error ? err.message : err);
+    error = err instanceof Error && err.name === 'TimeoutError' ? `timed out after ${timeoutMs}ms` : String(err instanceof Error ? err.message : err);
   }
 
   const durationMs = Date.now() - startedAt;

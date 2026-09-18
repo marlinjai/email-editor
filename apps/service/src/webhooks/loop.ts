@@ -13,6 +13,8 @@ export type WebhookLoopOptions = {
   idlePollMs?: number;
   policy?: SsrfPolicy;
   fetchImpl?: typeof fetch;
+  /** Overrides the per-send timeout; tests only. */
+  timeoutMs?: number;
   log?: Pick<Console, 'error'>;
 };
 
@@ -35,7 +37,7 @@ export function startWebhookDeliveryLoop(sql: Sql, sealer: Sealer, options: Webh
   const leaseSeconds = options.leaseSeconds ?? 30;
   const idlePollMs = options.idlePollMs ?? 1000;
   const log = options.log ?? console;
-  const deliverDeps: DeliverDeps = { sealer, policy: options.policy, fetchImpl: options.fetchImpl };
+  const deliverDeps: DeliverDeps = { sealer, policy: options.policy, fetchImpl: options.fetchImpl, timeoutMs: options.timeoutMs };
 
   let stopped = false;
   let resolveIdle: (() => void) | null = null;
