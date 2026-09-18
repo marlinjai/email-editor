@@ -163,7 +163,9 @@ export function contactRoutes(sql: Sql, deps: MountDeps) {
 
   /**
    * Erasure (Art. 17 GDPR). In one transaction: the messages archived for the
-   * person (their HTML included), their recipient rows, then the contact itself.
+   * person (their HTML included), their recipient rows, their signup
+   * submissions (pending confirmations stop working), then the contact itself;
+   * its consent records go with it.
    * Suppressions stay, so the address is still never emailed against its wish.
    * The audit row records the counts, never the address.
    */
@@ -176,6 +178,7 @@ export function contactRoutes(sql: Sql, deps: MountDeps) {
       if (!contact) throw new ApiError('not_found', 'No such contact in this workspace.');
       const erasedMessages = await r.messages.deleteForContact(access.workspaceId, id);
       const erasedRecipients = await r.recipients.deleteForContact(access.workspaceId, id);
+      const erasedSignups = await r.signup.deleteSubmissionsForEmail(access.workspaceId, contact.email);
       await r.contacts.delete(access.workspaceId, id);
       const suppressionsKept = await r.suppressions.countForEmail(access.workspaceId, contact.email);
       await r.audit.record(access.workspaceId, {
@@ -183,7 +186,12 @@ export function contactRoutes(sql: Sql, deps: MountDeps) {
         actor: actorOf(access),
         targetType: 'contact',
         targetId: id,
-        details: { erased_messages: erasedMessages, erased_recipients: erasedRecipients, suppressions_kept: suppressionsKept },
+        details: {
+          erased_messages: erasedMessages,
+          erased_recipients: erasedRecipients,
+          erased_signups: erasedSignups,
+          suppressions_kept: suppressionsKept,
+        },
       });
       return {
         ok: true as const,

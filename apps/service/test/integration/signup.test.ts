@@ -646,3 +646,32 @@ describe('tenancy', () => {
     expect(revoked.body.error.code).toBe('api_key_revoked');
   });
 });
+
+describe('erasure', () => {
+  it('erasing the contact deletes its consent records and every signup submission, pending links included', async () => {
+    const form = await createForm(W);
+    const email = 'erase@example.com';
+    await signUp(form.id, { email });
+    await drain();
+    expect((await confirm(linkFor(email))).status).toBe(200);
+    // A pending confirmation for another form's topic.
+    const other = await createForm(W, { topics: ['events'] });
+    await signUp(other.id, { email });
+    await drain();
+    const pending = linkFor(email);
+    expect(await consentsOf(email)).toHaveLength(1);
+
+    const contact = (await contactOf(email))!;
+    const erased = await h.call({ method: 'DELETE', path: `/v1/contacts/${contact.id}`, key: W.key });
+    expect(erased.status).toBe(200);
+    const [audit] = await h.sql`SELECT details FROM audit_log WHERE workspace_id = ${W.id} AND action = 'contact.erased'`;
+    expect(audit!.details).toMatchObject({ erased_signups: 2 });
+    expect((await h.sql`SELECT count(*)::int AS n FROM signup_submissions WHERE email = ${email}`)[0]!.n).toBe(0);
+    expect((await h.sql`SELECT count(*)::int AS n FROM contact_consents WHERE workspace_id = ${W.id}`)[0]!.n).toBe(0);
+
+    // The pending link no longer subscribes anyone.
+    const late = await confirm(pending);
+    expect(late.status).toBeGreaterThanOrEqual(400);
+    expect(await contactOf(email)).toBeNull();
+  });
+});

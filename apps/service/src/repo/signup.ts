@@ -276,6 +276,13 @@ export function signupRepo(db: Db) {
      * deleted once older than `olderThanMs`, and so are old rate-limit windows.
      * Across workspaces. Returns how many rows went.
      */
+    /** Erasure: every submission of the address in the workspace, pending ones included. Returns how many. */
+    async deleteSubmissionsForEmail(workspaceId: string, email: string): Promise<number> {
+      const rows = await db`
+        DELETE FROM signup_submissions WHERE workspace_id = ${workspaceId} AND email = ${email.toLowerCase()} RETURNING id`;
+      return rows.length;
+    },
+
     async purgeForWorker(olderThanMs: number): Promise<number> {
       const subs = await db`
         DELETE FROM signup_submissions
