@@ -166,15 +166,15 @@ export class SendWorker {
 
   /**
    * Runs cycles until nothing is due. With `waitUpToMs`, also waits for a
-   * provider interval or budget that frees up within that time. For tests and
+   * provider interval or budget that frees up within that long of now. For tests and
    * for a one-shot drain; the running loop does the same forever.
    */
   async drain(options: { waitUpToMs?: number } = {}): Promise<void> {
-    const deadline = Date.now() + (options.waitUpToMs ?? 0);
+    const most = options.waitUpToMs ?? 0;
     for (;;) {
       const pass = await this.runOnce();
       if (pass.worked) continue;
-      if (!pass.nextWakeAt || pass.nextWakeAt.getTime() > deadline) return;
+      if (!pass.nextWakeAt || pass.nextWakeAt.getTime() - Date.now() > most) return;
       await sleep(pass.nextWakeAt.getTime() - Date.now() + 5);
     }
   }

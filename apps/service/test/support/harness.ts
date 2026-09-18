@@ -1,10 +1,13 @@
 import { createApp } from '../../src/app.js';
 import type { Sql } from '../../src/db.js';
 import { migrate } from '../../src/migrate.js';
+import { MemoryTransport } from '../../src/transport/index.js';
+import { createUnsubscribeSigner } from '../../src/unsubscribe.js';
 import { freshDatabase } from './db.js';
 
 export const DASHBOARD_TOKEN = 'a'.repeat(64);
 export const SECRETS_KEYS = new Map([[1, Buffer.alloc(32, 7)]]);
+export const UNSUBSCRIBE_KEYS = new Map([[1, Buffer.alloc(32, 9)]]);
 
 type Json = Record<string, any>;
 
@@ -28,7 +31,17 @@ export async function startHarness() {
   const db = await freshDatabase();
   await migrate(db.sql, { log: () => {} });
   const errors: unknown[] = [];
-  const app = createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, log: { error: (...a) => errors.push(a) } });
+  const signer = createUnsubscribeSigner(UNSUBSCRIBE_KEYS);
+  /** Every provider sends through this one in tests (test sends; the worker gets it from sending.ts). */
+  const transport = new MemoryTransport();
+  const app = createApp({
+    sql: db.sql,
+    dashboardServiceToken: DASHBOARD_TOKEN,
+    secretsKeys: SECRETS_KEYS,
+    unsubscribeSigner: signer,
+    transportFor: () => transport,
+    log: { error: (...a) => errors.push(a) },
+  });
 
   async function call(c: Call): Promise<Result> {
     const headers: Record<string, string> = { ...(c.headers ?? {}) };
@@ -69,6 +82,6 @@ export async function startHarness() {
     return { id: ws.body.id as string, owner, key: key.body.key as string, keyId: key.body.api_key.id as string };
   }
 
-  return { sql: db.sql as Sql, app, call, seedWorkspace, errors, drop: db.drop, url: db.url };
+  return { sql: db.sql as Sql, app, call, seedWorkspace, errors, drop: db.drop, url: db.url, signer, transport };
 }
 export type Harness = Awaited<ReturnType<typeof startHarness>>;
