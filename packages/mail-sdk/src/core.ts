@@ -6,7 +6,10 @@ import {
   REQUEST_ID_HEADER,
   RETRYABLE_ERRORS,
   RETRY_AFTER_HEADER,
+  USAGE_WARNING_HEADER,
+  parseUsageWarningHeader,
   type ErrorCode,
+  type UsageWarningHeaderEntry,
   type OperationId,
   type RouteBody,
   type RouteDef,
@@ -36,10 +39,40 @@ export interface CoreConfig {
   random?: () => number;
 }
 
+/** What a successful response carried besides its body. */
+export interface ResponseMeta {
+  status: number;
+  /** The service's request id, quoted in support requests. */
+  requestId: string | null;
+  /** Every response header, for anything this type does not lift out. */
+  headers: Headers;
+  /**
+   * The USAGE_WARNING_HEADER, parsed: each plan limit the workspace is at or
+   * above USAGE_WARNING_RATIO of. Empty when the header was absent (the service
+   * sends it on `mailings.send` and `mailings.test`).
+   */
+  usageWarnings: UsageWarningHeaderEntry[];
+}
+
 export interface RequestOpts {
   /** Reused across every retry of this call. Auto-generated when omitted. */
   idempotencyKey?: string;
   signal?: AbortSignal;
+  /**
+   * Called with the successful response's metadata before the body is
+   * returned: once per call, once per page for `paginate`. Not called when the call fails: a `MailApiError` carries its own
+   * status and request id. An exception thrown here propagates to the caller.
+   */
+  onResponse?: (meta: ResponseMeta) => void;
+}
+
+function responseMeta(response: Response, requestId: string | null): ResponseMeta {
+  return {
+    status: response.status,
+    requestId,
+    headers: response.headers,
+    usageWarnings: parseUsageWarningHeader(response.headers.get(USAGE_WARNING_HEADER)),
+  };
 }
 
 export interface ExecuteArgs<K extends OperationId> {
@@ -148,6 +181,7 @@ export async function execute<K extends OperationId>(
 
       const requestId = response.headers.get(REQUEST_ID_HEADER);
       if (response.status >= 200 && response.status < 300) {
+        opts.onResponse?.(responseMeta(response, requestId));
         const text = await response.text();
         const json = text.length > 0 ? (JSON.parse(text) as unknown) : undefined;
         if (!config.validateResponses) return json as RouteResponse<K>;
@@ -242,6 +276,7 @@ export async function executeMultipart<K extends OperationId>(
 
       const requestId = response.headers.get(REQUEST_ID_HEADER);
       if (response.status >= 200 && response.status < 300) {
+        opts.onResponse?.(responseMeta(response, requestId));
         const text = await response.text();
         const json = text.length > 0 ? (JSON.parse(text) as unknown) : undefined;
         if (!config.validateResponses) return json as RouteResponse<K>;

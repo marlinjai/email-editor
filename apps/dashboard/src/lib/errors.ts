@@ -71,6 +71,9 @@ export function describeError(err: unknown): ActionError {
     const message =
       err.code === 'already_exists' && err.message
         ? `${err.message} Choose another.`
+        : err.code === 'plan_limit_reached' && err.message
+          ? // The service names the plan, the limit and what to do; the screen adds the way to Billing.
+            err.message
         : SERVICE_MESSAGE_WINS.has(err.code) && err.message
           ? `${base} ${err.message}`
           : base;
