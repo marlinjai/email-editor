@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OnRequestImage, TemplateSnapshotIn, TemplateSnapshotOut } from '@marlinjai/email-editor/react';
-import type { CompileResult, Template } from '@marlinjai/mail-contract';
+import { missingRequiredMergeFields, type CompileResult, type Template } from '@marlinjai/mail-contract';
 import '@marlinjai/email-editor/styles.css';
 import { ConfirmDialog, Dialog } from '@/components/dialog';
 import { CompileMessages, DeviceToggle, EmailFrame } from '@/components/email-preview';
@@ -214,7 +214,7 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
             {preview ? (
               <>
                 <CompileMessages errors={preview.errors} warnings={preview.warnings} />
-                {!preview.html.includes('{{unsubscribe_url}}') ? (
+                {missingRequiredMergeFields(preview.html).length > 0 ? (
                   <p className="rounded-lg border border-[rgba(240,192,90,0.22)] bg-warn-wash px-3 py-2 text-[12.5px] text-warn">
                     No <span className="font-mono">{'{{unsubscribe_url}}'}</span> link yet. A mailing cannot be sent without one; add it to
                     the footer.

@@ -11,6 +11,7 @@ export const EVENT_LABELS: Record<WebhookEventType, string> = {
   'message.sent': 'A message was sent',
   'message.failed': 'A message failed',
   'contact.unsubscribed': 'Someone unsubscribed',
+  'contact.resubscribed': 'Someone subscribed again',
   'contact.bounced': 'An address bounced or complained',
   'mailing.finished': 'A mailing finished',
 };
