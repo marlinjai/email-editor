@@ -5,6 +5,16 @@
   },
   "version": "0.1.0",
   "description": "The v1 API contract of the mail service: zod schemas and types for every request, response, error and webhook, the route table, and webhook signing helpers",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marlinjai/email-editor.git",
+    "directory": "packages/mail-contract"
+  },
+  "homepage": "https://github.com/marlinjai/email-editor/tree/main/packages/mail-contract#readme",
+  "bugs": {
+    "url": "https://github.com/marlinjai/email-editor/issues"
+  },
   "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -17,7 +27,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",

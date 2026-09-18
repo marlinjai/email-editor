@@ -412,7 +412,7 @@ importers:
   packages/mail-sdk:
     dependencies:
       '@marlinjai/mail-contract':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../mail-contract
     devDependencies:
       '@types/node':
