@@ -1,3 +1,10 @@
+---
+title: Section background gradients
+type: plan
+status: completed
+date: 2026-04-25
+---
+
 # Section Background Gradients Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
