@@ -26,6 +26,31 @@
       standard ones): it needs an open block type in the store and schema, a
       renderer hook for the canvas and a compile hook the server can trust.
       Until then the editor refuses a new type at setup (2026-09-18)
+- [ ] Mail service billing, test mode: put the shared Lumitra Stripe account's
+      TEST secret key (`sk_test_...`, from the Stripe dashboard in test mode) into
+      Infisical "Lumitra Mail" dev as `STRIPE_SECRET_KEY`, replacing
+      `PLACEHOLDER_REPLACE_ME` (Marlin: no Infisical project holds a test key).
+      Then run through the secrets proxy: `apps/service/scripts/stripe-catalogue.mjs`
+      (store the three printed ids as `STRIPE_PRICE_STARTER_ID`,
+      `STRIPE_PRICE_GROWTH_ID`, `STRIPE_PORTAL_CONFIGURATION_ID` in dev) and
+      `apps/service/scripts/stripe-webhook-endpoint.mjs https://mail.lumitra.co/stripe/webhook`
+      with a capture into `STRIPE_WEBHOOK_SECRET`
+      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Mail service billing, live mode (Marlin's decision: prices, limits and
+      tax in the plan's S5 defaults 1 and 2): `copy_secret op=copy` of
+      `STRIPE_SECRET_KEY` from Infisical "lumitra-qr" prod to "Lumitra Mail"
+      prod; run `stripe-catalogue.mjs --live` and store its three ids in prod;
+      run `stripe-webhook-endpoint.mjs https://mail.lumitra.co/stripe/webhook --live`
+      with a capture into prod `STRIPE_WEBHOOK_SECRET`; redeploy; then one real
+      checkout, a plan switch in the portal and a cancellation, refunded
+      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Mail service: exempt ŌPUNTIA's workspace from billing once it exists in
+      production: `node dist/main.js billing-exempt <its slug> on "OPUNTIA design
+      partner, decided 2026-09-18"` in the service container
+      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Mail service dashboard: the billing screens (plan, usage with the 80
+      percent warning, checkout, the portal) over `billing.*`, after S3 lands
+      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 
 ## Recently shipped
 

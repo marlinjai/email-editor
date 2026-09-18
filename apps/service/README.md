@@ -116,7 +116,7 @@ the parsed parts (a new multipart boundary on the retry still matches).
 
 ## Layout
 
-- `src/main.ts`: the two commands, `migrate` and `serve`.
+- `src/main.ts`: the commands `migrate`, `serve` and the operator's `billing-exempt`.
 - `src/app.ts`: middleware and wiring; `src/routes/*`: one file per resource, each
   operation registered with `mount()`. Request and response shapes are the
   contract's; `test/integration/contract.test.ts` parses every S0 response with them.
@@ -170,6 +170,7 @@ reports the pushed commit.
 | Coolify app env | only `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID`, `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`, `INFISICAL_PROJECT_ID`, `INFISICAL_ENV` |
 | Infisical `prod` | `DATABASE_URL`, `DASHBOARD_SERVICE_TOKEN`, `MAIL_SECRETS_KEY`, `MAIL_UNSUBSCRIBE_KEY`, `PUBLIC_BASE_URL` (`https://mail.lumitra.co`), `STORAGE_BRAIN_API_KEY` |
 | Optional, with defaults | `STORAGE_BRAIN_URL` (the SDK's production URL), `COMPILE_WORKERS` (2), `COMPILE_TIMEOUT_MS` (10000), `COMPILE_MAX_QUEUE` (32) |
+| Optional, billing (S5) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER_ID`, `STRIPE_PRICE_GROWTH_ID`, `STRIPE_PORTAL_CONFIGURATION_ID`. Unset or `PLACEHOLDER_REPLACE_ME` means not configured: plans, usage and limits still apply, checkout, the portal and `/stripe/webhook` answer 503 |
 
 `entrypoint.sh` refuses to start without the Coolify variables, trades the
 Universal Auth pair for a short-lived token, and runs `migrate` then `serve` under
@@ -312,3 +313,136 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
   SMTP server (`smtp-server`, self-signed TLS, so that one file sets
   `NODE_TLS_REJECT_UNAUTHORIZED=0`); `test/integration/contacts.test.ts` covers the
   upsert matrix, erasure and the contact lifecycle on the four paths.
+
+## Billing (S5)
+
+Plans, limits and Stripe, on the shared Lumitra Stripe account and the pattern
+of Lumitra QR. Code: `src/billing/*`, `src/routes/billing.ts`,
+`src/routes/stripe-webhook.ts`, migration `0015_billing.sql`.
+
+**Plans** (`src/billing/plans.ts`; limits and features are the service's own,
+what a plan costs is the Stripe Price its id points to):
+
+| Plan | Per month | Messages a month | Contacts | Members | Providers | Webhook endpoints | Features |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `free` | EUR 0 | 1,000 | 500 | 2 | 1 | 1 | none |
+| `starter` | EUR 9 | 10,000 | 5,000 | 5 | 2 | 3 | tracking |
+| `growth` | EUR 29 | 50,000 | 25,000 | 20 | 5 | 10 | tracking, A/B tests |
+| `design_partner` | not sold | unlimited | unlimited | unlimited | unlimited | unlimited | all |
+
+**Metering.** Usage is computed on every read, never stored. `messages` is the
+sum of the send ledger (`provider_sends`: every recipient handed to a provider,
+test sends included) in the period: the Stripe period for a paid plan, the
+calendar month in UTC otherwise. The other metrics are counts. Nothing is
+reported to Stripe: the plans are flat monthly prices with hard limits, so there
+is nothing to meter there (it would come back only with an overage price).
+
+**Enforcement** answers `plan_limit_reached` (429, not retryable) with
+`details.metric` or `details.feature`, `used` and `limit`:
+
+- `mailings.send`: the whole audience must fit what is left of the period after
+  what was sent and what started mailings still hold. A mailing runs whole or
+  not at all; once accepted it always finishes (the worker never checks a
+  limit, and `pause`, `resume` and `retry-failed` are not checked), so a limit
+  never cuts an audience in half. `mailings.test` is one more recipient.
+- Contacts (`contacts.upsert` and a recipient batch that creates contacts),
+  `members.add`, `providers.create`, `webhooks.create`: checked after the
+  insert in the same transaction, under the workspace's billing row lock, so a
+  no-op upsert never counts and two racing inserts cannot both slip through.
+  A refused batch rolls back whole. A downgrade removes nothing: new rows are
+  refused until the count fits.
+- Turning `settings.tracking_enabled` on needs a plan with `tracking`. S4's A/B
+  tests call `assertFeature(tx, workspaceId, 'ab_testing')` from
+  `src/billing/usage.ts`, and its imports and signup forms
+  `assertWithinLimit(tx, workspaceId, 'contacts')`.
+- Soft warning: at 80 percent of any limit `billing.usage` lists it in
+  `warnings`, and `mailings.send` and `mailings.test` answer with
+  `x-mail-usage-warning: messages=8200/10000`.
+
+**Checkout and the portal.** `billing.checkout` creates the workspace's Stripe
+customer on first use (tagged `metadata.product=mail` and the workspace id, so
+reconciliation can always find its subscriptions) and a Checkout Session on the
+plan's configured Price, with the tag and the workspace on the session and on
+`subscription_data`. It fails closed: without a Stripe key or the plan's Price
+id it answers 503 before anything is written or sent. A workspace that already
+has a subscription changes or cancels its plan in the Stripe customer portal
+(`billing.portal`); checkout answers `conflict` then. Stripe failures are
+`provider_error` (502) with `details.service = "stripe"`.
+
+**The webhook** `POST /stripe/webhook` (public, outside `/v1` and the contract,
+its own 512 KB body limit):
+
+1. Without `STRIPE_WEBHOOK_SECRET` or `STRIPE_SECRET_KEY`: 503, so Stripe keeps
+   the event and retries.
+2. `Stripe-Signature` is verified over the raw body (HMAC-SHA256, 300 second
+   tolerance, constant-time); a bad one is 400.
+3. The product gate: an event tagged for another product on the shared account
+   is acknowledged and dropped (only its type and id are logged); an untagged
+   one is ours only if its customer or subscription is one this service
+   recorded.
+4. The workspace is the one the recorded Stripe ids point to; a metadata
+   workspace id that disagrees is not believed (logged, recorded as
+   `unknown_workspace`).
+5. The subscription is re-read from Stripe and its current state mirrored onto
+   `workspace_billing`, so events out of order or twice converge on Stripe's
+   state; a late `deleted` of a replaced subscription never ends its successor.
+6. Exactly once: the event id is inserted into `stripe_events` in the same
+   transaction as the change; a replay changes nothing, a failure (Stripe
+   unreachable, a Price no plan is configured with) answers 500 and records
+   nothing, so Stripe's retry applies it.
+
+Status mapping: `active`, `trialing` keep the Price's plan; `past_due` and
+`unpaid` keep it while Stripe retries the payment; `canceled` and
+`incomplete_expired` drop to `free` with status `cancelled`; `paused` to `free`
+with `past_due`; `incomplete` changes nothing yet.
+
+**Reconciliation.** `serve` runs a loop (every 15 minutes, and at start) that
+re-reads the subscription of every workspace whose mirror is older than an
+hour, and `billing.subscription` does the same for its workspace on read. A
+lost webhook therefore heals within the hour, or at once when someone looks.
+Stripe being unreachable on a read serves the stored mirror and logs.
+
+**The design-partner exemption** (`billing_exempt`, plan `design_partner`, no
+limits, no checkout, no portal) is set only by the operator command, never by
+an API key, a member or a Stripe event; the schema refuses the plan without the
+flag and the flag without the plan:
+
+```bash
+# inside the service container (Coolify: the app's terminal), or locally with DATABASE_URL:
+node dist/main.js billing-exempt <workspace id or slug> on "<who decided, why>"
+node dist/main.js billing-exempt <workspace id or slug> off "<why>"
+```
+
+It writes a `billing.exemption_changed` audit row. Lifting it drops the
+workspace to `free` and marks the mirror stale, so the next read or
+reconciliation restores any plan it still pays for. An exempt workspace that
+still has a subscription keeps being charged by Stripe: cancel that in Stripe.
+
+**Stripe setup** (`scripts/`, run through the secrets proxy's
+`execute_with_secrets` with the Infisical project "Lumitra Mail", the file
+passed as a heredoc to `node --input-type=module`):
+
+- `stripe-catalogue.mjs`: the two Products, their monthly Prices (lookup keys
+  `mail-starter-monthly`, `mail-growth-monthly`) and a portal configuration
+  allowing switches between them and cancelling at the period's end.
+  Idempotent; refuses a live key without `--live`. Prints the three ids to store
+  as `STRIPE_PRICE_STARTER_ID`, `STRIPE_PRICE_GROWTH_ID`,
+  `STRIPE_PORTAL_CONFIGURATION_ID`.
+- `stripe-webhook-endpoint.mjs <https://host/stripe/webhook>`: registers the
+  endpoint for exactly `STRIPE_WEBHOOK_EVENTS`, pinned to the API version, and
+  writes the `whsec_` secret only to the proxy's capture
+  (`$SECRETS_CAPTURE_DIR/STRIPE_WEBHOOK_SECRET`), never to stdout.
+
+**Tests.** `test/integration/billing.test.ts` drives the real Stripe client
+against a stateful fake at the fetch level (`test/support/fake-stripe.ts`):
+signature, replay and racing replays, foreign products, forged workspaces,
+Stripe outages, the four paths of the subscription lifecycle (subscribe;
+change up and down, out of order; resume after a missed webhook, through the
+read, the loop and a restart; cancel and subscribe again, with dunning and a
+late event), limits with the mid-mailing rule, the free tier, the exemption and
+tenancy. `test/integration/stripe-mock.test.ts` runs the same client against
+stripe-mock (Stripe's own mock, which validates every request against Stripe's
+API description): `STRIPE_MOCK_URL` in CI, Testcontainers locally. The suites
+of earlier phases seed design-partner workspaces
+(`seedWorkspace(slug, { billing: 'free' })` opts into the free plan).
+
