@@ -7,9 +7,11 @@ import {
   AuditEntry,
   AuditQuery,
   Member,
-  MemberInvite,
+  MemberCreate,
   MemberUpdate,
   Workspace,
+  WorkspaceCreate,
+  WorkspaceMembership,
   WorkspaceUpdate,
 } from './workspace';
 import { TS } from './test-fixtures';
@@ -40,6 +42,21 @@ describe('workspace', () => {
     expect(Workspace.safeParse({ ...workspace, settings: { ...workspace.settings, locales: [] } }).success).toBe(false);
   });
 
+  it('WorkspaceCreate needs a slug, a name and the owner email', () => {
+    const ok = { slug: 'opuntia', name: 'ŌPUNTIA', owner: { email: 'a@b.de' } };
+    expect(WorkspaceCreate.safeParse(ok).success).toBe(true);
+    expect(WorkspaceCreate.safeParse({ ...ok, settings: { default_locale: 'de' }, owner: { email: 'a@b.de', name: null } }).success).toBe(true);
+    expect(WorkspaceCreate.safeParse({ ...ok, owner: {} }).success).toBe(false);
+    expect(WorkspaceCreate.safeParse({ ...ok, slug: 'ŌPUNTIA' }).success).toBe(false);
+    const { owner: _o, ...noOwner } = ok;
+    expect(WorkspaceCreate.safeParse(noOwner).success).toBe(false);
+  });
+
+  it('WorkspaceMembership adds the person\'s role', () => {
+    expect(WorkspaceMembership.safeParse({ ...workspace, role: 'owner' }).success).toBe(true);
+    expect(WorkspaceMembership.safeParse(workspace).success).toBe(false);
+  });
+
   it('WorkspaceUpdate needs at least one field and allows partial settings', () => {
     expect(WorkspaceUpdate.safeParse({ name: 'New' }).success).toBe(true);
     expect(WorkspaceUpdate.safeParse({ settings: { tracking_enabled: true } }).success).toBe(true);
@@ -49,11 +66,14 @@ describe('workspace', () => {
 });
 
 describe('members', () => {
-  it('accepts the four roles only', () => {
+  it('adds by auth-brain subject with email, accepting the four roles only', () => {
     for (const role of ['owner', 'admin', 'editor', 'viewer']) {
-      expect(MemberInvite.safeParse({ email: 'a@b.de', role }).success, role).toBe(true);
+      expect(MemberCreate.safeParse({ subject: 'auth|1', email: 'a@b.de', role }).success, role).toBe(true);
     }
-    expect(MemberInvite.safeParse({ email: 'a@b.de', role: 'superuser' }).success).toBe(false);
+    expect(MemberCreate.safeParse({ subject: 'auth|1', email: 'a@b.de', name: null, role: 'viewer' }).success).toBe(true);
+    expect(MemberCreate.safeParse({ subject: 'auth|1', email: 'a@b.de', role: 'superuser' }).success).toBe(false);
+    expect(MemberCreate.safeParse({ email: 'a@b.de', role: 'viewer' }).success).toBe(false);
+    expect(MemberCreate.safeParse({ subject: '', email: 'a@b.de', role: 'viewer' }).success).toBe(false);
     expect(MemberUpdate.safeParse({}).success).toBe(false);
   });
 

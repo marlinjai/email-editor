@@ -33,3 +33,6 @@ export const REQUEST_ID_HEADER = 'x-request-id';
 export const RETRY_AFTER_HEADER = 'retry-after';
 
 export const API_VERSION_PREFIX = '/v1';
+
+/** Liveness probe, outside the versioned API and without credentials. */
+export const HEALTH_PATH = '/healthz';
