@@ -127,6 +127,8 @@ export function createNamespaces(config: CoreConfig) {
       cancel: (id: string, opts?: RequestOpts) => execute(config, 'mailings.cancel', { params: { id }, body: {} }, opts),
       retryFailed: (id: string, body: RouteBody<'mailings.retryFailed'> = {}, opts?: RequestOpts) =>
         execute(config, 'mailings.retryFailed', { params: { id }, body }, opts),
+      duplicate: (id: string, opts?: RequestOpts) =>
+        execute(config, 'mailings.duplicate', { params: { id }, body: {} }, opts),
       // S4: scheduling, segments and A/B testing
       addSegment: (id: string, body: RouteBody<'mailings.addSegment'>, opts?: RequestOpts) =>
         execute(config, 'mailings.addSegment', { params: { id }, body }, opts),

@@ -7,7 +7,10 @@ import { createSql } from './db.js';
 import { migrate, MigrationError } from './migrate.js';
 import { repos } from './repo/index.js';
 import { createSealer } from './sealing.js';
+import { createUnsubscribeSigner } from './unsubscribe.js';
 import { startWebhookDeliveryLoop } from './webhooks/loop.js';
+import { SendWorker } from './worker/loop.js';
+import { createTransportCache } from './worker/transports.js';
 
 /**
  * The service's one entry point, with two commands:
@@ -39,6 +42,9 @@ async function runMigrate(): Promise<void> {
 async function runServe(): Promise<void> {
   const config = loadConfig();
   const sql = createSql(config.databaseUrl, { max: config.databasePoolMax });
+  const unsubscribeSigner = createUnsubscribeSigner(config.unsubscribeKeys);
+  // One transport per provider, shared by the worker and the test sends.
+  const transports = createTransportCache(createSealer(config.secretsKeys));
   const webhookUrlPolicy = {
     allowInsecureHttp: config.webhookAllowInsecureTargets,
     allowPrivateTargets: config.webhookAllowInsecureTargets,
@@ -58,6 +64,16 @@ async function runServe(): Promise<void> {
     compiler,
     assetStorage: new StorageBrainAssetStorage(config.storageBrain),
     publicBaseUrl: config.publicBaseUrl,
+    unsubscribeSigner,
+    transportFor: transports.get,
+  });
+  // The send worker: one loop per process. It reconciles what a previous
+  // process left mid-send before it claims anything new.
+  const worker = new SendWorker({
+    sql,
+    transportFor: transports.get,
+    signer: unsubscribeSigner,
+    publicBaseUrl: config.publicBaseUrl,
   });
 
   const webhookLoop = startWebhookDeliveryLoop(sql, createSealer(config.secretsKeys), { policy: webhookUrlPolicy });
@@ -75,6 +91,7 @@ async function runServe(): Promise<void> {
   const server = serve({ fetch: app.fetch, port: config.port, hostname: '0.0.0.0' }, (info) => {
     console.log(`[serve] listening on http://0.0.0.0:${info.port}`);
   });
+  worker.start();
 
   let stopping = false;
   const stop = (signal: string) => {
@@ -82,13 +99,20 @@ async function runServe(): Promise<void> {
     stopping = true;
     console.log(`[serve] ${signal}: draining`);
     clearInterval(purge);
+    // The worker finishes the send in flight (and records it) and starts no
+    // other; only then do the connections go.
+    const workerStopped = worker
+      .stop()
+      .then(() => transports.closeAll())
+      .catch((err) => console.error('[worker] stopping failed:', err));
     server.close(() => {
-      Promise.allSettled([webhookLoop.stop(), compiler.close()])
+      Promise.allSettled([workerStopped, webhookLoop.stop(), compiler.close()])
         .then(() => sql.end({ timeout: 5 }))
         .catch((err) => console.error('[serve] shutdown failed:', err))
         .finally(() => process.exit(0));
     });
-    setTimeout(() => process.exit(1), 10_000).unref();
+    // Longer than one send's timeout, so an in-flight send is recorded, not cut off.
+    setTimeout(() => process.exit(1), 150_000).unref();
   };
   process.on('SIGTERM', () => stop('SIGTERM'));
   process.on('SIGINT', () => stop('SIGINT'));
