@@ -773,8 +773,10 @@ block: a permanent rejection only recorded `message.failed`. Now:
   https address cannot either: the provider then shows `events.status:
   needs_secret`, the reason, and the URL to add at Resend by hand, and
   `PUT /v1/providers/:id/events-secret` (`providers.setEventsSecret`)
-  stores the pasted secret. Deleting a provider removes an endpoint the
-  service registered itself.
+  stores the pasted secret. A new API key that belongs to another Resend
+  account (the registered endpoint is not found with it) registers anew there;
+  one from the same account keeps the endpoint. Deleting a provider removes an
+  endpoint the service registered itself.
 - **Hardening an existing block.** An `unsubscribed` block the person could
   lift themselves becomes `bounced` or `complained`, and a `bounced` block that
   also draws a complaint becomes `complained`. A `manual` block is left alone.

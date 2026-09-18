@@ -160,6 +160,30 @@ export async function registerResendEvents(
   })) as ProviderRow;
 }
 
+/**
+ * Whether the Resend account this key belongs to has the given events endpoint:
+ * true, false (404), or null when that cannot be told (a sending-only key,
+ * Resend unreachable, another answer).
+ */
+async function resendWebhookExists(
+  opts: Pick<ProviderRouteOptions, 'fetch' | 'verifyTimeoutMs'>,
+  webhookId: string,
+  apiKey: string,
+): Promise<boolean | null> {
+  try {
+    const res = await opts.fetch(`${RESEND_API_URL}/webhooks/${encodeURIComponent(webhookId)}`, {
+      method: 'GET',
+      headers: { authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(opts.verifyTimeoutMs),
+    });
+    if (res.ok) return true;
+    if (res.status === 404) return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Removes an events endpoint the service registered at Resend itself. Best effort: a failure is logged. */
 async function unregisterResendEvents(
   opts: Pick<ProviderRouteOptions, 'fetch' | 'verifyTimeoutMs' | 'log'>,
@@ -423,10 +447,23 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
         targetId: id,
         details: { fields, secret_rotated: secret !== undefined },
       });
-      return updated;
+      return { updated, secret };
     });
+    let result = row.updated;
+    // A new Resend key may belong to another Resend account, where the endpoint
+    // the service registered does not exist: register it there. A key that may
+    // manage webhooks also gets one registered when none is set up yet.
+    if (result.kind === 'resend' && row.secret !== undefined) {
+      if (result.events_source === 'automatic' && result.events_webhook_id) {
+        if ((await resendWebhookExists(opts, result.events_webhook_id, row.secret)) === false) {
+          await pool.providers.clearEvents(access.workspaceId, id);
+          result = (await pool.providers.get(access.workspaceId, id)) ?? result;
+        }
+      }
+      result = await registerResendEvents(sql, sealer, opts, access.workspaceId, result, row.secret, actorOf(access));
+    }
     c.header('cache-control', 'no-store');
-    return c.json(toProvider(row, opts.publicBaseUrl));
+    return c.json(toProvider(result, opts.publicBaseUrl));
   });
 
   // Soft delete, refused while a mailing still needs the provider to send.

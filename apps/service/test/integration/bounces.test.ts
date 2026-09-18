@@ -541,6 +541,43 @@ describe('Resend events endpoint registration', () => {
     });
   });
 
+  it('backtrack: a new API key from the same account keeps the endpoint; one from another account registers anew', async () => {
+    const created = await appOver(h, { providerFetch: fakeResend({ webhooks: registered }).fetch }).call({
+      method: 'POST',
+      path: '/v1/providers',
+      key: W.key,
+      body: createBody,
+    });
+    const rotate = (key: string) => ({ kind: 'resend', config: { api_key: key } });
+    const sameKey = `re_${randomBytes(18).toString('base64url')}`;
+    const same = fakeResend({ domains: () => new Response('{"object":"webhook","id":"wh_123"}', { status: 200 }) });
+    const kept = await appOver(h, { providerFetch: same.fetch }).call({ method: 'PATCH', path: `/v1/providers/${created.body.id}`, key: W.key, body: rotate(sameKey) });
+    expect(kept.status).toBe(200);
+    expect(same.seen.map((s) => `${s.method} ${s.url}`)).toEqual(['GET https://api.resend.com/webhooks/wh_123']);
+    expect(kept.body.events).toMatchObject({ status: 'active', source: 'automatic' });
+    expect((await post(created.body.id, bounceEvent('re-12', 'k@example.com'))).status).toBe(200);
+
+    const otherSecret = `whsec_${randomBytes(24).toString('base64')}`;
+    const otherKey = `re_${randomBytes(18).toString('base64url')}`;
+    const other = fakeResend({
+      domains: () => new Response('{"name":"not_found"}', { status: 404 }),
+      webhooks: () => new Response(JSON.stringify({ object: 'webhook', id: 'wh_456', signing_secret: otherSecret }), { status: 201 }),
+    });
+    const moved = await appOver(h, { providerFetch: other.fetch }).call({ method: 'PATCH', path: `/v1/providers/${created.body.id}`, key: W.key, body: rotate(otherKey) });
+    expect(moved.body.events).toMatchObject({ status: 'active', source: 'automatic', error: null });
+    expect(other.seen.map((s) => `${s.method} ${s.url} ${s.auth === `Bearer ${otherKey}`}`)).toEqual([
+      'GET https://api.resend.com/webhooks/wh_123 true',
+      'POST https://api.resend.com/webhooks true',
+    ]);
+    expect((await post(created.body.id, bounceEvent('re-13', 'l@example.com'))).status).toBe(400);
+    expect((await post(created.body.id, bounceEvent('re-13', 'l@example.com'), { secret: otherSecret })).status).toBe(200);
+
+    // A rename without a new key calls nothing at Resend.
+    const quiet = fakeResend({});
+    await appOver(h, { providerFetch: quiet.fetch }).call({ method: 'PATCH', path: `/v1/providers/${created.body.id}`, key: W.key, body: { kind: 'resend', name: 'Renamed' } });
+    expect(quiet.seen).toEqual([]);
+  });
+
   it('an instance without a public https address does not call Resend and says so', async () => {
     const resend = fakeResend({ webhooks: registered });
     const created = await appOver(h, { providerFetch: resend.fetch, publicBaseUrl: 'http://localhost:8787' }).call({
