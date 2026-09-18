@@ -1,7 +1,6 @@
 import {
   canTransition,
   EDITABLE_MAILING_STATUSES,
-  MAX_DOCUMENT_BYTES,
   missingRequiredMergeFields,
   type CompileMessage,
   type Mailing,
@@ -14,6 +13,7 @@ import {
 } from '@marlinjai/mail-contract';
 import { Hono, type Context } from 'hono';
 import { ApiError } from '../api-error.js';
+import { validateDocument } from '../documents.js';
 import { actorOf, type AppEnv, type WorkspaceAccess } from '../context.js';
 import type { Db, Sql } from '../db.js';
 import { emitEvent } from '../events.js';
@@ -27,7 +27,7 @@ import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
 export type CompiledDocument = { mjml: string; html: string; warnings: CompileMessage[]; errors: CompileMessage[] };
 
 export type MailingRouteDeps = MountDeps & {
-  /** Validates the document with the editor core's schema and compiles it to MJML and HTML. */
+  /** Compiles a validated document to MJML and HTML (S1's CompilePool in production). */
   compile: (document: TemplateDocument) => Promise<CompiledDocument>;
   /** Sends one test message outside the queue (src/worker/test-send.ts). */
   sendTest: (input: {
@@ -37,12 +37,8 @@ export type MailingRouteDeps = MountDeps & {
     to: string;
     merge: Record<string, unknown>;
   }) => Promise<MailingTestResult>;
-  /**
-   * The current document of a saved template, or null when there is none.
-   * Absent until the templates of S1 are wired in: then a mailing can only be
-   * created from a document.
-   */
-  loadTemplateDocument?: (workspaceId: string, templateId: string) => Promise<TemplateDocument | null>;
+  /** The current document of a saved template of the workspace, or null when there is none. */
+  loadTemplateDocument: (workspaceId: string, templateId: string) => Promise<TemplateDocument | null>;
 };
 
 export function toMailingSummary(row: MailingRow, counts: MailingCounts): MailingSummary {
@@ -84,12 +80,6 @@ function toRecipient(row: RecipientRow) {
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
-}
-
-function checkDocumentSize(document: unknown) {
-  if (Buffer.byteLength(JSON.stringify(document)) > MAX_DOCUMENT_BYTES) {
-    throw new ApiError('payload_too_large', `The document is larger than ${MAX_DOCUMENT_BYTES} bytes.`);
-  }
 }
 
 function invalidState(row: MailingRow, action: MailingAction): never {
@@ -174,17 +164,13 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     let document = input.document;
     let templateId: string | null = null;
     if (input.template_id !== undefined) {
-      if (!deps.loadTemplateDocument) {
-        throw new ApiError('validation_failed', 'Saved templates are not available yet: send the document itself.', {
-          issues: [{ path: ['template_id'], message: 'templates are not available' }],
-        });
-      }
       templateId = rowId(input.template_id, 'template');
       const loaded = await deps.loadTemplateDocument(access.workspaceId, templateId);
       if (!loaded) throw new ApiError('not_found', 'No such template in this workspace.');
       document = loaded;
     }
-    checkDocumentSize(document);
+    // The editor core's full schema, not only the contract's envelope.
+    const validated = validateDocument(document);
     const mailing = await sql.begin(async (tx) => {
       const r = repos(tx);
       const topic = await resolveTopic(r, access.workspaceId, input.topic);
@@ -194,7 +180,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
         subject: input.subject,
         preheader: input.preheader ?? null,
         templateId,
-        document: document as Record<string, unknown>,
+        document: validated as unknown as Record<string, unknown>,
         topicId: topic.id,
         providerId: provider.id,
         metadata: input.metadata ?? {},
@@ -223,7 +209,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     const access = c.get('access');
     const id = mailingId(c, 'mailings.get');
     const input = await body(c, 'mailings.update');
-    if (input.document !== undefined) checkDocumentSize(input.document);
+    const document = input.document === undefined ? undefined : validateDocument(input.document);
     const mailing = await withLocked(access, id, async (r, _tx, row) => {
       if (!EDITABLE_MAILING_STATUSES.includes(row.status)) {
         throw new ApiError('mailing_invalid_state', `A ${row.status} mailing can no longer be changed.`, {
@@ -237,7 +223,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
         name: input.name,
         subject: input.subject,
         preheader: input.preheader,
-        document: input.document as Record<string, unknown> | undefined,
+        document: document as unknown as Record<string, unknown> | undefined,
         topicId,
         providerId,
         metadata: input.metadata,
@@ -308,7 +294,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     const stored = await pool.mailings.compiled(workspaceId, id);
     let html = stored?.html ?? null;
     if (html === null) {
-      const compiled = await deps.compile(mailing.document as TemplateDocument);
+      const compiled = await deps.compile(validateDocument(mailing.document) as unknown as TemplateDocument);
       if (compiled.errors.length > 0) {
         throw new ApiError('compile_failed', 'The document does not compile.', { errors: compiled.errors });
       }
@@ -328,7 +314,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     if (!canTransition(current.status, 'send')) invalidState(current, 'send');
     // Compile outside the transaction (it is CPU work); the snapshot is taken
     // under the lock below and refused if the document changed meanwhile.
-    const compiled = await deps.compile(current.document as TemplateDocument);
+    const compiled = await deps.compile(validateDocument(current.document) as unknown as TemplateDocument);
     if (compiled.errors.length > 0) {
       throw new ApiError('compile_failed', 'The document does not compile.', { errors: compiled.errors });
     }

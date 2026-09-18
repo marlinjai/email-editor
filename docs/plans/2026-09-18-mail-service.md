@@ -348,8 +348,8 @@ Defaults taken in S0 (each can be overturned later):
    `.github/workflows/deploy-service.yml` on pushes to `main` that touch the service.
    `/healthz` reports the served commit, and the deploy waits until every reply
    carries it.
-7. **The in-memory `ek_` key counting in `packages/core/src/api/validation.ts` stays**
-   for now: nothing published depends on it, but the deployed demo's compile route
+7. **The in-memory `ek_` key counting in `packages/core/src/api/validation.ts` stayed**
+   through S0 (retired in S1, see below): nothing published depends on it, but the deployed demo's compile route
    (`examples/nextjs/app/api/compile/route.ts`) does, and S1's compile API is what
    replaces that route. It is retired together with the demo route in S1.
 
@@ -359,6 +359,69 @@ Inputs for later phases, found while building S0:
   an auth-brain company. S3 adds that column when the dashboard creates workspaces
   for a signed-in company, and subscribes the `mail` app to erasure then.
 
+### S1, templates, compile and assets (built 2026-09-18, branch `feat/s1-templates`)
+
+Built and verified (details in `apps/service/README.md`, section "Templates,
+compile and assets"):
+
+- **Migration `0002_templates_assets`**: `templates` (document `jsonb`,
+  `schema_version`, name, description, thumbnail, current `version`, archive),
+  `template_versions` (one immutable row per saved version, append-only enforced
+  by a trigger) and `assets` (the Storage Brain file id, the sniffed type, size,
+  dimensions, SHA-256).
+- **Templates CRUD and versions** exactly per the contract's route table. Every
+  stored or compiled document passes the editor core's `migrateTemplate` first.
+  Saves are optimistically locked on `base_version` (409 `conflict` with the
+  current version; the row is locked, so of two racing saves exactly one wins);
+  an unchanged save keeps the version.
+- **Compile** (`templates.compile`, `compile`): always 200 with `{ mjml, html,
+  warnings, errors }`, MJML messages without server paths. MJML runs in a pool of
+  worker threads with a per-job deadline (the worker is terminated and replaced)
+  and a bounded queue (503 when full). A test holds `/healthz` answering during a
+  multi-second compile.
+- **Assets**: multipart upload, content-sniffed (PNG, JPEG, GIF, WebP), 10 MB,
+  stored in Storage Brain, served at `https://mail.lumitra.co/a/<id>` by streaming
+  through a fresh five-minute signed URL per request, with the stored type,
+  `Cache-Control: public, max-age=31536000, immutable` and an `ETag`.
+- **Retired**: `packages/core/src/api/` (the `ek_` key parsing, in-memory usage
+  counting, tiers and watermark) and its `export * from './api'` in
+  `@marlinjai/email-editor-core/server`. `examples/nextjs`'s compile route now
+  validates with `migrateTemplate` and compiles with no key handling, and the
+  demo's export surfaces a failed compile instead of swallowing it.
+- **Secrets and config**: `STORAGE_BRAIN_API_KEY` in Infisical "Lumitra Mail"
+  dev and prod, each from its own new Storage Brain tenant (`lumitra-mail-dev`,
+  `lumitra-mail`), minted by the Storage Brain admin API inside the secrets
+  proxy and stored by its capture mechanism, never printed; `PUBLIC_BASE_URL`
+  (`https://mail.lumitra.co` in prod, `http://localhost:3000` in dev). Both are
+  required at boot.
+- **Tests**: 220 in the service (unit and integration on Testcontainers Postgres
+  17): tenancy on every S1 route, the version conflict and the race, invalid and
+  newer-version documents, compile with and without errors, the event loop under
+  a heavy compile, compile timeout, queue overflow and worker crash, upload
+  sniffing and limits, the public URL's headers, 304, 404 and 503, idempotent
+  upload retries, the Storage Brain adapter against a local stand-in, and the
+  four stateful-flow paths of template editing (forward; backtrack and revise;
+  resume after a restart; re-entry by restoring an old version as a new one).
+
+Defaults taken in S1 (each can be overturned later):
+
+1. **Restoring a version is a save**, not its own route: the client saves the old
+   version's document on the current `base_version`, which appends a new version
+   and never rewrites history. The contract needed no extension for it.
+2. **A rejected document is `validation_failed`** with the editor core's reason in
+   `details.reason` (`NEWER_VERSION` carries `details.document_version`), rather
+   than a new error code: the contract's envelope already carries it.
+3. **Every real change bumps the version**, a rename or an archive too, since the
+   version is the lock token; each version row snapshots the document.
+4. **A compile past its deadline** (`COMPILE_TIMEOUT_MS`, 10 s) answers 200 with
+   the timeout in `errors`, as the contract answers every readable compile;
+   only a full queue is an error (503, retryable).
+5. **Assets stream through the service** rather than redirect, so the type and
+   the caching are the service's, the Storage Brain URL never reaches a mail
+   client, and a 304 costs no Storage Brain call.
+6. **One Storage Brain tenant per environment**, not a key shared with another
+   app: quota, listing and erasure stay the mail service's own.
+7. **The contract gained one audit action**, `asset.uploaded`.
 ### S2, F2: mailings and the send worker (built 2026-09-18, branch `feat/s2-mailings-worker`)
 
 Mailings with the contract's state machine, the recipient batch, test sends, the
@@ -377,8 +440,8 @@ stated defaults, open to change:
 - **`mailings.duplicate`** (`POST /v1/mailings/:id/duplicate`) was added to the
   contract and the SDK: any mailing, in any state, copied into a new draft
   without recipients.
-- **Compiling** runs in process through `src/worker/compile.ts` until S1's
-  compile pool is on main; both implement the same `Compiler` interface.
+- **Compiling** goes through S1's compile pool and document validation, the same
+  path as the compile API.
 
 ## Legal shape
 
@@ -438,3 +501,14 @@ later decision can overturn:
    in this phase: it needs the same npm Trusted Publishing registration as
    `@marlinjai/mail-contract` before its first publish succeeds. Add it to the same
    npmjs.com trusted-publisher setup Marlin does for the other packages under item 4.
+7. **S2 providers and topics, contract gaps** (settled with the orchestrator,
+   2026-09-18): a provider's `policy` stays required on create, so there is no
+   default per kind; a provider on `smtp.mail.me.com` is refused
+   (`validation_failed`, pointing at `ICLOUD_SMTP_POLICY`) above Apple's limits of
+   1,000 recipients a day and one recipient per message. The route table has no
+   `topics.delete`: the schema already refuses to delete a topic a mailing uses,
+   and the route waits for a client that needs it (ROADMAP.md). `providers.verify`
+   answers `{ ok: false, error }` with `error` starting with a stable code
+   (`auth_failed`, `tls_failed`, `host_unreachable`, `no_secret`,
+   `provider_rejected`); for Resend it reads `GET /domains` and counts a key
+   restricted to sending as valid.

@@ -24,3 +24,10 @@ export const withoutUnsubscribe = () => documentWith([textBlock('<p>Hello {{firs
 
 /** Passes the contract's envelope, fails the editor core's schema. */
 export const invalidForCore = () => ({ version: '1.0' as const, metadata: {}, sections: [{ id: 's', type: 'nope' }] });
+
+/** Valid for the schema, but MJML rejects the spacer's height: compiles with errors. */
+export const brokenSpacer = () =>
+  documentWith([
+    { id: 'sp-1', type: 'spacer', height: 'abc' },
+    textBlock('<p><a href="{{unsubscribe_url}}">Unsubscribe</a></p>', 'txt-2'),
+  ]);

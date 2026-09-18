@@ -146,6 +146,7 @@ export const AUDIT_ACTIONS = [
   'template.created',
   'template.updated',
   'template.deleted',
+  'asset.uploaded',
   'contact.erased',
   'suppression.created',
   'suppression.deleted',
@@ -159,6 +160,7 @@ export const AUDIT_ACTIONS = [
   'webhook.updated',
   'webhook.deleted',
   'webhook.secret_rotated',
+  'webhook.redelivered',
   'contact.unsubscribed',
 ] as const;
 export const AuditAction = z.enum(AUDIT_ACTIONS);

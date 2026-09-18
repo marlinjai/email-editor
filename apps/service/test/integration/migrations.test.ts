@@ -29,6 +29,7 @@ async function copyOfMigrations(): Promise<string> {
 const shipped = async () => (await loadMigrations()).map((m) => m.name);
 
 const S0_TABLES = ['_migrations', 'api_keys', 'audit_log', 'idempotency_keys', 'workspace_members', 'workspaces'];
+const S1_TABLES = ['assets', 'template_versions', 'templates'];
 const S2_TABLES = [
   'contact_topic_subscriptions',
   'contacts',
@@ -56,7 +57,8 @@ describe('migrations', () => {
     const result = await migrate(sql, quiet);
     expect(result.applied).toEqual(await shipped());
     expect(result.applied).toEqual(expect.arrayContaining(['0001_foundation.sql', '0003_sending.sql']));
-    expect(await tableNames(sql)).toEqual(expect.arrayContaining([...S0_TABLES, ...S2_TABLES]));
+    expect(await tableNames(sql)).toEqual(expect.arrayContaining([...S0_TABLES, ...S1_TABLES, ...S2_TABLES]));
+    expect(result.applied).toEqual(expect.arrayContaining(['0002_templates_assets.sql']));
   });
 
   it('is a no-op the second time (re-entry after completion)', async () => {
@@ -84,7 +86,7 @@ describe('migrations', () => {
     else await writeFile(join(dir, late), 'CREATE TABLE arrives_late (id int);\n');
     const second = await migrate(sql, { ...quiet, dir });
     expect(second.applied).toEqual([late]);
-    expect(await tableNames(sql)).toEqual(expect.arrayContaining(S2_TABLES));
+    expect(await tableNames(sql)).toEqual(expect.arrayContaining([...S1_TABLES, ...S2_TABLES]));
     const recorded = await sql<{ name: string }[]>`SELECT name FROM _migrations ORDER BY name`;
     expect(recorded.map((r) => r.name)).toContain(late);
   });

@@ -2,7 +2,7 @@ import { ErrorBody, routes, type OperationId } from '@marlinjai/mail-contract';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { repos } from '../../src/repo/index.js';
 import { startHarness, type Harness } from '../support/harness.js';
-import { invalidForCore, newsletter, withoutUnsubscribe } from '../support/mail-documents.js';
+import { brokenSpacer, invalidForCore, newsletter, withoutUnsubscribe } from '../support/mail-documents.js';
 import { action, addRecipients, createMailing, eventsOf, makeWorker, seedContact, seedSending } from '../support/sending.js';
 
 /**
@@ -93,7 +93,7 @@ describe('contract conformance, mailings and messages', () => {
 });
 
 describe('creating and sending: refusals', () => {
-  it('refuses an unknown topic or provider, and a template while templates are not wired', async () => {
+  it('refuses an unknown topic, provider or template, and a document the editor core rejects', async () => {
     const base = { subject: 'S', document: newsletter() };
     const topic = await h.call({ method: 'POST', path: '/v1/mailings', key: A.key, body: { ...base, topic: 'nope', provider_id: sA.provider.id } });
     expect(topic.body.error.code).toBe('unknown_topic');
@@ -105,8 +105,21 @@ describe('creating and sending: refusals', () => {
       key: A.key,
       body: { subject: 'S', topic: 'news', provider_id: sA.provider.id, template_id: '00000000-0000-4000-8000-000000000000' },
     });
-    expect(template.status).toBe(400);
-    expect(template.body.error.code).toBe('validation_failed');
+    expect(template.status).toBe(404);
+    const invalid = await h.call({ method: 'POST', path: '/v1/mailings', key: A.key, body: { ...base, document: invalidForCore(), topic: 'news', provider_id: sA.provider.id } });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.code).toBe('validation_failed');
+  });
+
+  it("snapshots a saved template's current document, and B cannot use A's template", async () => {
+    const saved = await h.call({ method: 'POST', path: '/v1/templates', key: A.key, body: { name: 'Spring', document: newsletter('From a template') } });
+    expect(saved.status).toBe(201);
+    const m = await h.call({ method: 'POST', path: '/v1/mailings', key: A.key, body: { subject: 'S', topic: 'news', provider_id: sA.provider.id, template_id: saved.body.id } });
+    expect(m.status).toBe(201);
+    expect(m.body.template_id).toBe(saved.body.id);
+    expect(JSON.stringify(m.body.document)).toContain('From a template');
+    const cross = await h.call({ method: 'POST', path: '/v1/mailings', key: B.key, body: { subject: 'S', topic: 'news', provider_id: sB.provider.id, template_id: saved.body.id } });
+    expect(cross.status).toBe(404);
   });
 
   it('refuses to send without {{unsubscribe_url}}, with a broken document, or without recipients', async () => {
@@ -117,7 +130,7 @@ describe('creating and sending: refusals', () => {
     expect(r1.status).toBe(422);
     expect(r1.body.error).toMatchObject({ code: 'missing_unsubscribe_url', details: { missing: ['unsubscribe_url'] } });
 
-    const broken = await createMailing(h, A, { topic: 'news', provider_id: sA.provider.id, document: invalidForCore() });
+    const broken = await createMailing(h, A, { topic: 'news', provider_id: sA.provider.id, document: brokenSpacer() });
     await addRecipients(h, A, broken.id, [{ contact_id: c.id }]);
     const r2 = await action(h, A, broken.id, 'send');
     expect(r2.status).toBe(422);
