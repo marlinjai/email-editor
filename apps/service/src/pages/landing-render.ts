@@ -66,10 +66,10 @@ const ARROW =
 // the gold text gradient's darkest stop 8.6:1 on black. The focus ring (#f1d37a)
 // is 14:1 on black (SC 1.4.11 asks 3:1).
 const CSS = `
-:root{color-scheme:dark;--bg:#000;--panel:#121110;--panel-2:#191714;--ink:#f3f2f7;--muted:#a89f8c;--line:rgba(255,255,255,.11);--line-soft:rgba(255,255,255,.06);--accent:#e0bb54;--focus:#f1d37a;--gold-ink:#1a1200;--gold-edge:rgba(241,211,122,.35);--gold-grad:repeating-linear-gradient(115deg,rgba(255,255,255,.10) 0 1px,rgba(255,255,255,0) 1px 3px),linear-gradient(135deg,#c9a04a 0%,#f1d37a 42%,#d9b552 58%,#c9a04a 100%);--gold-text-grad:linear-gradient(135deg,#c9a04a 0%,#f1d37a 50%,#e0bb54 100%);--radius:14px;--ease:cubic-bezier(.2,.8,.2,1);--shadow:0 1px 2px rgba(0,0,0,.5),0 24px 60px rgba(0,0,0,.55)}
+:root{color-scheme:dark;--bg:#000;--panel:#121110;--panel-2:#191714;--ink:#f3f2f7;--muted:#a89f8c;--line:rgba(255,255,255,.11);--line-soft:rgba(255,255,255,.06);--accent:#e0bb54;--focus:#f1d37a;--gold-ink:#1a1200;--gold-edge:rgba(241,211,122,.35);--gold-grad:repeating-linear-gradient(115deg,rgba(255,255,255,.10) 0 1px,rgba(255,255,255,0) 1px 3px),linear-gradient(135deg,#c9a04a 0%,#f1d37a 42%,#d9b552 58%,#c9a04a 100%);--gold-text-grad:linear-gradient(135deg,#c9a04a 0%,#f1d37a 50%,#e0bb54 100%);--radius:14px;--ease:cubic-bezier(.2,.8,.2,1)}
 *{box-sizing:border-box}
 html{background:#000;scrollbar-color:#3a3326 #000;-webkit-text-size-adjust:100%;scroll-padding-top:5rem}
-body{margin:0;min-height:100svh;color:var(--ink);font:400 1.0625rem/1.65 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden;background:radial-gradient(900px 560px at 30% -8%,rgba(224,187,84,.20),rgba(224,187,84,0) 70%),radial-gradient(1400px 900px at 85% 110%,rgba(224,187,84,.06),rgba(224,187,84,0) 60%),repeating-linear-gradient(115deg,rgba(255,255,255,.018) 0 1px,rgba(255,255,255,0) 1px 4px),linear-gradient(160deg,#0d0b08 0%,#000 42%,#000 58%,#0b0906 100%) #000}
+body{margin:0;min-height:100svh;color:var(--ink);font:400 1.0625rem/1.65 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:radial-gradient(900px 560px at 30% -8%,rgba(224,187,84,.20),rgba(224,187,84,0) 70%),radial-gradient(1400px 900px at 85% 110%,rgba(224,187,84,.06),rgba(224,187,84,0) 60%),repeating-linear-gradient(115deg,rgba(255,255,255,.018) 0 1px,rgba(255,255,255,0) 1px 4px),linear-gradient(160deg,#0d0b08 0%,#000 42%,#000 58%,#0b0906 100%) #000}
 ::selection{background:#e0bb54;color:#1a1200}
 h1,h2,h3{margin:0;letter-spacing:-.025em;line-height:1.15;text-wrap:balance}
 p{margin:0}
@@ -90,7 +90,7 @@ a:focus-visible{outline:2px solid var(--focus);outline-offset:3px;border-radius:
 .nav li.opt{display:none}
 @media (min-width:44rem){.nav li.opt{display:list-item}}
 .nav li a.btn{color:var(--gold-ink);padding:0 1rem;min-height:40px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:48px;padding:0 1.5rem;border-radius:11px;border:1px solid var(--gold-edge);background:var(--gold-grad);color:var(--gold-ink);font-weight:620;font-size:1rem;text-decoration:none;box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 8px 24px rgba(201,160,74,.18);transition:transform 150ms var(--ease),filter 150ms var(--ease)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:48px;padding:0 1.5rem;border-radius:11px;border:1px solid var(--gold-edge);background:var(--gold-grad);color:var(--gold-ink);font-weight:620;font-size:1rem;text-decoration:none;box-shadow:0 1px 0 rgba(255,255,255,.25) inset;transition:transform 150ms var(--ease),filter 150ms var(--ease)}
 .btn:hover{filter:brightness(1.07);transform:translateY(-1px)}
 .btn:active{transform:translateY(0);filter:brightness(.97)}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line);box-shadow:none}
@@ -105,7 +105,7 @@ h1 .gold{display:block;color:var(--accent);background:var(--gold-text-grad);-web
 .cta-row{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:2rem}
 .note{margin-top:1rem;color:var(--muted);font-size:.9375rem}
 figure{margin:0}
-.mock{position:relative;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(180deg,#171512 0%,#0e0d0b 100%);box-shadow:var(--shadow);overflow:hidden}
+.mock{position:relative;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(180deg,#171512 0%,#0e0d0b 100%);overflow:hidden}
 .mock-head{padding:1rem 1.25rem;border-bottom:1px solid var(--line-soft);font-size:.875rem;display:grid;gap:.25rem}
 .mock-head .from{font-weight:600}
 .mock-head .subject{color:var(--muted)}
@@ -140,7 +140,7 @@ h3{font-size:1.1875rem;font-weight:650;letter-spacing:-.015em}
 @media (min-width:56rem){.plans{grid-template-columns:repeat(3,1fr)}}
 .plan{display:flex;flex-direction:column;gap:1.25rem;padding:1.75rem 1.5rem;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(180deg,var(--panel-2),var(--panel))}
 .plan.first{border-color:var(--gold-edge)}
-.plan-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+.plan-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;min-height:2rem}
 .badge{font-size:.8125rem;font-weight:600;padding:.25rem .625rem;border-radius:999px;border:1px solid var(--gold-edge);color:var(--focus)}
 .price{font-size:2.25rem;font-weight:700;letter-spacing:-.03em;line-height:1}
 .price small{font-size:.9375rem;font-weight:500;letter-spacing:0;color:var(--muted);margin-left:.375rem}
