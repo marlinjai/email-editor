@@ -11,8 +11,10 @@ The multi-tenant mail service at `https://mail.lumitra.co`: a long-running Node 
 process (Hono on `@hono/node-server`, Postgres 17 through `postgres`). The plan and
 its binding "Service architecture" section: `docs/plans/2026-09-18-mail-service.md`.
 
-This is phase S0, the foundation: workspaces, their members, workspace API keys,
-the audit log, idempotent mutations, and the deploy chain. Sending arrives in S2.
+Phase S0 laid the foundation: workspaces, their members, workspace API keys, the
+audit log, idempotent mutations, and the deploy chain. Phase S1 adds templates
+with their version history, compilation to MJML (Mailjet Markup Language) and
+HTML, and uploaded images. Sending arrives in S2.
 
 ## Who can call it
 
@@ -33,8 +35,8 @@ access levels map to roles (`owner`, `admin`, `editor`, `viewer`) and key scopes
 
 | Access | Member needs | Key needs | S0 operations |
 | --- | --- | --- | --- |
-| `read` | viewer | any scope | `workspace.get`, `members.list` |
-| `write` | editor | send or full | none in S0 |
+| `read` | viewer | any scope | `workspace.get`, `members.list`, `templates.list`, `templates.get`, `templates.versions`, `templates.version`, `templates.compile`, `compile`, `assets.get` |
+| `write` | editor | send or full | `templates.create`, `templates.update`, `templates.delete`, `assets.upload` |
 | `admin` | admin | full | `workspace.update`, `members.add`, `members.update`, `members.remove`, `apiKeys.create` (the key is in this response only), `apiKeys.list`, `apiKeys.revoke`, `audit.list` |
 | `dashboard` | a signed-in person, no workspace yet | refused | `workspaces.create`, `workspaces.list` |
 
@@ -61,6 +63,56 @@ under `MAIL_SECRETS_KEY` (`src/sealing.ts`), since one of them is the only copy 
 freshly minted API key. Keys are scoped per workspace (and per person
 for creating a workspace), in the `idempotency_keys` table, for later phases to reuse
 through `idempotent()` in `src/idempotency.ts`.
+
+## Templates, compile and assets (S1)
+
+**Documents.** Every document the service stores or compiles is first run
+through the editor core's `migrateTemplate` (`src/documents.ts`), which checks
+the full block schema. A rejected document is `validation_failed` with the core's
+reason in `details.reason` (`INVALID_DOCUMENT`, `NEWER_VERSION` for a document
+from a newer editor, with `details.document_version`, `UNSUPPORTED_VERSION`,
+`MISSING_VERSION`) and the failing paths in `details.issues`. A document over
+`MAX_DOCUMENT_BYTES` is `payload_too_large`.
+
+**Versions.** `templates.version` is an optimistic lock: a save sends
+`base_version`, and if someone saved since, the answer is `conflict` (409) with
+`details.current_version`, and nothing is overwritten (the row is locked, so of
+two saves racing on the same base exactly one wins). Every real change bumps
+the version and appends the document to `template_versions` in the same
+transaction; a save identical to the current state (JSON compared as `jsonb`, so
+key order does not matter) keeps the version. History is append-only, enforced
+by a trigger. Restoring an old version is a save of that version's document on
+the current `base_version`, which becomes a new version. `created_by` is
+`api_key:<id>` or `member:<member id>`.
+
+**Compile.** `POST /v1/templates/:id/compile` (optionally `{ version }`) and
+`POST /v1/compile` (an unsaved document) always answer 200 with
+`{ mjml, html, warnings, errors }` once the document is readable; a non-empty
+`errors` means not sendable. MJML's messages are rewritten to
+`{ message, line, path }` without the server's file paths. MJML runs in a pool of
+worker threads (`src/compile/pool.ts`, `src/compile-worker.js`), never on the
+request thread: a compile past `COMPILE_TIMEOUT_MS` is stopped (its worker
+terminated and replaced) and answered with an error, and when every worker is
+busy and `COMPILE_MAX_QUEUE` jobs wait, a new compile is `service_unavailable`
+(503, retryable). A test proves other requests keep being answered during a
+multi-second compile.
+
+**Assets.** `POST /v1/assets` takes `multipart/form-data` with one `file` field,
+up to `MAX_ASSET_BYTES` (the 1 MiB JSON body limit does not apply to this route).
+The type is sniffed from the bytes (PNG, JPEG, GIF, WebP; never SVG); the name
+and the declared type are not trusted, and anything else is
+`unsupported_media_type`. The bytes go to Storage Brain (one tenant for the
+service, each file labelled `mail/<workspace id>`); the row keeps the sniffed
+type, size, dimensions and a SHA-256. The answer's `url` is
+`<PUBLIC_BASE_URL>/a/<id>`: public, stable for the asset's life, safe in a mail.
+`GET /a/:id` mints a five-minute signed Storage Brain URL on every request,
+fetches through it server-side and streams the bytes with the stored
+`Content-Type`, `Content-Length`, `Cache-Control: public, max-age=31536000,
+immutable`, an `ETag` (the SHA-256, so `If-None-Match` gets 304 without touching
+Storage Brain) and `nosniff`. An unknown id is 404 (cached a minute); Storage
+Brain unreachable is 503 with `Retry-After`, never cached. With an
+`Idempotency-Key`, a retried upload replays the first answer; the fingerprint is
+the parsed parts (a new multipart boundary on the retry still matches).
 
 ## Layout
 
@@ -112,11 +164,17 @@ reports the pushed commit.
 | --- | --- |
 | GitHub secrets | `COOLIFY_WEBHOOK`, `COOLIFY_TOKEN` (Terraform: `infra/deployments/lumitra-mail/github.tf`) |
 | Coolify app env | only `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID`, `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`, `INFISICAL_PROJECT_ID`, `INFISICAL_ENV` |
-| Infisical `prod` | `DATABASE_URL`, `DASHBOARD_SERVICE_TOKEN`, `MAIL_SECRETS_KEY` |
+| Infisical `prod` | `DATABASE_URL`, `DASHBOARD_SERVICE_TOKEN`, `MAIL_SECRETS_KEY`, `PUBLIC_BASE_URL` (`https://mail.lumitra.co`), `STORAGE_BRAIN_API_KEY` |
+| Optional, with defaults | `STORAGE_BRAIN_URL` (the SDK's production URL), `COMPILE_WORKERS` (2), `COMPILE_TIMEOUT_MS` (10000), `COMPILE_MAX_QUEUE` (32) |
 
 `entrypoint.sh` refuses to start without the Coolify variables, trades the
 Universal Auth pair for a short-lived token, and runs `migrate` then `serve` under
-`infisical run`. The service refuses to start without its three secrets. The
+`infisical run`. The service refuses to start without its required variables.
+
+`STORAGE_BRAIN_API_KEY` is a key of the service's own Storage Brain tenant
+(`lumitra-mail` for prod, `lumitra-mail-dev` for dev), minted and written with
+`infra/scripts/storage-brain-create-tenant.sh`, which pipes the key from Storage
+Brain's admin API into Infisical without printing it. The
 Postgres (`ifq2uzzun0xg97wmx2ubq23a`) and DNS live in `infra/deployments/lumitra-mail`.
 
 `MAIL_SECRETS_KEY` and `DASHBOARD_SERVICE_TOKEN` are 32 random bytes as 64 hex
