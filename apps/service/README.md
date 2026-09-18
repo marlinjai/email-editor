@@ -418,20 +418,37 @@ workspace to `free` and marks the mirror stale, so the next read or
 reconciliation restores any plan it still pays for. An exempt workspace that
 still has a subscription keeps being charged by Stripe: cancel that in Stripe.
 
-**Stripe setup** (`scripts/`, run through the secrets proxy's
-`execute_with_secrets` with the Infisical project "Lumitra Mail", the file
-passed as a heredoc to `node --input-type=module`):
+**Stripe setup: one command.** `scripts/stripe-setup.mjs` does the whole
+setup on the shared account in one run: the two Products and their monthly
+Prices (lookup keys `mail-starter-monthly`, `mail-growth-monthly`), a portal
+configuration that switches between them or cancels at the period's end, and
+the webhook endpoint `https://mail.lumitra.co/stripe/webhook` for exactly
+`STRIPE_WEBHOOK_EVENTS`, pinned to the API version. It writes the three ids and
+the endpoint's `whsec_` secret only to the secrets proxy's capture directory,
+never to stdout. It is idempotent (a re-run creates nothing and captures the
+same ids; an existing endpoint's secret cannot be read back, so none is
+captured unless `--recreate` replaces the endpoint), refuses a live key
+without `--live`, and stops on a Price that exists with another amount.
 
-- `stripe-catalogue.mjs`: the two Products, their monthly Prices (lookup keys
-  `mail-starter-monthly`, `mail-growth-monthly`) and a portal configuration
-  allowing switches between them and cancelling at the period's end.
-  Idempotent; refuses a live key without `--live`. Prints the three ids to store
-  as `STRIPE_PRICE_STARTER_ID`, `STRIPE_PRICE_GROWTH_ID`,
-  `STRIPE_PORTAL_CONFIGURATION_ID`.
-- `stripe-webhook-endpoint.mjs <https://host/stripe/webhook>`: registers the
-  endpoint for exactly `STRIPE_WEBHOOK_EVENTS`, pinned to the API version, and
-  writes the `whsec_` secret only to the proxy's capture
-  (`$SECRETS_CAPTURE_DIR/STRIPE_WEBHOOK_SECRET`), never to stdout.
+Once the shared account's `sk_test_` key is in Infisical "Lumitra Mail" dev and
+prod, the one command is a single `execute_with_secrets` call:
+
+- `projectId` `f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4`, `env` `dev`, `workingDir` `/tmp`;
+- `command`: `node --input-type=module - <<'EOF_STRIPE_SETUP'`, then the file's
+  content, then `EOF_STRIPE_SETUP` (the proxy host runs Node 22);
+- `captures`: `STRIPE_PRICE_STARTER_ID`, `STRIPE_PRICE_GROWTH_ID`,
+  `STRIPE_PORTAL_CONFIGURATION_ID` and `STRIPE_WEBHOOK_SECRET`, each with two
+  destinations (the project, envs `dev` and `production`, path `/`, same key);
+  `STRIPE_WEBHOOK_SECRET` with `overwrite: true` (it replaces the
+  placeholder) and `required: false` (a re-run that keeps the endpoint writes
+  none).
+
+Captures are stored only when the command exits 0, so a failed run changes
+nothing in Infisical; run it again. Then redeploy. Until launch, production
+runs in Stripe test mode, which lets the whole flow be tried on the real
+deployment without real money. Going live (Marlin's decision) repeats the
+command with the live key in prod, `--live` appended to the `node` line, and
+destinations in `production` only.
 
 **Tests.** `test/integration/billing.test.ts` drives the real Stripe client
 against a stateful fake at the fetch level (`test/support/fake-stripe.ts`):
@@ -442,7 +459,11 @@ read, the loop and a restart; cancel and subscribe again, with dunning and a
 late event), limits with the mid-mailing rule, the free tier, the exemption and
 tenancy. `test/integration/stripe-mock.test.ts` runs the same client against
 stripe-mock (Stripe's own mock, which validates every request against Stripe's
-API description): `STRIPE_MOCK_URL` in CI, Testcontainers locally. The suites
+API description): `STRIPE_MOCK_URL` in CI, Testcontainers locally.
+`test/integration/stripe-setup.test.ts` runs the setup script exactly as the
+proxy does (the file on stdin, a capture directory) against stripe-mock and
+against a stateful fake: every request valid, a re-run creating nothing,
+`--recreate` rotating the secret, and every refusal made before any request. The suites
 of earlier phases seed design-partner workspaces
 (`seedWorkspace(slug, { billing: 'free' })` opts into the free plan).
 
