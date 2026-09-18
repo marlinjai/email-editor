@@ -248,3 +248,31 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
 - **Delivery.** A 2xx reply means delivered. A non-2xx reply, a timeout (10 seconds) or a network error retries on `WEBHOOK_RETRY_DELAYS_SECONDS` up to `WEBHOOK_MAX_ATTEMPTS`, then the delivery is `failed`. Redirects are never followed (a 3xx is a failed attempt). An endpoint disabled while a delivery is waiting is skipped without consuming an attempt, and resumes when re-enabled. `webhooks.redeliver` resets one delivery to pending, due now, and is audited as `webhook.redelivered`. The last status code, a response snippet (500 characters) and the duration are kept in `webhook_deliveries` for operators, not returned by the API.
 - **Ordering and duplicates.** Order is not guaranteed and a delivery can repeat (a retry after a lost reply). **Receivers must deduplicate on the event id** (`id` in the body, `x-mail-event-id` in the headers).
 - **Server-side request forgery (SSRF) guard.** Only `https` endpoints are accepted, and a hostname that resolves to a private, loopback or link-local address is refused, at create and update and again immediately before every send (so a DNS rebinding cannot slip through). Setting `WEBHOOK_ALLOW_INSECURE_TARGETS=true` lifts both, for local development only; never in production.
+### F1: providers, topics, contacts and suppressions
+
+- **Providers.** The password or API key is taken on create and update, sealed
+  with `MAIL_SECRETS_KEY`, and never returned (`has_secret` instead), audited
+  (`provider.updated` records the changed field names and `secret_rotated`) or
+  logged. `verify` connects through `createSmtpTransport` (or reads Resend's
+  `GET /domains`) with a 10 second limit (`providerVerifyTimeoutMs`) and answers
+  `{ ok, error }`, `error` starting with `auth_failed`, `tls_failed`,
+  `host_unreachable`, `no_secret` or `provider_rejected`. On `smtp.mail.me.com`
+  a policy above Apple's limits is refused. Deleting is soft, and refused
+  (`conflict`) while a mailing that uses the provider is scheduled, sending or
+  paused (`mailings.countActiveForProvider`).
+- **Topics.** The slug is unique per workspace (`already_exists`). No delete
+  route yet; the schema refuses to delete a topic a mailing uses.
+- **Contacts.** Upsert finds by `external_id`, else by `email` (trimmed and
+  lowercased). An external id and an email that name two contacts, or an email
+  whose contact carries another external id, is a `conflict`, never a merge.
+  `topics` replaces the subscriptions but skips every topic the address
+  unsubscribed from. Erasure deletes the archived messages, the recipient rows
+  and the contact in one transaction, keeps every suppression, and audits the
+  counts without the address.
+- **Suppressions.** Adding one is idempotent per address and topic; a new
+  `unsubscribed` block unsubscribes the contact and emits `contact.unsubscribed`
+  (source `api` or `dashboard`) in the same transaction. Lifting needs `admin`.
+- Tests: `test/integration/providers.test.ts` verifies against a real in-process
+  SMTP server (`smtp-server`, self-signed TLS, so that one file sets
+  `NODE_TLS_REJECT_UNAUTHORIZED=0`); `test/integration/contacts.test.ts` covers the
+  upsert matrix, erasure and the contact lifecycle on the four paths.
