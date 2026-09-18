@@ -12,6 +12,12 @@ import { auditRoutes } from './routes/audit.js';
 import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { workspaceRoutes } from './routes/workspaces.js';
+import { providerRoutes } from './routes/providers.js';
+import { contactRoutes } from './routes/contacts.js';
+import { suppressionRoutes } from './routes/suppressions.js';
+import { topicRoutes } from './routes/topics.js';
+import { createSmtpTransport, type SmtpSettings } from './transport/smtp.js';
+import type { Transport } from './transport/types.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -21,9 +27,23 @@ export type AppOptions = {
   /** MAIL_SECRETS_KEY by version; seals what the service stores at rest. */
   secretsKeys: SecretsKeys;
   log?: Pick<Console, 'error'>;
+  /** F1: the SMTP transport `providers.verify` connects through (a test points it at a local server). */
+  smtpTransport?: (settings: SmtpSettings) => Transport;
+  /** F1: how long `providers.verify` waits for a provider. */
+  providerVerifyTimeoutMs?: number;
+  /** F1: the HTTP client `providers.verify` checks a Resend key with. */
+  providerFetch?: typeof fetch;
 };
 
-export function createApp({ sql, dashboardServiceToken, secretsKeys, log = console }: AppOptions) {
+export function createApp({
+  sql,
+  dashboardServiceToken,
+  secretsKeys,
+  log = console,
+  smtpTransport = createSmtpTransport,
+  providerVerifyTimeoutMs = 10_000,
+  providerFetch = fetch,
+}: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
   const sealer = createSealer(secretsKeys);
@@ -62,6 +82,10 @@ export function createApp({ sql, dashboardServiceToken, secretsKeys, log = conso
   app.route('/', memberRoutes(sql, deps));
   app.route('/', apiKeyRoutes(sql, deps));
   app.route('/', auditRoutes(deps));
+  app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch }));
+  app.route('/', topicRoutes(sql, deps));
+  app.route('/', contactRoutes(sql, deps));
+  app.route('/', suppressionRoutes(sql, deps));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 
