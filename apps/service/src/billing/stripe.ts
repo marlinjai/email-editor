@@ -70,8 +70,12 @@ export function formEncode(params: Record<string, string | undefined>): URLSearc
   return out;
 }
 
-export function createStripeApi(secretKey: string, options: { fetch?: typeof fetch; timeoutMs?: number } = {}): StripeApi {
+export function createStripeApi(
+  secretKey: string,
+  options: { fetch?: typeof fetch; timeoutMs?: number; /** stripe-mock in tests; Stripe itself otherwise. */ baseUrl?: string } = {},
+): StripeApi {
   const doFetch = options.fetch ?? fetch;
+  const base = options.baseUrl ?? STRIPE_API;
   const timeoutMs = options.timeoutMs ?? 10_000;
   const auth = `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`;
 
@@ -81,7 +85,7 @@ export function createStripeApi(secretKey: string, options: { fetch?: typeof fet
     if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
     let res: Response;
     try {
-      res = await doFetch(`${STRIPE_API}${path}`, { method, headers, body: form?.toString(), signal: AbortSignal.timeout(timeoutMs) });
+      res = await doFetch(`${base}${path}`, { method, headers, body: form?.toString(), signal: AbortSignal.timeout(timeoutMs) });
     } catch (err) {
       throw new StripeRequestError(0, `Stripe was not reached: ${err instanceof Error ? err.message : String(err)}`);
     }
