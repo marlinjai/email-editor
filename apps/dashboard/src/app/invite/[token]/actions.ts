@@ -2,51 +2,35 @@
 
 import { MailApiError } from '@marlinjai/mail-sdk';
 import { act, DashboardRefusal } from '@/lib/action';
-import { readInvite } from '@/lib/invites';
-import { mailOnBehalfOf } from '@/lib/mail';
+import { mail } from '@/lib/mail';
 import type { ActionResult } from '@/lib/result';
-import { requireViewer } from '@/lib/viewer';
+
+const REFUSALS: Record<string, string> = {
+  email_mismatch: 'This invitation is for another address. Sign out and sign in with the address it was sent to.',
+  inviter_lacks_role: 'The person who invited you can no longer add members with this role. Ask them, or another admin, for a new invitation.',
+  expired: 'This invitation has expired. Ask for a new one.',
+  revoked: 'This invitation was withdrawn. Ask for a new one if you still need access.',
+  accepted: 'This invitation was already used. Ask for a new one.',
+};
 
 /**
- * Accepts an invitation for the signed-in person. The link must be genuine,
- * unexpired and addressed to the person's own email; the mail service then
- * adds them on the inviter's behalf and checks the inviter's role. Accepting
- * twice (a double click, a second tab) is a success, not an error.
+ * Accepts an invitation for the signed-in person. The service checks the rest:
+ * the address matches, the invitation is pending, and the inviter may still
+ * grant the role. Accepting again, once in, is a success.
  */
-export async function acceptInvite(token: string): Promise<ActionResult<{ workspaceId: string }>> {
+export async function acceptInvite(token: string): Promise<ActionResult<{ workspaceId: string; alreadyMember: boolean }>> {
   return act('invites.accept', async () => {
-    const viewer = await requireViewer(`/invite/${token}`);
-    const check = readInvite(token);
-    if (!check.ok) {
-      throw new DashboardRefusal(
-        'invalid_request',
-        check.reason === 'expired'
-          ? 'This invitation has expired. Ask for a new one.'
-          : 'This invitation link is not valid. Check that it was copied completely.',
-      );
-    }
-    const invite = check.payload;
-    if (invite.e !== viewer.email.toLowerCase()) {
-      throw new DashboardRefusal(
-        'forbidden',
-        `This invitation is for ${invite.e}, and you are signed in as ${viewer.email}. Sign out and sign in with the invited address.`,
-      );
-    }
+    const { api, viewer } = await mail();
     try {
-      await mailOnBehalfOf(invite.s, invite.w).members.add(
-        { subject: viewer.subject, email: viewer.email, name: viewer.name, role: invite.r },
-        { idempotencyKey: `invite-${invite.n}-${viewer.subject}`.slice(0, 255) },
-      );
+      const accepted = await api.invites.accept({ token, email: viewer.email, name: viewer.name });
+      return { workspaceId: accepted.workspace.id, alreadyMember: accepted.already_member };
     } catch (err) {
-      if (err instanceof MailApiError && err.code === 'already_exists') return { workspaceId: invite.w };
-      if (err instanceof MailApiError && (err.code === 'forbidden' || err.code === 'insufficient_role' || err.code === 'not_found')) {
-        throw new DashboardRefusal(
-          'forbidden',
-          'The person who invited you can no longer add members to this workspace, or it no longer exists. Ask for a new invitation.',
-        );
+      if (err instanceof MailApiError) {
+        const reason = typeof err.details?.reason === 'string' ? err.details.reason : null;
+        if (reason && REFUSALS[reason]) throw new DashboardRefusal(err.code, REFUSALS[reason]);
+        if (err.code === 'not_found') throw new DashboardRefusal('not_found', 'This invitation link is not valid. Check that the whole link was copied.');
       }
       throw err;
     }
-    return { workspaceId: invite.w };
   });
 }

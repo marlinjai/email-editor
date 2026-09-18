@@ -485,11 +485,19 @@ Built and verified (details in `apps/dashboard/README.md`):
 
 Defaults taken in S3 (each can be overturned later):
 
-1. **Members join by invitation link**, not by email lookup: only auth-brain's admin
-   API resolves an email to a subject, and the dashboard must not hold that key. The
-   link is signed (a sub-key of `AUTH_SESSION_SECRET`), bound to one address, one role
-   and one workspace, valid seven days; accepting adds the person on the inviter's
-   behalf and the service re-checks the inviter's role then. Nothing is emailed.
+1. **Members join by invitation, a resource of the service** (decided with the
+   orchestrator 2026-09-18, replacing a first stateless signed link, which could not
+   be revoked or listed): migration `0009_workspace_invites` and the routes
+   `invites.create`, `invites.list`, `invites.revoke`, `invites.accept`. The token is
+   shown once and stored as a SHA-256; an invitation is single use, revocable and
+   expires (7 days by default, at most 30). Accepting needs the signed-in auth-brain
+   address to match the invited one, the invitation to be pending, and the inviter
+   to still be a member able to grant the role; accepting while already a member is
+   a no-op success. Only a person signed in can invite (an API key cannot), since
+   acceptance re-checks the inviter. Audited as `member.invited`, `invite.revoked`
+   and `member.added`. Nothing is emailed: the admin sends the link. Tested on the
+   four paths (accept; revoke first; expiry, then a new invitation; a second
+   acceptance, and a return after leaving).
 2. **`company_id` is nullable and optional on create**: workspaces created before S3,
    or by a path with no company, carry none, and no company erasure reaches them. The
    dashboard always sends the signed-in person's company (their choice when they have

@@ -48,12 +48,14 @@ and its binding "Service architecture" section: `docs/plans/2026-09-18-mail-serv
 ## Members join by invitation
 
 The service binds members by auth-brain subject, and only auth-brain's admin API
-could look a subject up by email. So an admin creates an invitation link for one
-address and role (`src/lib/invite-token.ts`): signed with a key derived from
-`AUTH_SESSION_SECRET`, valid seven days. The invitee opens it, signs in with that
-address, and accepts; the dashboard then adds them on the inviter's behalf, and the
-service checks at that moment that the inviter may still add members and grant the
-role. Accepting twice is harmless. The invitee's company needs the `mail` grant.
+could look a subject up by email. So an admin invites an address with a role
+(Settings, Members): the service's `invites.create` answers with a token once, the
+dashboard turns it into a link (`/invite/<token>`) for the admin to send, and the
+service keeps only its hash. The invitee signs in with that address and accepts;
+the service checks the address, that the invitation is still pending (not expired,
+revoked or used) and that the inviter may still grant the role. Pending
+invitations are listed and can be revoked. The invitee's company needs the `mail`
+grant for the link to open.
 
 ## Run it locally
 

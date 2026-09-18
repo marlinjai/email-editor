@@ -350,37 +350,64 @@ test('people: suppressions, a contact erased for good, and the audit log', async
   await expect(log.getByText('api_key.revoked')).toHaveCount(0);
 });
 
-test('members: an invitation brings in an editor, who does not see the admin screens', async ({ page, browser }) => {
+test('members: an invitation brings in an editor; revoked and misaddressed links do nothing', async ({ page, browser }) => {
+  async function createInvite(email: string, role: string) {
+    await page.getByLabel('Email address').fill(email);
+    await page.getByLabel('Role', { exact: true }).selectOption(role);
+    const link = page.getByTestId('invite-link');
+    const before = (await link.count()) > 0 ? (await link.textContent())!.trim() : '';
+    await page.getByRole('button', { name: 'Create invitation' }).click();
+    // Wait for this invitation's link, not the one still shown from the last.
+    await expect(link).not.toHaveText(before);
+    await expect(page.getByText(`Send this link to ${email}`, { exact: false })).toBeVisible();
+    return new URL((await link.textContent())!.trim()).pathname;
+  }
+  async function asPerson(who: typeof EDITOR) {
+    const context = await browser.newContext();
+    const p = await context.newPage();
+    await signIn(p, who);
+    return { context, p };
+  }
+
   await open(page, '/settings/members');
-  await page.getByLabel('Email address').fill(EDITOR.email);
-  await page.getByLabel('Role').selectOption('editor');
-  await page.getByRole('button', { name: 'Create invitation' }).click();
-  const link = (await page.getByTestId('invite-link').textContent())!.trim();
-  const path = new URL(link).pathname;
+  const editorLink = await createInvite(EDITOR.email, 'editor');
+  const invitations = page.getByRole('table', { name: 'Invitations' });
+  await expect(invitations.getByRole('row', { name: /editor@example.com.*pending/i })).toBeVisible();
 
-  const other = await browser.newContext();
-  const editorPage = await other.newPage();
-  await signIn(editorPage, EDITOR);
-  await editorPage.goto(path);
-  await editorPage.getByRole('button', { name: 'Accept invitation' }).click();
-  await expect(editorPage).toHaveURL(new RegExp(`/w/${ws}$`));
-  await expect(editorPage.getByRole('link', { name: 'Audit log' })).toHaveCount(0);
-  await editorPage.goto(`/w/${ws}/settings`);
-  await expect(editorPage.getByRole('link', { name: 'API keys' })).toHaveCount(0);
-  // Accepting again is harmless.
-  await editorPage.goto(path);
-  await editorPage.getByRole('button', { name: 'Accept invitation' }).click();
-  await expect(editorPage).toHaveURL(new RegExp(`/w/${ws}$`));
+  // Forward: the invited person accepts and lands in the workspace, without the admin screens.
+  const editor = await asPerson(EDITOR);
+  await editor.p.goto(editorLink);
+  await editor.p.getByRole('button', { name: 'Accept invitation' }).click();
+  await expect(editor.p).toHaveURL(new RegExp(`/w/${ws}$`));
+  await expect(editor.p.getByRole('link', { name: 'Audit log' })).toHaveCount(0);
+  await editor.p.goto(`/w/${ws}/settings`);
+  await expect(editor.p.getByRole('link', { name: 'API keys' })).toHaveCount(0);
+  // Re-entry: accepting again once in is harmless.
+  await editor.p.goto(editorLink);
+  await editor.p.getByRole('button', { name: 'Accept invitation' }).click();
+  await expect(editor.p).toHaveURL(new RegExp(`/w/${ws}$`));
 
-  // The same link opened by someone else is refused.
-  const stranger = await browser.newContext();
-  const strangerPage = await stranger.newPage();
-  await signIn(strangerPage, { ...EDITOR, subject: 'e2e-stranger', email: 'stranger@example.com' });
-  await strangerPage.goto(path);
-  await expect(strangerPage.getByRole('heading', { name: 'Invitation for another address' })).toBeVisible();
+  // Someone else opening a link meant for another address is refused.
+  const strangerWho = { ...EDITOR, subject: 'e2e-stranger', email: 'stranger@example.com' };
+  const stranger = await asPerson(strangerWho);
+  const guestLink = await createInvite('guest@example.com', 'viewer');
+  await stranger.p.goto(guestLink);
+  await stranger.p.getByRole('button', { name: 'Accept invitation' }).click();
+  await expect(stranger.p.getByRole('alert').filter({ hasText: 'another address' })).toBeVisible();
+
+  // Backtrack: a revoked invitation stops working at once.
+  const strangerLink = await createInvite(strangerWho.email, 'viewer');
+  await page.reload();
+  await invitations.getByRole('row', { name: /stranger@example.com/ }).getByRole('button', { name: 'Revoke' }).click();
+  await page.getByRole('button', { name: 'Revoke invitation' }).click();
+  await expect(invitations.getByRole('row', { name: /stranger@example.com.*revoked/i })).toBeVisible();
+  await stranger.p.goto(strangerLink);
+  await stranger.p.getByRole('button', { name: 'Accept invitation' }).click();
+  await expect(stranger.p.getByRole('alert').filter({ hasText: 'withdrawn' })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole('cell', { name: /editor@example.com/ })).toBeVisible();
-  await other.close();
-  await stranger.close();
+  await expect(page.getByRole('table', { name: 'Members' }).getByText('editor@example.com')).toBeVisible();
+  await expect(invitations.getByRole('row', { name: /editor@example.com.*accepted/i })).toBeVisible();
+  await editor.context.close();
+  await stranger.context.close();
 });

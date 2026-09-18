@@ -4,7 +4,6 @@ import { describeError } from '@/lib/errors';
 import { formatBytes, percent, slugify } from '@/lib/format';
 import { mailingControls, mailingProgress } from '@/lib/mailing-status';
 import { can } from '@/lib/roles';
-import { signInvite, verifyInvite, INVITE_TTL_MS } from '@/lib/invite-token';
 import { assertTestAuthNotInProduction, decodeTestIdentity, encodeTestIdentity, testAuthEnabled, TestAuthInProductionError } from '@/lib/test-auth';
 
 const api = (code: ConstructorParameters<typeof MailApiError>[0]['code'], extra: Partial<ConstructorParameters<typeof MailApiError>[0]> = {}) =>
@@ -89,31 +88,6 @@ describe('small helpers', () => {
     expect(can('admin', 'admin')).toBe(true);
     expect(can('admin', 'owner')).toBe(false);
     expect(can('owner', 'owner')).toBe(true);
-  });
-});
-
-describe('invitation tokens', () => {
-  const secret = 's'.repeat(40);
-  const input = { workspaceId: 'ws-1', inviterSubject: 'sub-admin', email: 'Ana@Example.com', role: 'editor' as const };
-
-  it('round-trips and lowercases the invited address', () => {
-    const { token } = signInvite(input, secret, 1_000);
-    const check = verifyInvite(token, secret, 2_000);
-    expect(check).toMatchObject({ ok: true, payload: { w: 'ws-1', s: 'sub-admin', e: 'ana@example.com', r: 'editor', x: 1_000 + INVITE_TTL_MS } });
-  });
-
-  it('refuses a token signed with another secret, a tampered body, garbage and an expired one', () => {
-    const { token } = signInvite(input, secret, 1_000);
-    expect(verifyInvite(token, 'other'.repeat(10), 2_000)).toEqual({ ok: false, reason: 'bad_signature' });
-    const [body, sig] = token.split('.');
-    const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(body!, 'base64url').toString()), r: 'owner' })).toString('base64url');
-    expect(verifyInvite(`${forged}.${sig}`, secret, 2_000)).toEqual({ ok: false, reason: 'bad_signature' });
-    expect(verifyInvite('nonsense', secret)).toEqual({ ok: false, reason: 'malformed' });
-    expect(verifyInvite(token, secret, 1_000 + INVITE_TTL_MS)).toEqual({ ok: false, reason: 'expired' });
-  });
-
-  it('gives every invitation its own id (the idempotency key of accepting it)', () => {
-    expect(signInvite(input, secret).payload.n).not.toBe(signInvite(input, secret).payload.n);
   });
 });
 

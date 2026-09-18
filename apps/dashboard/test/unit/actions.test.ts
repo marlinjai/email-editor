@@ -17,16 +17,15 @@ const viewer = {
 const api = {
   workspaces: { create: vi.fn() },
   members: { list: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  invites: { create: vi.fn(), revoke: vi.fn(), accept: vi.fn() },
   templates: { update: vi.fn(), get: vi.fn(), version: vi.fn() },
   mailings: { addRecipients: vi.fn(), create: vi.fn(), test: vi.fn(), retryFailed: vi.fn(), pause: vi.fn() },
   providers: { create: vi.fn(), update: vi.fn() },
   assets: { upload: vi.fn() },
 };
-const onBehalf = { members: { add: vi.fn() } };
 
 vi.mock('@/lib/mail', () => ({
   mail: vi.fn(async () => ({ api, viewer })),
-  mailOnBehalfOf: vi.fn(() => onBehalf),
 }));
 vi.mock('@/lib/viewer', () => ({ requireViewer: vi.fn(async () => viewer), getViewer: vi.fn(async () => viewer) }));
 vi.mock('@/lib/auth', () => ({ auth: { appUrl: () => 'https://app.mail.test' } }));
@@ -35,9 +34,8 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 const { createWorkspace } = await import('@/app/workspaces/actions');
 const { saveTemplate, restoreVersion, uploadImage } = await import('@/app/w/[ws]/templates/actions');
 const { addRecipients, createMailing, sendTest, retryFailed, controlMailing } = await import('@/app/w/[ws]/mailings/actions');
-const { inviteMember, saveProvider } = await import('@/app/w/[ws]/settings/actions');
+const { inviteMember, revokeInvite, saveProvider } = await import('@/app/w/[ws]/settings/actions');
 const { acceptInvite } = await import('@/app/invite/[token]/actions');
-const { createInvite } = await import('@/lib/invites');
 
 const conflict = (current: number) => new MailApiError({ code: 'conflict', status: 409, message: 'moved on', details: { current_version: current } });
 
@@ -200,50 +198,48 @@ describe('providers', () => {
 });
 
 describe('invitations', () => {
-  it('lets only an admin or owner invite, and only an owner invite an owner', async () => {
-    api.members.list.mockResolvedValue({ data: [{ id: 'm', subject: 'sub-me', email: 'me@example.com', role: 'editor' }] });
-    expect((await inviteMember('ws', { email: 'new@example.com', role: 'viewer' })).ok).toBe(false);
-    api.members.list.mockResolvedValue({ data: [{ id: 'm', subject: 'sub-me', email: 'me@example.com', role: 'admin' }] });
-    const owner = await inviteMember('ws', { email: 'new@example.com', role: 'owner' });
-    expect(owner.ok).toBe(false);
-    const ok = await inviteMember('ws', { email: 'new@example.com', role: 'editor' });
-    expect(ok.ok).toBe(true);
-    if (ok.ok) expect(ok.data.url).toMatch(/^https:\/\/app\.mail\.test\/invite\//);
+  it('creates through the service and turns the token into a link', async () => {
+    api.invites.create.mockResolvedValue({ invite: { id: 'inv-1', expires_at: '2026-09-25T10:00:00.000Z' }, token: 'inv_secret' });
+    const r = await inviteMember('ws', { email: 'new@example.com', role: 'editor' });
+    expect(api.invites.create).toHaveBeenCalledWith({ email: 'new@example.com', role: 'editor' });
+    expect(r).toEqual({ ok: true, data: { url: 'https://app.mail.test/invite/inv_secret', expiresAt: '2026-09-25T10:00:00.000Z' } });
   });
 
-  it('refuses to invite someone already in the workspace', async () => {
-    api.members.list.mockResolvedValue({ data: [{ id: 'm', subject: 'sub-me', email: 'me@example.com', role: 'owner' }, { id: 'n', subject: 's2', email: 'New@Example.com', role: 'viewer' }] });
+  it('shows the service reason when an invitation cannot be created', async () => {
+    api.invites.create.mockRejectedValue(new MailApiError({ code: 'already_exists', status: 409, message: 'new@example.com already has a pending invitation. Revoke it to send a new one.' }));
     const r = await inviteMember('ws', { email: 'new@example.com', role: 'editor' });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.code).toBe('already_exists');
+    if (!r.ok) expect(r.error.message).toMatch(/pending invitation/);
+    expect((await inviteMember('ws', { email: 'not an address', role: 'editor' })).ok).toBe(false);
   });
 
-  it('accepts on the inviter\'s behalf, idempotently, only for the invited address', async () => {
-    const { url } = createInvite({ workspaceId: 'ws-9', inviterSubject: 'sub-admin', email: 'ME@example.com', role: 'editor' });
-    const token = url.split('/invite/')[1]!;
-    onBehalf.members.add.mockResolvedValue({ id: 'new' });
-    expect(await acceptInvite(token)).toEqual({ ok: true, data: { workspaceId: 'ws-9' } });
-    const [body, opts] = onBehalf.members.add.mock.calls[0]!;
-    expect(body).toEqual({ subject: 'sub-me', email: 'me@example.com', name: 'Me', role: 'editor' });
-    expect(opts.idempotencyKey).toMatch(/^invite-/);
-
-    // A second acceptance (another tab) is a success, not an error.
-    onBehalf.members.add.mockRejectedValue(new MailApiError({ code: 'already_exists', status: 409, message: 'x' }));
-    expect(await acceptInvite(token)).toEqual({ ok: true, data: { workspaceId: 'ws-9' } });
-
-    // The inviter lost the right to add members in the meantime.
-    onBehalf.members.add.mockRejectedValue(new MailApiError({ code: 'insufficient_role', status: 403, message: 'x' }));
-    const lost = await acceptInvite(token);
-    expect(lost.ok).toBe(false);
-    if (!lost.ok) expect(lost.error.message).toMatch(/new invitation/);
+  it('revokes', async () => {
+    api.invites.revoke.mockResolvedValue({ id: 'inv-1', status: 'revoked' });
+    expect(await revokeInvite('ws', 'inv-1')).toEqual({ ok: true, data: null });
   });
 
-  it('refuses an invitation for another address or with a broken link', async () => {
-    const { url } = createInvite({ workspaceId: 'ws-9', inviterSubject: 'sub-admin', email: 'someone-else@example.com', role: 'editor' });
-    const other = await acceptInvite(url.split('/invite/')[1]!);
-    expect(other.ok).toBe(false);
-    if (!other.ok) expect(other.error.message).toMatch(/someone-else@example.com/);
-    expect((await acceptInvite('broken.token')).ok).toBe(false);
-    expect(onBehalf.members.add).not.toHaveBeenCalled();
+  it('accepts as the signed-in person, with their verified address', async () => {
+    api.invites.accept.mockResolvedValue({ workspace: { id: 'ws-9' }, already_member: false });
+    expect(await acceptInvite('inv_token')).toEqual({ ok: true, data: { workspaceId: 'ws-9', alreadyMember: false } });
+    expect(api.invites.accept).toHaveBeenCalledWith({ token: 'inv_token', email: 'me@example.com', name: 'Me' });
+  });
+
+  it('explains each refusal in words', async () => {
+    const cases: Array<[string, number, string, RegExp]> = [
+      ['forbidden', 403, 'email_mismatch', /another address/],
+      ['forbidden', 403, 'inviter_lacks_role', /can no longer add members/],
+      ['conflict', 409, 'expired', /expired/],
+      ['conflict', 409, 'revoked', /withdrawn/],
+      ['conflict', 409, 'accepted', /already used/],
+    ];
+    for (const [code, status, reason, message] of cases) {
+      api.invites.accept.mockRejectedValueOnce(new MailApiError({ code: code as 'conflict', status, message: 'x', details: { reason } }));
+      const r = await acceptInvite('inv_token');
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error.message).toMatch(message);
+    }
+    api.invites.accept.mockRejectedValueOnce(new MailApiError({ code: 'not_found', status: 404, message: 'x' }));
+    const unknown = await acceptInvite('inv_token');
+    if (!unknown.ok) expect(unknown.error.message).toMatch(/not valid/);
   });
 });

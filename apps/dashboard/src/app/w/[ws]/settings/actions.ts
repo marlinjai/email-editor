@@ -14,8 +14,8 @@ import {
   type ProviderUsage,
   type ProviderVerifyResult,
 } from '@marlinjai/mail-sdk';
-import { act, DashboardRefusal, parseInput } from '@/lib/action';
-import { createInvite } from '@/lib/invites';
+import { act, parseInput } from '@/lib/action';
+import { auth } from '@/lib/auth';
 import { mail } from '@/lib/mail';
 import type { ActionResult } from '@/lib/result';
 
@@ -87,33 +87,27 @@ export async function removeMember(ws: string, memberId: string): Promise<Action
 const InviteInput = z.object({ email: Email, role: MemberRole });
 
 /**
- * An invitation link (see src/lib/invites.ts): signed, bound to the invited
- * address, the role and this workspace, valid for seven days. Only someone who
- * may add members can create one; the service re-checks that when the link is
- * accepted.
+ * An invitation (the service's `invites.create`): one address, one role, seven
+ * days. The token comes back once and becomes the link the admin sends; the
+ * service keeps only its hash, and it can be revoked until it is used.
  */
-export async function inviteMember(
-  ws: string,
-  input: z.input<typeof InviteInput>,
-): Promise<ActionResult<{ url: string; expiresAt: string }>> {
+export async function inviteMember(ws: string, input: z.input<typeof InviteInput>): Promise<ActionResult<{ url: string; expiresAt: string }>> {
   const parsed = parseInput(InviteInput, input);
   if (!parsed.ok) return parsed;
   return act('invites.create', async () => {
-    const { api, viewer } = await mail(ws);
-    // Proves the inviter may add members right now (members.add is admin), and
-    // finds whether the address is already in.
-    const members = await api.members.list({ limit: 100 });
-    const me = members.data.find((m) => m.subject === viewer.subject);
-    if (!me || (me.role !== 'admin' && me.role !== 'owner')) {
-      throw new DashboardRefusal('insufficient_role', 'Only an admin or owner can invite people.');
-    }
-    if (parsed.data.role === 'owner' && me.role !== 'owner') {
-      throw new DashboardRefusal('insufficient_role', 'Only an owner can invite another owner.', { role: 'Choose admin or lower' });
-    }
-    if (members.data.some((m) => m.email.toLowerCase() === parsed.data.email.toLowerCase())) {
-      throw new DashboardRefusal('already_exists', 'That address is already a member of this workspace.', { email: 'Already a member' });
-    }
-    return createInvite({ workspaceId: ws, inviterSubject: viewer.subject, email: parsed.data.email, role: parsed.data.role });
+    const { api } = await mail(ws);
+    const created = await api.invites.create({ email: parsed.data.email, role: parsed.data.role });
+    revalidatePath(settingsPath(ws, '/members'));
+    return { url: `${auth.appUrl()}/invite/${created.token}`, expiresAt: created.invite.expires_at };
+  });
+}
+
+export async function revokeInvite(ws: string, inviteId: string): Promise<ActionResult> {
+  return act('invites.revoke', async () => {
+    const { api } = await mail(ws);
+    await api.invites.revoke(inviteId);
+    revalidatePath(settingsPath(ws, '/members'));
+    return null;
   });
 }
 

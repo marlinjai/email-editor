@@ -2,13 +2,14 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { MEMBER_ROLES, type Member, type MemberRole } from '@marlinjai/mail-contract';
+import { MEMBER_ROLES, type Invite, type InviteStatus, type Member, type MemberRole } from '@marlinjai/mail-contract';
+import type { ActionResult } from '@/lib/result';
 import { ConfirmDialog } from '@/components/dialog';
 import { FormError } from '@/components/form-error';
-import { Badge, Button, describedBy, Field, Input, Notice, Section, Select, Table, Td, Th, When } from '@/components/ui';
+import { Badge, Button, describedBy, EmptyState, ErrorPanel, Field, Input, Notice, Section, Select, Table, Td, Th, When } from '@/components/ui';
 import { useAction } from '@/components/use-action';
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/lib/roles';
-import { changeRole, inviteMember, removeMember } from '../actions';
+import { changeRole, inviteMember, removeMember, revokeInvite } from '../actions';
 
 function RoleSelect({ ws, member, myRole }: { ws: string; member: Member; myRole: MemberRole }) {
   const { run, pending, error } = useAction();
@@ -48,6 +49,7 @@ function RoleSelect({ ws, member, myRole }: { ws: string; member: Member; myRole
 }
 
 function InviteForm({ ws, myRole }: { ws: string; myRole: MemberRole }) {
+  const router = useRouter();
   const { run, pending, error, fields } = useAction();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<MemberRole>('editor');
@@ -65,6 +67,7 @@ function InviteForm({ ws, myRole }: { ws: string; myRole: MemberRole }) {
             (r) => {
               setLink({ ...r, email });
               setEmail('');
+              router.refresh();
             },
           );
         }}
@@ -126,7 +129,77 @@ function InviteForm({ ws, myRole }: { ws: string; myRole: MemberRole }) {
   );
 }
 
-export function MembersView({ ws, members, me, myRole }: { ws: string; members: Member[]; me: string; myRole: MemberRole }) {
+const INVITE_TONE: Record<InviteStatus, 'gold' | 'ok' | 'neutral'> = { pending: 'gold', accepted: 'ok', revoked: 'neutral', expired: 'neutral' };
+
+function Invitations({ ws, invites }: { ws: string; invites: ActionResult<Invite[]> }) {
+  const router = useRouter();
+  const [revoking, setRevoking] = useState<Invite | null>(null);
+  if (!invites.ok) return <ErrorPanel title="Invitations could not be loaded" message={invites.error.message} requestId={invites.error.requestId} />;
+  if (invites.data.length === 0) return <EmptyState title="No invitations yet">Invitations you create appear here until they are used, withdrawn or expire.</EmptyState>;
+  return (
+    <>
+      <Table label="Invitations">
+        <thead>
+          <tr>
+            <Th>Address</Th>
+            <Th>Role</Th>
+            <Th>Status</Th>
+            <Th>Invited by</Th>
+            <Th>Expires</Th>
+            <Th>
+              <span className="sr-only">Actions</span>
+            </Th>
+          </tr>
+        </thead>
+        <tbody>
+          {invites.data.map((i) => (
+            <tr key={i.id}>
+              <Td>{i.email}</Td>
+              <Td className="text-muted">{ROLE_LABELS[i.role]}</Td>
+              <Td>
+                <Badge tone={INVITE_TONE[i.status]}>{i.status}</Badge>
+              </Td>
+              <Td className="text-muted">{i.invited_by.email ?? 'a former member'}</Td>
+              <Td>
+                <When at={i.expires_at} />
+              </Td>
+              <Td className="text-right">
+                {i.status === 'pending' ? (
+                  <Button variant="ghost" onClick={() => setRevoking(i)}>
+                    Revoke
+                  </Button>
+                ) : null}
+              </Td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      <ConfirmDialog
+        open={revoking !== null}
+        onClose={() => setRevoking(null)}
+        title={`Withdraw the invitation to ${revoking?.email ?? ''}?`}
+        description="The link stops working at once. You can invite the address again afterwards."
+        confirmLabel="Revoke invitation"
+        action={() => revokeInvite(ws, revoking!.id)}
+        onDone={() => router.refresh()}
+      />
+    </>
+  );
+}
+
+export function MembersView({
+  ws,
+  members,
+  me,
+  myRole,
+  invites,
+}: {
+  ws: string;
+  members: Member[];
+  me: string;
+  myRole: MemberRole;
+  invites: ActionResult<Invite[]> | null;
+}) {
   const router = useRouter();
   const [removing, setRemoving] = useState<Member | null>(null);
   const isAdmin = can(myRole, 'admin');
@@ -183,6 +256,11 @@ export function MembersView({ ws, members, me, myRole }: { ws: string; members: 
           description="Creates a link for one address and role, valid for seven days. You send it; nothing is emailed automatically."
         >
           <InviteForm ws={ws} myRole={myRole} />
+        </Section>
+      ) : null}
+      {invites ? (
+        <Section title="Invitations" description="Pending ones can be withdrawn; a link works once, for the invited address only.">
+          <Invitations ws={ws} invites={invites} />
         </Section>
       ) : null}
       <ConfirmDialog
