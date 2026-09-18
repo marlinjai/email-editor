@@ -1,7 +1,7 @@
 ---
 title: Turn the email editor into a mail service with workspaces, and make ŌPUNTIA its first client
 type: plan
-status: draft
+status: in-progress
 date: 2026-09-18
 summary: Rebuild this repository's demo-complete platform as a real multi-tenant service (workspaces, API keys via auth-brain, a Postgres-backed API, a send worker with provider policies, suppression and preference topics, webhooks, a hosted unsubscribe page) with the visual editor embeddable through a published SDK. ŌPUNTIA's admin Studio is the first client and keeps its own people; the service keeps the mail.
 tags: [saas, multi-tenant, mjml, smtp, resend, unsubscribe, webhooks, auth-brain, opuntia]
@@ -258,10 +258,19 @@ sub-processors (Hetzner, the workspace's own mail provider, Storage Brain), and
 the erasure and export endpoints. ŌPUNTIA's agreement, currently being drafted in
 the business-plan repository, names this service explicitly.
 
-## Questions to settle before S0
+## Questions settled by default (2026-09-18)
 
-1. The product name and domain.
-2. Whether this repository is renamed to match, or the service lives beside the
-   editor packages under the current name.
-3. Retention default for the archive (proposal: keep until the controller
-   deletes; ŌPUNTIA wants indefinite for its own audit trail).
+Marlin approved the plan on 2026-09-18 and asked for implementation to proceed on
+stated defaults where an answer is still outstanding. Each is an assumption that a
+later decision can overturn:
+
+1. **Product name and domain:** "Lumitra Mail" at `mail.lumitra.co`. The package
+   slug stays product-based (`@marlinjai/mail-sdk`), never `lumitra`.
+2. **Repository:** not renamed. The service lives beside the editor packages in
+   `marlinjai/email-editor` as `apps/service` (API, worker, hosted pages).
+3. **Archive retention:** keep until the controller deletes. Suppressions are kept
+   until the controller deletes them, and erasure of a contact never lifts one.
+4. **npm Trusted Publishing:** the GitHub Actions workflow is prepared; each
+   package still has to be registered as a trusted publisher on npmjs.com by
+   Marlin before the first publish succeeds (a 404 on the upload means it is not
+   registered yet). Until then hosts consume the packages from the workspace.

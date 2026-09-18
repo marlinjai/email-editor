@@ -3,8 +3,8 @@
 ## Now
 
 - [ ] Turn the editor into a multi-tenant mail service with ŌPUNTIA's admin as its
-      first client [plan](docs/plans/2026-09-18-mail-service.md) : draft, awaiting
-      Marlin's approval. Clients keep their people, the service keeps the mail:
+      first client [plan](docs/plans/2026-09-18-mail-service.md) : in progress, approved
+      2026-09-18, built by an agent team in phases S0 to S5. Clients keep their people, the service keeps the mail:
       workspaces and API keys via auth-brain, a Postgres-backed API, a send worker
       with per-provider policies (iCloud+ SMTP first), suppression and preference
       topics, webhooks, a hosted unsubscribe page, and the editor published as an
