@@ -131,8 +131,9 @@ export function MailingView({
         }
         description={
           <>
-            <span className="text-ink">{mailing.subject}</span>
-            {mailing.preheader ? <span className="text-muted"> · {mailing.preheader}</span> : null}
+            {/* The title is the subject when there is no internal name; do not say it twice. */}
+            {mailing.name ? <span className="text-ink">{mailing.subject}</span> : null}
+            {mailing.preheader ? <span className="text-muted">{mailing.name ? ' · ' : ''}{mailing.preheader}</span> : null}
             <span className="mt-1 block text-[12.5px] text-faint">
               Topic <Mono>{mailing.topic}</Mono>. Created <When at={mailing.created_at} />
               {mailing.started_at ? (
@@ -257,7 +258,8 @@ export function MailingView({
                     <Td className="tabular text-right text-muted">{r.attempts}</Td>
                     <Td className="max-w-[44ch]">
                       {r.skip_reason ? <span className="text-muted">{SKIP_LABEL[r.skip_reason] ?? r.skip_reason}</span> : null}
-                      {r.last_error ? <span className="block truncate text-[12px] text-danger" title={r.last_error}>{r.last_error}</span> : null}
+                      {/* An error is shown only while it still describes the recipient: a retried, sent one no longer failed. */}
+                      {r.last_error && r.status !== 'sent' ? <span className="block truncate text-[12px] text-danger" title={r.last_error}>{r.last_error}</span> : null}
                       {r.message_id ? (
                         <Link href={`/w/${ws}/archive/${r.message_id}`} className="text-[12.5px] text-muted underline decoration-line-strong hover:text-ink">
                           View sent message
