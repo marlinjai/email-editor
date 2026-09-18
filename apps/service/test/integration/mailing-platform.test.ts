@@ -36,7 +36,7 @@ afterEach(() => h?.drop());
 
 const MIN = 60_000;
 const quiet = { error: () => {}, log: () => {} };
-const scheduleJob = () => createScheduleJob({ sql: h.sql, compile: (d) => h.compiler.compile(d), log: quiet });
+const scheduleJob = () => createScheduleJob({ sql: h.sql, compile: (_workspaceId, d) => h.compiler.compile(d), log: quiet });
 const abJob = () => createAbDecisionJob({ sql: h.sql, log: quiet });
 const tokens = createTrackingTokens(UNSUBSCRIBE_KEYS);
 /** A public /t/ endpoint answers a GIF, a redirect or a plain 404, never JSON. */
@@ -177,7 +177,7 @@ describe('scheduling', () => {
     const job = createScheduleJob({
       sql: h.sql,
       log: { error: (...x: unknown[]) => errors.push(x), log: () => {} },
-      compile: async (d) => {
+      compile: async (_workspaceId, d) => {
         if (JSON.stringify(d).includes('Stuck headline')) throw new ApiError('service_unavailable', 'the compile queue is full');
         return h.compiler.compile(d);
       },

@@ -4,7 +4,10 @@ import { PUBLIC_BASE_URL, startHarness, type Harness } from '../support/harness.
 import { ImageServer } from '../support/image-server.js';
 import { pngBytes } from '../support/images.js';
 import { documentWith, textBlock } from '../support/mail-documents.js';
-import { action, addRecipients, createMailing, seedContact, seedSending } from '../support/sending.js';
+import { workspaceCompile } from '../../src/compile/workspace-compile.js';
+import { createScheduleJob } from '../../src/platform/schedule-job.js';
+import { repos } from '../../src/repo/index.js';
+import { action, addRecipients, createMailing, eventsOf, mailingStatus, seedContact, seedSending } from '../support/sending.js';
 
 /**
  * The per-workspace asset policy and `assets.import`: where a workspace's mails
@@ -213,6 +216,41 @@ describe('sending under the policy', () => {
     expect(test.body.error.code).toBe('compile_failed');
     await action(h, S, m.id, 'cancel');
     await setPolicy(S, 'any');
+  });
+
+  it('schedule runs the same check, and a scheduled mailing goes back to draft if the policy tightened before its time', async () => {
+    await setPolicy(S, 'service_only');
+    const refused = await draft(imageDoc(REMOTE));
+    const at = new Date(Date.now() + 2 * 60_000);
+    const early = await action(h, S, refused.id, 'schedule', { send_at: at.toISOString() });
+    expect(early.status).toBe(422);
+    expect(early.body.error.code).toBe('compile_failed');
+
+    await setPolicy(S, 'any');
+    const m = await draft(imageDoc(REMOTE));
+    expect((await action(h, S, m.id, 'schedule', { send_at: at.toISOString() })).status).toBe(200);
+    await setPolicy(S, 'service_only');
+    // The release compiles the way the platform worker does (src/platform/jobs.ts).
+    const forWorkspace = workspaceCompile(repos(h.sql), h.compiler, PUBLIC_BASE_URL);
+    const job = createScheduleJob({ sql: h.sql, compile: (ws, d) => forWorkspace.compile(ws, d), log: { error: () => {}, log: () => {} } });
+    expect(await job.tick(new Date(Date.now() + 3 * 60_000))).toBe(true);
+    expect(await mailingStatus(h, S.id, m.id)).toBe('draft');
+    const failed = (await eventsOf(h, S.id, 'mailing.schedule_failed')).find((e) => e.payload.data.mailing_id === m.id);
+    expect(failed!.payload.data).toMatchObject({ code: 'compile_failed' });
+    await setPolicy(S, 'any');
+  });
+
+  it('a signup form refuses a confirmation template with a remote image', async () => {
+    await setPolicy(S, 'service_only');
+    const confirm = documentWith([{ id: 'img-1', type: 'image', src: REMOTE }, textBlock('<p><a href="{{confirm_url}}">Confirm</a></p>', 'txt-c')]);
+    const template = await h.call({ method: 'POST', path: '/v1/templates', key: S.key, body: { name: 'Confirm', document: confirm } });
+    const input = { name: 'Newsletter', title: 'Stay in touch', consent_text: 'I agree.', topics: ['news'], provider_id: seeded.provider.id, confirmation_template_id: template.body.id };
+    const refused = await h.call({ method: 'POST', path: '/v1/signup-forms', key: S.key, body: input });
+    expect(refused.status, JSON.stringify(refused.body)).toBe(422);
+    expect(refused.body.error.code).toBe('compile_failed');
+    await setPolicy(S, 'any');
+    const accepted = await h.call({ method: 'POST', path: '/v1/signup-forms', key: S.key, body: input });
+    expect(accepted.status, JSON.stringify(accepted.body)).toBe(201);
   });
 
   it('under any, the same remote image sends as before', async () => {
