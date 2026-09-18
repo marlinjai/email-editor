@@ -28,6 +28,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** The packages this release publishes, in dependency order. */
 export const EDITOR_PACKAGES = ['core', 'blocks', 'ui', 'editor'];
@@ -42,7 +43,7 @@ const argValue = (flag) => {
 const keepDir = argValue('--out') ? resolve(argValue('--out')) : undefined;
 const requiredVersion = argValue('--version');
 
-const repoRoot = resolve(new URL('..', import.meta.url).pathname);
+const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'));

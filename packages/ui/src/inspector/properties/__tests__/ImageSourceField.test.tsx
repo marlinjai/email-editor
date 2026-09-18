@@ -189,4 +189,25 @@ describe('ImageSourceField with onRequestImage', () => {
     expect(errors).not.toHaveBeenCalled();
     errors.mockRestore();
   });
+
+  it('keeps a late rejection for one block off the inspector of the block now shown', async () => {
+    const pending = deferred();
+    const store = createRootStore();
+    const columnId = store.template.sections[0].columns[0].id;
+    store.template.insertBlock(columnId, { id: 'a', type: 'image', src: 'https://cdn.example.com/a.png' } as never);
+    store.template.insertBlock(columnId, { id: 'b', type: 'image', src: 'https://cdn.example.com/b.png' } as never);
+    const view = (id: string) => (
+      <StoreProvider value={store}>
+        <EditorHostProvider onRequestImage={() => pending.promise}>
+          <ImageSourceField block={store.template.findBlockById(id)!} />
+        </EditorHostProvider>
+      </StoreProvider>
+    );
+    const { rerender } = render(view('a'));
+    await act(async () => fireEvent.click(screen.getByRole('button')));
+    rerender(view('b')); // the user selected block b while a's picker was open
+    await act(async () => pending.reject(new Error('Upload failed')));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(false);
+  });
 });

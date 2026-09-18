@@ -21,6 +21,10 @@ export const ImageSourceField = observer(function ImageSourceField({ block }: { 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
+  // The block this inspector currently shows. A request still open for a
+  // previous block must not put its error or pending state on this one.
+  const shownBlockId = useRef(block.id);
+  shownBlockId.current = block.id;
 
   useEffect(() => {
     mounted.current = true;
@@ -71,9 +75,9 @@ export const ImageSourceField = observer(function ImageSourceField({ block }: { 
       if (typeof result.alt === 'string') updates.alt = result.alt;
       target.updateProperties(updates);
     } catch (err) {
-      if (mounted.current) setError(describeError(err));
+      if (mounted.current && shownBlockId.current === blockId) setError(describeError(err));
     } finally {
-      if (mounted.current) setPending(false);
+      if (mounted.current && shownBlockId.current === blockId) setPending(false);
     }
   };
 
