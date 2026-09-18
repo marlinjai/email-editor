@@ -12,6 +12,12 @@ export const EVENT_LABELS: Record<WebhookEventType, string> = {
   'message.failed': 'A message failed',
   'contact.unsubscribed': 'Someone unsubscribed',
   'contact.resubscribed': 'Someone subscribed again',
+  'contact.subscribed': 'Someone signed up through a form',
+  'import.finished': 'A contact import finished',
+  'mailing.scheduled': 'A mailing was scheduled',
+  'mailing.started': 'A mailing started sending',
+  'mailing.schedule_failed': 'A scheduled mailing could not start',
+  'mailing.ab_winner_selected': 'An A/B test picked its winner',
   'contact.bounced': 'An address bounced or complained',
   'mailing.finished': 'A mailing finished',
 };

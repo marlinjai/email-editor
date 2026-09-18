@@ -31,6 +31,7 @@ const MESSAGES: Record<ErrorCode, string> = {
   unknown_provider: 'That provider does not exist in this workspace. Pick one from the list.',
   recipient_suppressed: 'That address is suppressed and will not receive mail from this workspace.',
   unsupported_media_type: 'Only PNG, JPEG, GIF and WebP images can be uploaded.',
+  tracking_disabled: 'Opens and clicks are not tracked in this workspace. Turn tracking on under Settings first.',
   rate_limited: 'Too many requests at once. Wait a moment and try again.',
   daily_budget_exhausted: "This provider's daily sending budget is used up. Sending continues when it frees up.",
   plan_limit_reached: "This workspace has reached its plan's limit.",
