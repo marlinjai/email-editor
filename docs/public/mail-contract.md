@@ -148,7 +148,16 @@ if it bounces again, it is blocked again.
   553 whose text names the recipient). A rejection that is the sender's problem
   (5.7.x: authentication, relaying, content, reputation, rate) never blocks the
   recipient; it is counted on the provider as `rejections` (`count`,
-  `last_error`, `last_at`).
+  `last_error`, `last_at`). A 5.1.x reply that names the sender or the setup
+  counts as the sender's problem too.
+- **The bounce circuit breaker:** when, in one run of a mailing, 5 recipients
+  in a row are refused with the same reply, or more than 20 percent of the
+  first 50 are refused, the refusals are more likely the provider's fault than
+  the list's. The service undoes that run's `bounced` blocks (emitting
+  `contact.resubscribed` with `source: 'bounce_reverted'` for each), pauses the
+  mailing with a `pause_reason`, and sets the provider's
+  `rejections.anomaly`. Fix the provider, then resume; the resumed run is
+  watched afresh.
 - **Resend:** also bounces and spam complaints reported afterwards, through
   Resend's webhooks. A Resend provider's `events` says where they arrive (`url`)
   and whether the service can verify them (`status`: `active` or
@@ -157,6 +166,9 @@ if it bounces again, it is blocked again.
   Resend for that URL with the events `email.bounced` and `email.complained`,
   and store its signing secret with `providers.setEventsSecret`
   (`PUT /v1/providers/:id/events-secret`, `{ signing_secret: "whsec_..." }`).
+  Only an event for a message the service sent through that provider acts;
+  an event for any other email on the same Resend account is counted in
+  `events.unmatched` and never blocks anyone.
 - **Not detected:** bounces that an SMTP server reports later as an email to
   the sender's inbox. That is how iCloud+ reports almost all of them, so with an
   iCloud+ provider, addresses that bounce later have to be blocked by hand.
