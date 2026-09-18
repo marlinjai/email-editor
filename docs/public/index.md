@@ -98,3 +98,4 @@ function App() {
 - [Installation](./installation) -- Detailed installation and platform packages
 - [Integration](./integration) -- React, vanilla JS, and platform integration patterns
 - [API Reference](./api) -- Full API documentation
+- [Mail service API contract](./mail-contract): v1 schemas, routes, errors and webhook signing of the mail service
