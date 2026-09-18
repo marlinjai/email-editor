@@ -1,4 +1,4 @@
-import { MAX_ASSET_BYTES, REQUEST_ID_HEADER, routes } from '@marlinjai/mail-contract';
+import { MAX_ASSET_BYTES, MAX_IMPORT_BYTES, REQUEST_ID_HEADER, matchRoute, routes, type HttpMethod } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AssetStorage } from './assets/storage.js';
@@ -22,6 +22,10 @@ import { unsubscribeRoutes } from './routes/unsubscribe.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 import { mailingRoutes } from './routes/mailings.js';
 import { messageRoutes } from './routes/messages.js';
+import { mailingPlatformRoutes } from './routes/mailing-platform.js';
+import { trackingRoutes } from './routes/track.js';
+import { createTrackingTokens } from './platform/tracking.js';
+import type { RootKeys } from './platform/tokens.js';
 import type { UnsubscribeSigner } from './unsubscribe.js';
 import { createTestSender } from './worker/test-send.js';
 import { createTransportCache, type TransportFor } from './worker/transports.js';
@@ -30,16 +34,25 @@ import { providerRoutes } from './routes/providers.js';
 import { contactRoutes } from './routes/contacts.js';
 import { suppressionRoutes } from './routes/suppressions.js';
 import { topicRoutes } from './routes/topics.js';
+import { tagRoutes } from './routes/tags.js';
+import { contactPropertyRoutes } from './routes/contact-properties.js';
+import { segmentRoutes } from './routes/segments.js';
+import { importRoutes } from './routes/imports.js';
 import { billingRoutes } from './routes/billing.js';
 import { stripeWebhookRoutes } from './routes/stripe-webhook.js';
 import type { BillingConfig } from './billing/plans.js';
 import type { StripeApi } from './billing/stripe.js';
 import { createSmtpTransport, type SmtpSettings } from './transport/smtp.js';
 import type { Transport } from './transport/types.js';
+import { signupFormRoutes } from './routes/signup-forms.js';
+import { signupPageRoutes } from './routes/signup-pages.js';
+import { createSignupService, type SignupOptions } from './signup/service.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 /** An image upload: the file itself plus room for the multipart framing around it. */
 export const MAX_UPLOAD_BODY_BYTES = MAX_ASSET_BYTES + 64 * 1024;
+/** A CSV import: the file plus room for the multipart framing. */
+export const MAX_IMPORT_BODY_BYTES = MAX_IMPORT_BYTES + 64 * 1024;
 
 export type AppOptions = {
   sql: Sql;
@@ -76,11 +89,35 @@ export type AppOptions = {
   unsubscribeSigner?: UnsubscribeSigner;
   /** F2: the provider transports for test sends; main.ts shares the worker's. Tests pass a MemoryTransport. */
   transportFor?: TransportFor;
+  /**
+   * S4: MAIL_UNSUBSCRIBE_KEY by version, from which the S4 token signers derive
+   * their keys (src/platform/tokens.ts). The public S4 endpoints (tracking,
+   * the hosted signup pages `/f/...`) are served, and signup submissions
+   * accepted, only when it is given.
+   */
+  platformKeys?: RootKeys;
+  /** S4: the time check and rate limits of the signup forms (defaults in src/signup/service.ts). */
+  signup?: SignupOptions;
   /** S5: plans' Stripe Price ids and the webhook secret; absent means billing without Stripe (checkout fails closed). */
   billing?: BillingConfig;
   /** S5: the Stripe client (null without a key). Tests pass a fake. */
   stripe?: StripeApi | null;
 };
+
+const PUBLIC_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+/**
+ * Whether a request is for a route the contract marks `public` (the signup
+ * submission), which takes no credential. An OPTIONS preflight counts when any
+ * method of that path is public.
+ */
+export function isPublicRequest(method: string, path: string): boolean {
+  const methods = method === 'OPTIONS' ? PUBLIC_METHODS : [method as HttpMethod];
+  return methods.some((m) => {
+    const match = matchRoute(m, path);
+    return match !== null && routes[match.id].access === 'public';
+  });
+}
 
 export function createApp({
   sql,
@@ -97,6 +134,8 @@ export function createApp({
   providerFetch = fetch,
   unsubscribeSigner,
   transportFor,
+  platformKeys,
+  signup,
   billing = { prices: {} },
   stripe = null,
 }: AppOptions) {
@@ -117,6 +156,9 @@ export function createApp({
   // Public and outside /v1: a browser page (HTML, its own body limit, no API
   // credentials), so none of the API middleware below applies to it.
   if (unsubscribeSigner) app.route('/', unsubscribeRoutes(sql, { signer: unsubscribeSigner, log }));
+  if (platformKeys) app.route('/', trackingRoutes(sql, { tokens: createTrackingTokens(platformKeys) }));
+  const signupService = platformKeys ? createSignupService({ sql, keys: platformKeys, options: signup }) : null;
+  if (signupService) app.route('/', signupPageRoutes(sql, { service: signupService, publicBaseUrl, log: { error: log.error, log: console.log } }));
   // Public and outside /v1 too: Stripe signs its requests, it holds no API key.
   app.route('/', stripeWebhookRoutes(sql, { config: billing, stripe, log: { error: log.error, log: console.log } }));
 
@@ -129,19 +171,24 @@ export function createApp({
     });
   const jsonLimit = limit(MAX_BODY_BYTES);
   const uploadLimit = limit(MAX_UPLOAD_BODY_BYTES);
+  const importLimit = limit(MAX_IMPORT_BODY_BYTES);
   const upload = routes['assets.upload'];
+  const csvImport = routes['imports.create'];
   app.use('/v1/*', (c, next) =>
-    c.req.method === upload.method && c.req.path === upload.path ? uploadLimit(c, next) : jsonLimit(c, next),
+    c.req.method === upload.method && c.req.path === upload.path
+      ? uploadLimit(c, next)
+      : c.req.method === csvImport.method && c.req.path === csvImport.path
+        ? importLimit(c, next)
+        : jsonLimit(c, next),
   );
-  app.use(
-    '/v1/*',
-    authenticate({
-      dashboardServiceToken,
-      findCredentialByHash: (hash) => pool.apiKeys.findCredentialByHash(hash),
-      touchApiKey: (ws, id) => pool.apiKeys.touch(ws, id),
-      findMember: (ws, subject) => pool.members.bySubject(ws, subject),
-    }),
-  );
+  const auth = authenticate({
+    dashboardServiceToken,
+    findCredentialByHash: (hash) => pool.apiKeys.findCredentialByHash(hash),
+    touchApiKey: (ws, id) => pool.apiKeys.touch(ws, id),
+    findMember: (ws, subject) => pool.members.bySubject(ws, subject),
+  });
+  // Routes the contract marks `public` take no credential.
+  app.use('/v1/*', (c, next) => (isPublicRequest(c.req.method, c.req.path) ? next() : auth(c, next)));
 
   const deps = { pool, sealer };
   app.route('/', workspaceRoutes(sql, deps));
@@ -166,6 +213,7 @@ export function createApp({
   app.route('/', topicRoutes(sql, deps));
   app.route('/', contactRoutes(sql, deps));
   app.route('/', suppressionRoutes(sql, deps));
+  app.route('/', importRoutes(sql, deps));
 
   app.route(
     '/',
@@ -188,6 +236,19 @@ export function createApp({
     }),
   );
   app.route('/', messageRoutes(deps));
+  app.route('/', mailingPlatformRoutes(sql, { ...deps, compile: (workspaceId, document) => compileForWorkspace.compile(workspaceId, document) }));
+  app.route('/', tagRoutes(sql, deps));
+  app.route('/', contactPropertyRoutes(sql, deps));
+  app.route('/', segmentRoutes(sql, deps));
+  app.route(
+    '/',
+    signupFormRoutes(sql, {
+      ...deps,
+      compile: (workspaceId, document) => compileForWorkspace.compile(workspaceId, document),
+      publicBaseUrl,
+      service: signupService,
+    }),
+  );
   app.route('/', billingRoutes(sql, { ...deps, config: billing, stripe, log }));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));

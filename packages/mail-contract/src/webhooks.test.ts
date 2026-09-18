@@ -57,6 +57,37 @@ const samples = {
     bounced_at: TS,
   },
   'mailing.finished': { mailing_id: 'mlg_1', mailing_metadata: {}, status: 'partially_failed', counts, finished_at: TS },
+  'contact.subscribed': {
+    contact_id: 'ctc_1',
+    external_id: null,
+    email: 'a@b.de',
+    topics: ['programme-updates'],
+    source: 'signup_form',
+    signup_form_id: 'sf_1',
+    signup_form_version: 2,
+    subscribed_at: TS,
+  },
+  'import.finished': {
+    import_id: 'imp_1',
+    status: 'completed',
+    result: { created: 2, updated: 1, unchanged: 0, suppressed: 1, skipped: 1, skipped_by_reason: { invalid_email: 1 }, topics_withheld: 0 },
+    error: null,
+    finished_at: TS,
+  },
+  'mailing.scheduled': { mailing_id: 'mlg_1', mailing_metadata: {}, scheduled_at: TS },
+  'mailing.started': { mailing_id: 'mlg_1', mailing_metadata: {}, trigger: 'schedule', recipients: 3, started_at: TS },
+  'mailing.schedule_failed': { mailing_id: 'mlg_1', mailing_metadata: {}, code: 'unknown_provider', message: 'gone', failed_at: TS },
+  'mailing.ab_winner_selected': {
+    mailing_id: 'mlg_1',
+    mailing_metadata: {},
+    winner: 'b',
+    decided_by: 'metric',
+    variants: [
+      { key: 'a', sent: 10, unique_opens: 2, unique_clicks: 0 },
+      { key: 'b', sent: 10, unique_opens: 5, unique_clicks: 1 },
+    ],
+    decided_at: TS,
+  },
 } as const;
 
 describe('webhook events', () => {

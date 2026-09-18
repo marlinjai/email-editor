@@ -1,7 +1,7 @@
 import type { Db } from '../db.js';
 import { asJson } from './json.js';
 
-/** A contact as stored. `topics` (the subscribed slugs) is joined in by `withTopics`. */
+/** A contact as stored. `topics` (the subscribed slugs) and `tags` (S4, the tag slugs) are joined in on read. */
 export type ContactRow = {
   id: string;
   external_id: string | null;
@@ -14,12 +14,14 @@ export type ContactRow = {
   updated_at: string;
 };
 
-export type ContactWithTopics = ContactRow & { topics: string[] };
+export type ContactWithTopics = ContactRow & { topics: string[]; tags: string[] };
 
 const COLUMNS = 'id, external_id, email, first_name, last_name, locale, properties, created_at, updated_at';
 const COLUMNS_C = 'c.id, c.external_id, c.email, c.first_name, c.last_name, c.locale, c.properties, c.created_at, c.updated_at';
 const TOPICS_OF_C = `COALESCE((SELECT array_agg(t.slug ORDER BY t.slug) FROM contact_topic_subscriptions s
-  JOIN topics t ON t.id = s.topic_id WHERE s.contact_id = c.id), ARRAY[]::text[]) AS topics`;
+  JOIN topics t ON t.id = s.topic_id WHERE s.contact_id = c.id), ARRAY[]::text[]) AS topics,
+  COALESCE((SELECT array_agg(g.slug ORDER BY g.slug) FROM contact_tags ct
+  JOIN tags g ON g.id = ct.tag_id WHERE ct.contact_id = c.id), ARRAY[]::text[]) AS tags`;
 
 type ContactFields = {
   externalId?: string | null;

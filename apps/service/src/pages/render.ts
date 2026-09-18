@@ -87,6 +87,15 @@ nav li{display:inline;padding:0;border:0}
 nav a{display:inline-block;padding:.5rem .125rem;min-height:44px;line-height:1.75;color:var(--text);text-underline-offset:3px}
 nav a[aria-current]{font-weight:650;text-decoration:none}
 footer{margin-top:1.25rem;color:var(--muted);font-size:.875rem}
+.field{margin:0 0 1rem}
+label{display:block;font-weight:600;margin:0 0 .25rem}
+.opt{font-weight:400;color:var(--muted)}
+input[type=email],input[type=text]{font:inherit;width:100%;min-height:44px;padding:.5rem .75rem;border:1px solid var(--muted);border-radius:10px;background:var(--surface);color:var(--text)}
+input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+input[aria-invalid=true]{border-width:2px}
+.field-error{margin:.25rem 0 0;font-size:.875rem;font-weight:600}
+.hp{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+.consent{color:var(--muted);font-size:.875rem}
 @media (forced-colors:active){button{border:1px solid ButtonText}.notice{border:1px solid CanvasText}}
 `
   .replace(/\n/g, '')
@@ -99,13 +108,22 @@ const STYLE_HASH = createHash('sha256').update(CSS).digest('base64');
  * post only back to this page, the page cannot be framed (clickjacking the
  * unsubscribe button), and `<base>` cannot redirect relative URLs.
  */
-export const CONTENT_SECURITY_POLICY = [
-  "default-src 'none'",
-  `style-src 'sha256-${STYLE_HASH}'`,
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "base-uri 'none'",
-].join('; ');
+export const CONTENT_SECURITY_POLICY = contentSecurityPolicy();
+
+/**
+ * The policy of every hosted page. `formActionOrigin` adds one more origin a
+ * form may lead to: browsers apply `form-action` to the redirect after a post,
+ * so a signup confirmation that redirects to the workspace's own site needs it.
+ */
+export function contentSecurityPolicy(formActionOrigin?: string): string {
+  return [
+    "default-src 'none'",
+    `style-src 'sha256-${STYLE_HASH}'`,
+    formActionOrigin ? `form-action 'self' ${formActionOrigin}` : "form-action 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+  ].join('; ');
+}
 
 export type TopicState = 'subscribed' | 'not_subscribed' | 'unsubscribed' | 'paused';
 
@@ -134,7 +152,8 @@ export type PreferencesView = {
   outcome?: Outcome;
 };
 
-function page(locale: PageLocale, title: string, body: string): string {
+/** The document around a hosted page's body: charset first, not indexed, one inline stylesheet. */
+export function page(locale: PageLocale, title: string, body: string): string {
   return (
     '<!doctype html>' +
     `<html lang="${locale}"><head>` +
@@ -148,7 +167,7 @@ function page(locale: PageLocale, title: string, body: string): string {
   );
 }
 
-function hidden(name: string, value: string): string {
+export function hidden(name: string, value: string): string {
   return `<input type="hidden" name="${name}" value="${escapeHtml(value)}">`;
 }
 
@@ -169,7 +188,7 @@ function actionForm(
   );
 }
 
-function languageSwitch(locale: PageLocale, offered: readonly PageLocale[], path: string | null): string {
+export function languageSwitch(locale: PageLocale, offered: readonly PageLocale[], path: string | null): string {
   if (offered.length < 2) return '';
   const items = offered
     .map((l) => {

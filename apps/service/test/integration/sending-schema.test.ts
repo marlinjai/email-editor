@@ -272,7 +272,7 @@ describe('mailings and recipients', () => {
     expect(await r.settle(ws, c0!.id, ['sending'], { status: 'sent', messageId: msg.id })).toBeNull();
     await r.settle(ws, c1!.id, ['sending'], { status: 'failed', messageId: null, error: '550 no such user' });
     await r.settle(ws, c2!.id, ['sending'], { status: 'skipped', reason: 'outcome_unknown' });
-    await r.settle(ws, c3!.id, ['sending'], { status: 'queued', retryAt: new Date(Date.now() + 60_000), error: '451 later' });
+    await r.settle(ws, c3!.id, ['sending'], { status: 'queued', retryInMs: 60_000, error: '451 later' });
     expect(await repos(sql).mailings.counts(ws, m.id)).toMatchObject({ total: 5, sent: 1, failed: 1, skipped: 1, queued: 1, sending: 1 });
     // A requeued row is not due yet.
     expect(await r.claimNext(ws, m.id)).toBeNull();

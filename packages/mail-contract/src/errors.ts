@@ -34,6 +34,8 @@ export const ERROR_STATUS = {
   unknown_provider: 422,
   recipient_suppressed: 422,
   unsupported_media_type: 422,
+  /** Opens and clicks are not tracked in this workspace (an A/B metric, an engagement filter). */
+  tracking_disabled: 422,
   // 429
   rate_limited: 429,
   daily_budget_exhausted: 429,

@@ -1,7 +1,6 @@
 import {
   canTransition,
   EDITABLE_MAILING_STATUSES,
-  missingRequiredMergeFields,
   type CompileMessage,
   type Mailing,
   type MailingAction,
@@ -22,6 +21,7 @@ import { mount, type MountDeps } from '../mount.js';
 import { repos, type Repos } from '../repo/index.js';
 import type { MailingRow } from '../repo/mailings.js';
 import type { RecipientRow } from '../repo/recipients.js';
+import { applyStart, prepareStart } from '../platform/start-mailing.js';
 import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
 import { assertCanSend, assertCanTest, assertWithinLimit, computeUsage, usageWarningHeader } from '../billing/usage.js';
 
@@ -61,6 +61,7 @@ export function toMailingSummary(row: MailingRow, counts: MailingCounts): Mailin
     counts,
     metadata: row.metadata,
     scheduled_at: row.scheduled_at,
+    ab_test: row.ab_test,
     started_at: row.started_at,
     finished_at: row.finished_at,
     created_at: row.created_at,
@@ -338,47 +339,12 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     if (!current) notFound();
     if (!canTransition(current.status, 'send')) invalidState(current, 'send');
     // Compile outside the transaction (it is CPU work); the snapshot is taken
-    // under the lock below and refused if the document changed meanwhile.
-    const compiled = await deps.compile(access.workspaceId, validateDocument(current.document) as unknown as TemplateDocument);
-    if (compiled.errors.length > 0) {
-      throw new ApiError('compile_failed', 'The document does not compile.', { errors: compiled.errors });
-    }
-    const missing = missingRequiredMergeFields(compiled.html);
-    if (missing.length > 0) {
-      throw new ApiError(
-        'missing_unsubscribe_url',
-        'A broadcast must contain {{unsubscribe_url}}, so every recipient can leave the list.',
-        { missing },
-      );
-    }
-    const mailing = await withLocked(access, id, async (r, tx, row) => {
+    // under the lock below and refused if the mailing changed meanwhile. The
+    // same path starts a scheduled mailing at its time (src/platform/start-mailing.ts).
+    const prepared = await prepareStart(deps.compile, pool, access.workspaceId, current);
+    const mailing = await withLocked(access, id, async (_r, tx, row) => {
       if (!canTransition(row.status, 'send')) invalidState(row, 'send');
-      if (row.updated_at !== current.updated_at) {
-        throw new ApiError('conflict', 'The mailing changed while it was being prepared. Send it again.');
-      }
-      if (!(await r.providers.get(access.workspaceId, row.provider_id))) {
-        throw new ApiError('unknown_provider', "The mailing's provider was deleted. Choose another one.", {
-          provider_id: row.provider_id,
-        });
-      }
-      const counts = await r.mailings.counts(access.workspaceId, id);
-      if (counts.total === 0) throw new ApiError('mailing_not_ready', 'The mailing has no recipients yet.');
-      // S5: the whole audience must fit the plan's period, or the mailing does
-      // not start. Once started it always finishes (resume and retry-failed are
-      // not checked), so a limit never cuts an audience in half.
-      await assertCanSend(tx, access.workspaceId, counts.queued);
-      await r.mailings.setCompiled(access.workspaceId, id, { mjml: compiled.mjml, html: compiled.html });
-      const moved = await r.mailings.transition(access.workspaceId, id, ['draft', 'scheduled'], 'sending', {
-        startedAt: true,
-      });
-      await r.audit.record(access.workspaceId, {
-        action: 'mailing.sent',
-        actor: actorOf(access),
-        targetType: 'mailing',
-        targetId: id,
-        details: { recipients: counts.total },
-      });
-      return moved!;
+      return applyStart(tx, access.workspaceId, row, prepared, { trigger: 'send', actor: actorOf(access), now: new Date() });
     });
     await warnOnUsage(c, access.workspaceId);
     return c.json(mailing, 202);

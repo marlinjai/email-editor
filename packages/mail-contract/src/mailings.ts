@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Email, Id, PageQuery, Properties, Slug, Timestamp } from './common';
+import { AbTestState } from './ab-test';
 import { TemplateDocument } from './templates';
 
 /*
@@ -20,14 +21,15 @@ export const MAILING_STATUSES = [
 export const MailingStatus = z.enum(MAILING_STATUSES);
 export type MailingStatus = z.infer<typeof MailingStatus>;
 
-export const MAILING_ACTIONS = ['send', 'schedule', 'pause', 'resume', 'cancel', 'retry-failed'] as const;
+export const MAILING_ACTIONS = ['send', 'schedule', 'unschedule', 'pause', 'resume', 'cancel', 'retry-failed'] as const;
 export const MailingAction = z.enum(MAILING_ACTIONS);
 export type MailingAction = z.infer<typeof MailingAction>;
 
 /**
  * Which action is allowed in which state. The service answers any other
  * combination with `mailing_invalid_state` (409); the dashboard enables its
- * buttons from the same table. `schedule` belongs to the S4 platform features.
+ * buttons from the same table. `schedule` (also from `scheduled`: a new time)
+ * and `unschedule` (back to `draft`) belong to the S4 platform features.
  *
  * A mailing whose queue drains ends `sent` when every recipient was sent or
  * skipped for a policy reason, and `partially_failed` when at least one failed
@@ -36,7 +38,7 @@ export type MailingAction = z.infer<typeof MailingAction>;
  */
 export const MAILING_TRANSITIONS: Readonly<Record<MailingStatus, readonly MailingAction[]>> = {
   draft: ['send', 'schedule', 'cancel'],
-  scheduled: ['send', 'cancel'],
+  scheduled: ['send', 'schedule', 'unschedule', 'cancel'],
   sending: ['pause', 'cancel'],
   paused: ['resume', 'cancel'],
   sent: [],
@@ -91,6 +93,8 @@ export const Mailing = z.object({
   counts: MailingCounts,
   metadata: MailingMetadata,
   scheduled_at: Timestamp.nullable(),
+  /** The A/B test on subject or content (S4), null when there is none. */
+  ab_test: AbTestState.nullable(),
   started_at: Timestamp.nullable(),
   finished_at: Timestamp.nullable(),
   created_at: Timestamp,
