@@ -1,4 +1,4 @@
-import { createApp } from '../../src/app.js';
+import { createApp, type AppOptions } from '../../src/app.js';
 import type { Sql } from '../../src/db.js';
 import { migrate } from '../../src/migrate.js';
 import { freshDatabase } from './db.js';
@@ -24,11 +24,11 @@ export type Call = {
 export type Result = { status: number; body: Json; headers: Headers };
 
 /** A migrated database and the app over it, driven in-process through app.request. */
-export async function startHarness() {
+export async function startHarness(extra: Partial<Omit<AppOptions, 'sql'>> = {}) {
   const db = await freshDatabase();
   await migrate(db.sql, { log: () => {} });
   const errors: unknown[] = [];
-  const app = createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, log: { error: (...a) => errors.push(a) } });
+  const app = createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, log: { error: (...a) => errors.push(a) }, ...extra });
 
   async function call(c: Call): Promise<Result> {
     const headers: Record<string, string> = { ...(c.headers ?? {}) };

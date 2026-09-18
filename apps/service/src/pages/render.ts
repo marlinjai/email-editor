@@ -46,7 +46,7 @@ export function maskEmail(email: string): string {
 // AA contrast (4.5:1 for body text, 3:1 for the focus ring and control borders)
 // in both schemes.
 const CSS = `
-:root{color-scheme:light dark;--bg:#f5f4f1;--surface:#fff;--text:#1f1e1c;--muted:#57554f;--line:#d6d3cc;--ink:#1f1e1c;--on-ink:#fff;--ok-bg:#eef5ef;--ok-line:#8fb597;--note-bg:#f3efe4;--note-line:#bfae7f;--focus:#2455c3}
+:root{color-scheme:light dark;--bg:#f5f4f1;--surface:#ffffff;--text:#1f1e1c;--muted:#57554f;--line:#d6d3cc;--ink:#1f1e1c;--on-ink:#ffffff;--ok-bg:#eef5ef;--ok-line:#8fb597;--note-bg:#f3efe4;--note-line:#bfae7f;--focus:#2455c3}
 @media (prefers-color-scheme:dark){:root{--bg:#171715;--surface:#22211f;--text:#eeece8;--muted:#b3b0a8;--line:#4a4843;--ink:#eeece8;--on-ink:#171715;--ok-bg:#1f2b21;--ok-line:#5d8a66;--note-bg:#2b2719;--note-line:#8a7a4c;--focus:#8fb1ff}}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
