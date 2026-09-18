@@ -1,8 +1,17 @@
 import type { Db } from '../db.js';
 import { apiKeysRepo } from './api-keys.js';
 import { auditRepo } from './audit.js';
+import { contactsRepo } from './contacts.js';
 import { idempotencyRepo } from './idempotency.js';
+import { mailingsRepo } from './mailings.js';
 import { membersRepo } from './members.js';
+import { messagesRepo } from './messages.js';
+import { providerSendsRepo } from './provider-sends.js';
+import { providersRepo } from './providers.js';
+import { recipientsRepo } from './recipients.js';
+import { suppressionsRepo } from './suppressions.js';
+import { topicsRepo } from './topics.js';
+import { webhookDeliveriesRepo, webhookEndpointsRepo, webhookEventsRepo } from './webhooks.js';
 import { workspacesRepo } from './workspaces.js';
 
 /**
@@ -10,6 +19,12 @@ import { workspacesRepo } from './workspaces.js';
  * repositories, and every such function takes `workspaceId` as its first
  * argument. There is no unscoped query helper: a route cannot read a row of
  * another workspace because no function exists that would let it.
+ *
+ * The exceptions are named and few, each returning only what locates the
+ * workspace for the scoped calls that follow: `apiKeys.findCredentialByHash`
+ * (how a key's workspace is found), and the worker's scans across workspaces,
+ * all suffixed `ForWorker` (`mailings.listSendingForWorker`,
+ * `recipients.listStuckForWorker`, `webhookDeliveries.claimDueForWorker`).
  *
  * Built over a `Db`, which is either the pool or a transaction, so a route can
  * write a change and its audit row atomically: `sql.begin((tx) => repos(tx)...)`.
@@ -21,6 +36,17 @@ export function repos(db: Db) {
     apiKeys: apiKeysRepo(db),
     audit: auditRepo(db),
     idempotency: idempotencyRepo(db),
+    providers: providersRepo(db),
+    providerSends: providerSendsRepo(db),
+    topics: topicsRepo(db),
+    contacts: contactsRepo(db),
+    suppressions: suppressionsRepo(db),
+    mailings: mailingsRepo(db),
+    recipients: recipientsRepo(db),
+    messages: messagesRepo(db),
+    webhookEndpoints: webhookEndpointsRepo(db),
+    webhookEvents: webhookEventsRepo(db),
+    webhookDeliveries: webhookDeliveriesRepo(db),
   };
 }
 export type Repos = ReturnType<typeof repos>;

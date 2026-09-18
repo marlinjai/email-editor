@@ -5,6 +5,7 @@ const valid = {
   DATABASE_URL: 'postgres://u:p@localhost:5432/mail',
   DASHBOARD_SERVICE_TOKEN: 'ab'.repeat(32),
   MAIL_SECRETS_KEY: 'cd'.repeat(32),
+  MAIL_UNSUBSCRIBE_KEY: 'ef'.repeat(32),
 };
 
 describe('config', () => {
@@ -12,6 +13,7 @@ describe('config', () => {
     const config = loadConfig(valid);
     expect(config.port).toBe(3000);
     expect(config.secretsKeys.get(1)).toHaveLength(32);
+    expect(config.unsubscribeKeys.get(1)).toHaveLength(32);
   });
 
   it('names every missing variable at once', () => {
@@ -21,7 +23,12 @@ describe('config', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(ConfigError);
       expect((err as ConfigError).problems).toEqual(
-        expect.arrayContaining(['DATABASE_URL is not set', 'DASHBOARD_SERVICE_TOKEN is not set', 'MAIL_SECRETS_KEY is not set']),
+        expect.arrayContaining([
+          'DATABASE_URL is not set',
+          'DASHBOARD_SERVICE_TOKEN is not set',
+          'MAIL_SECRETS_KEY is not set',
+          'MAIL_UNSUBSCRIBE_KEY is not set',
+        ]),
       );
     }
   });
@@ -35,6 +42,12 @@ describe('config', () => {
       expect((err as Error).message).toContain('MAIL_SECRETS_KEY');
       expect((err as Error).message).not.toContain(secret);
     }
+  });
+
+  it('refuses to boot without the unsubscribe key, or with a malformed one', () => {
+    const { MAIL_UNSUBSCRIBE_KEY: _omitted, ...withoutKey } = valid;
+    expect(() => loadConfig(withoutKey)).toThrow(/MAIL_UNSUBSCRIBE_KEY is not set/);
+    expect(() => loadConfig({ ...valid, MAIL_UNSUBSCRIBE_KEY: 'ab'.repeat(16) })).toThrow(/MAIL_UNSUBSCRIBE_KEY: must be 64 hex/);
   });
 
   it('rejects a non-postgres database URL', () => {
