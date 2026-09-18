@@ -116,7 +116,8 @@ describe('GET /u/<token>', () => {
     const before = await counts(s.ws.id);
     const page = await get(s.token());
     expect(page.status).toBe(200);
-    expect(page.doc.querySelector('.sender')?.textContent).toBe(`Workspace unsub-${seq}`);
+    expect(page.doc.querySelector('.lead')?.textContent).toBe(`Choose which emails you receive from Workspace unsub-${seq}.`);
+    expect(page.doc.title).toBe(`Email preferences: Workspace unsub-${seq}`);
     expect(page.doc.querySelector('.address')?.textContent).toMatch(/p•••\d@e•••\.com/);
     expect(page.html).not.toContain('example.com');
     expect(stateOf(page, 'Programme updates')).toBe('Subscribed');

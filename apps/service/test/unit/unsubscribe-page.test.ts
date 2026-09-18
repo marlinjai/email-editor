@@ -45,7 +45,7 @@ function allPages(locale: PageLocale): Array<[string, string]> {
     ['all paused', renderPreferences(view(locale, { all: 'paused' }))],
     ['no topics', renderPreferences(view(locale, { topics: [], mailTopic: null }))],
     ['test preview', renderPreferences(view(locale, { isTest: true, maskedEmail: null, outcome: { kind: 'test' } }))],
-    ['gone', renderMessage({ kind: 'gone', locale, offered: PAGE_LOCALES, workspaceName: 'ŌPUNTIA' })],
+    ['gone', renderMessage({ kind: 'gone', locale, offered: PAGE_LOCALES })],
     ['invalid', renderMessage({ kind: 'invalid', locale, offered: PAGE_LOCALES })],
     ['cross site', renderMessage({ kind: 'cross_site', locale, offered: PAGE_LOCALES })],
     ['error', renderMessage({ kind: 'error', locale, offered: PAGE_LOCALES })],

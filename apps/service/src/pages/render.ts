@@ -49,16 +49,17 @@ const CSS = `
 :root{color-scheme:light dark;--bg:#f5f4f1;--surface:#ffffff;--text:#1f1e1c;--muted:#57554f;--line:#d6d3cc;--ink:#1f1e1c;--on-ink:#ffffff;--ok-bg:#eef5ef;--ok-line:#8fb597;--note-bg:#f3efe4;--note-line:#bfae7f;--focus:#2455c3}
 @media (prefers-color-scheme:dark){:root{--bg:#171715;--surface:#22211f;--text:#eeece8;--muted:#b3b0a8;--line:#4a4843;--ink:#eeece8;--on-ink:#171715;--ok-bg:#1f2b21;--ok-line:#5d8a66;--note-bg:#2b2719;--note-line:#8a7a4c;--focus:#8fb1ff}}
 *{box-sizing:border-box}
+::selection{background:var(--focus);color:var(--surface)}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+body{margin:0;accent-color:var(--ink);background:var(--bg);color:var(--text);font:1rem/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 main{max-width:34rem;margin:0 auto;padding:clamp(1.5rem,6vw,4rem) 1rem 3rem}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:clamp(1.25rem,5vw,2rem)}
-.sender{margin:0 0 .25rem;color:var(--muted);font-size:.875rem;font-weight:600;letter-spacing:.02em;overflow-wrap:anywhere}
-h1{margin:0 0 .5rem;font-size:clamp(1.5rem,5vw,1.875rem);line-height:1.2;font-weight:650;letter-spacing:-.01em}
-h2{margin:0 0 .75rem;font-size:1.0625rem;line-height:1.3;font-weight:650}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.5rem 1.25rem}
+@media (min-width:36rem){.card{padding:2rem}}
+h1{margin:0 0 .75rem;font-size:clamp(1.625rem,5vw,1.875rem);line-height:1.2;font-weight:650;letter-spacing:-.01em;text-wrap:balance;overflow-wrap:anywhere}
+h2{margin:0 0 .75rem;font-size:1.125rem;line-height:1.3;font-weight:650}
 p{margin:0 0 1rem}
 .lead{color:var(--muted)}
-.address{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.9375rem}
+.address{color:var(--muted);font-size:.875rem}
 section{margin-top:1.75rem;padding-top:1.5rem;border-top:1px solid var(--line)}
 .notice{margin:0 0 1.25rem;padding:.875rem 1rem;border-radius:10px;border:1px solid var(--ok-line);background:var(--ok-bg)}
 .notice.note{border-color:var(--note-line);background:var(--note-bg)}
@@ -69,7 +70,7 @@ li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
 li:last-child{border-bottom:0}
 .topic{flex:1 1 14rem;min-width:0}
 .topic-name{display:block;font-weight:600;overflow-wrap:anywhere}
-.topic-desc{display:block;color:var(--muted);font-size:.9375rem;overflow-wrap:anywhere}
+.topic-desc{display:block;color:var(--muted);font-size:.875rem;overflow-wrap:anywhere}
 .state{display:block;margin-top:.125rem;font-size:.875rem;color:var(--muted)}
 form{margin:0}
 button{font:inherit;font-weight:600;min-height:44px;padding:.625rem 1.125rem;border-radius:10px;cursor:pointer;border:1px solid var(--ink);background:transparent;color:var(--text);max-width:100%;overflow-wrap:anywhere}
@@ -79,13 +80,13 @@ button:focus-visible,a:focus-visible{outline:3px solid var(--focus);outline-offs
 .link-button{border:0;padding:.5rem 0;min-height:44px;text-decoration:underline;text-underline-offset:3px;font-weight:600;box-shadow:none}
 .link-button:hover{box-shadow:none;text-decoration-thickness:2px}
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-nav{margin-top:1.5rem;font-size:.9375rem}
+nav{margin-top:1.5rem;font-size:.875rem}
 nav h2{display:inline;font-size:inherit;font-weight:400;color:var(--muted);margin:0 .5rem 0 0}
 nav ul{display:inline-flex;flex-wrap:wrap;gap:.25rem .75rem}
 nav li{display:inline;padding:0;border:0}
 nav a{display:inline-block;padding:.5rem .125rem;min-height:44px;line-height:1.75;color:var(--text);text-underline-offset:3px}
 nav a[aria-current]{font-weight:650;text-decoration:none}
-footer{margin-top:1.25rem;color:var(--muted);font-size:.8125rem}
+footer{margin-top:1.25rem;color:var(--muted);font-size:.875rem}
 @media (forced-colors:active){button{border:1px solid ButtonText}.notice{border:1px solid CanvasText}}
 `
   .replace(/\n/g, '')
@@ -298,7 +299,6 @@ export function renderPreferences(view: PreferencesView): string {
 
   const body =
     '<div class="card">' +
-    `<p class="sender">${escapeHtml(view.workspaceName)}</p>` +
     `<h1>${heading}</h1>` +
     testBanner +
     outcomeNotice(view) +
@@ -319,14 +319,12 @@ export type MessageKind = 'gone' | 'invalid' | 'cross_site' | 'error';
 /**
  * A page with one message and nothing else: an unusable link, an erased contact,
  * a refused cross-site request, or our own failure. It names nothing from the
- * token, so it discloses nothing about whose link it was, beyond the workspace
- * name when the link was genuine.
+ * token, not even the workspace, so it discloses nothing about whose link it was.
  */
 export function renderMessage(input: {
   kind: MessageKind;
   locale: PageLocale;
   offered: readonly PageLocale[];
-  workspaceName?: string | null;
 }): string {
   const { kind, locale } = input;
   const keys = {
@@ -339,7 +337,6 @@ export function renderMessage(input: {
   const title = t(locale, titleKey);
   const body =
     '<div class="card">' +
-    (input.workspaceName ? `<p class="sender">${escapeHtml(input.workspaceName)}</p>` : '') +
     `<h1>${title}</h1><p class="lead">${t(locale, textKey)}</p>` +
     '</div>' +
     languageSwitch(locale, input.offered, null);

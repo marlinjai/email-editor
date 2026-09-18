@@ -174,7 +174,7 @@ export function unsubscribeRoutes(sql: Sql, deps: UnsubscribeRouteDeps) {
 
   function message(c: Context<AppEnv>, status: number, kind: MessageKind, workspace: Workspace | null, explicit?: string) {
     const { locale, offered } = localeFor(c, workspace, null, explicit);
-    return respond(c, status, renderMessage({ kind, locale, offered, workspaceName: workspace?.name ?? null }));
+    return respond(c, status, renderMessage({ kind, locale, offered }));
   }
 
   function preferences(
