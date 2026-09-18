@@ -331,6 +331,12 @@ function BounceHandling({ ws, provider: p, canAdmin }: { ws: string; provider: P
           : 'Until this is set up, only bounces Resend refuses at once are noticed; later bounces and spam complaints are missed.'}
       </p>
       {e.status !== 'active' && e.error ? <p className="mt-1.5 text-[12.5px] text-warn">{e.error}</p> : null}
+      {e.unmatched > 0 ? (
+        <p className="mt-1.5 text-[12.5px] text-muted">
+          {formatCount(e.unmatched)} {e.unmatched === 1 ? 'event' : 'events'} named an email this provider did not send through Lumitra
+          Mail (another app on the same Resend account). Those are counted and never block anyone.
+        </p>
+      ) : null}
       {canAdmin && (e.status !== 'active' || open) ? (
         <div className="mt-3 flex flex-col gap-3">
           <p className="text-[12.5px] text-muted">
@@ -380,6 +386,34 @@ function BounceHandling({ ws, provider: p, canAdmin }: { ws: string; provider: P
         </Button>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The bounce circuit breaker tripped on one of this provider's mailings: too
+ * many recipients refused as dead addresses in one run, which points at the
+ * provider or the sender's setup. The run's blocks were undone.
+ */
+function BreakerAnomaly({ ws, provider: p }: { ws: string; provider: Provider }) {
+  const a = p.rejections.anomaly;
+  if (!a) return null;
+  return (
+    <Notice tone="danger">
+      <span className="font-medium">
+        A mailing was paused <When at={a.at} />: too many recipients were refused as unknown addresses.
+      </span>
+      <span className="mt-1 block text-[12.5px]">
+        {a.reason} The addresses were not blocked. Check this provider&apos;s account and the sender&apos;s domain setup, then resume
+        the mailing{a.mailing_id ? (
+          <>
+            {' '}
+            (<a className="underline" href={`/w/${ws}/mailings/${a.mailing_id}`}>open it</a>)
+          </>
+        ) : null}
+        .
+      </span>
+      {a.sample ? <span className="mt-1 block font-mono text-[12px] text-muted">{a.sample}</span> : null}
+    </Notice>
   );
 }
 
@@ -476,6 +510,7 @@ function ProviderCard({ ws, item, canAdmin }: { ws: string; item: Item; canAdmin
         {verify.error ? <FormError error={verify.error} /> : verified ? <VerifyResult result={verified} /> : null}
       </div>
       <div className="mt-3 flex flex-col gap-3">
+        <BreakerAnomaly ws={ws} provider={p} />
         <Rejections provider={p} />
         <BounceHandling ws={ws} provider={p} canAdmin={canAdmin} />
       </div>
