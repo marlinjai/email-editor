@@ -41,7 +41,7 @@ describe('translations', () => {
   it('uses no en dash or em dash anywhere', () => {
     for (const locale of PAGE_LOCALES) {
       for (const [key, value] of Object.entries(LANDING_MESSAGES[locale])) {
-        expect(/[–—]/.test(value), `${locale}.${key}`).toBe(false);
+        expect(/[\u2013\u2014]/.test(value), `${locale}.${key}`).toBe(false);
       }
     }
   });
@@ -55,7 +55,7 @@ describe('translations', () => {
 
   it.each(PAGE_LOCALES)('%s renders with no unfilled placeholder and no stray key name', (locale) => {
     const html = page(locale);
-    const text = dom(html).body.textContent ?? '';
+    const text = dom(html).querySelector('body')?.textContent ?? '';
     expect(text).not.toMatch(/\{\w+\}/);
     expect(text).not.toMatch(/\b(f_\w+|limit_\w+|hero_\w+|cta_\w+)\b/);
   });

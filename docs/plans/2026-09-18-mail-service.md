@@ -729,6 +729,37 @@ Defaults taken in S5 (each can be overturned later):
   was switched to `asset_policy: service_only` after the deploy; its only
   template (the base template) compiles without errors under it.
 
+### The landing page at mail.lumitra.co (built 2026-09-19, branch `feat/mail-landing`)
+
+Approved by Marlin on 2026-09-18: the root of the service answered 404, while
+every unsubscribe link and image URL points at this host.
+
+- `GET /` and `/en`, `/de`, `/it`, `/fr`, `/es`: a server-rendered page, no script,
+  one stylesheet allowed by hash in its own CSP (Content-Security-Policy). What
+  Lumitra Mail is, the two ways in (API and SDK for apps, the dashboard without
+  one), the features, the privacy stance (processor, EU hosting at Hetzner,
+  tracking off by default), pricing, a note for recipients, and the cross-link
+  to email-mcp. Copy in Marlin's public voice, four translations in the formal
+  register of the hosted pages. `robots.txt`, `sitemap.xml`, icon and Open Graph
+  image on the same router. Details: the service README, "The landing page".
+- Pricing reads `LISTED_PLANS` and `checkoutPriceId` from `src/billing/plans.ts`;
+  checkout now uses the same function, so a plan is "coming soon" on the page
+  exactly when checkout would answer 503.
+- Legal links point at `lumitra.co/impressum` and `lumitra.co/datenschutz`, which
+  cover the product subdomains. The Datenschutz page defers product-specific
+  processing to a privacy notice on the product's own domain, and Mail has none
+  yet: a ROADMAP.md line.
+- `email-editor.lumitra.co` becomes a 308 redirect to `https://mail.lumitra.co/`
+  through a ten-line Worker (`examples/nextjs/redirect/`) under the demo's
+  script name. Chosen over a Cloudflare redirect rule in Terraform because none
+  of the Cloudflare tokens in Infisical can manage rulesets (verified
+  2026-09-19: all three answer "Authentication error" on the zone's
+  `http_request_dynamic_redirect` phase), minting one is Marlin's step, and the
+  demo was a manual wrangler deploy anyway. The deploy waits until this page is
+  live, so old links never land on a 404 (ROADMAP.md).
+- Screenshots: `docs/plans/assets/2026-09-19-landing-desktop.png` and
+  `-mobile.png`.
+
 ## Legal shape
 
 The service is a data processor for each workspace's controller. It ships with a
