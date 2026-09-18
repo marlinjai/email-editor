@@ -9,7 +9,8 @@
 # Optional:
 #   INFISICAL_ENV   defaults to "prod"
 #
-# Everything else (DATABASE_URL, DASHBOARD_SERVICE_TOKEN, MAIL_SECRETS_KEY) is
+# Everything else (DATABASE_URL, DASHBOARD_SERVICE_TOKEN, MAIL_SECRETS_KEY,
+# MAIL_UNSUBSCRIBE_KEY) is
 # injected by `infisical run` at process start and never written to disk. The
 # service itself validates those and refuses to start without them.
 set -eu

@@ -21,6 +21,12 @@ const EnvSchema = z.object({
    * rotation adds MAIL_SECRETS_KEY_V2 and re-seals, without a flag day.
    */
   MAIL_SECRETS_KEY: hex64,
+  /**
+   * Version 1 of the HMAC-SHA256 key that signs hosted unsubscribe links
+   * (src/unsubscribe.ts). Versioned the same way: a rotation adds
+   * MAIL_UNSUBSCRIBE_KEY_V2, and links signed under v1 keep working while v1 is held.
+   */
+  MAIL_UNSUBSCRIBE_KEY: hex64,
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
 });
 
@@ -29,6 +35,7 @@ export type Config = {
   port: number;
   dashboardServiceToken: string;
   secretsKeys: ReadonlyMap<number, Buffer>;
+  unsubscribeKeys: ReadonlyMap<number, Buffer>;
   databasePoolMax: number;
 };
 
@@ -56,6 +63,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: e.PORT,
     dashboardServiceToken: e.DASHBOARD_SERVICE_TOKEN.toLowerCase(),
     secretsKeys: new Map([[1, Buffer.from(e.MAIL_SECRETS_KEY, 'hex')]]),
+    unsubscribeKeys: new Map([[1, Buffer.from(e.MAIL_UNSUBSCRIBE_KEY, 'hex')]]),
     databasePoolMax: e.DATABASE_POOL_MAX,
   };
 }
