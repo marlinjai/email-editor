@@ -5,3 +5,4 @@ export * from './gradient';
 export * from './types';
 export * from './validation';
 
+export * from './migrate';

@@ -1,10 +1,33 @@
 {
   "name": "@marlinjai/email-editor-blocks",
-  "publishConfig": {
-    "access": "public"
+  "version": "0.1.0",
+  "description": "The 14 standard block types of the email editor",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marlinjai/email-editor.git",
+    "directory": "packages/blocks"
   },
-  "version": "0.0.1",
-  "description": "Standard block library for email editor",
+  "homepage": "https://github.com/marlinjai/email-editor/tree/main/packages/blocks#readme",
+  "bugs": {
+    "url": "https://github.com/marlinjai/email-editor/issues"
+  },
+  "keywords": [
+    "email",
+    "mjml",
+    "email-editor",
+    "blocks"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -24,27 +47,17 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@marlinjai/email-editor-core": "workspace:*",
-    "@tiptap/core": "^2.1.13",
-    "@tiptap/extension-bold": "^2.1.13",
-    "@tiptap/extension-italic": "^2.1.13",
-    "@tiptap/extension-underline": "^2.1.13",
-    "@tiptap/extension-link": "^2.1.13",
-    "@tiptap/extension-heading": "^2.1.13",
-    "@tiptap/extension-paragraph": "^2.1.13",
-    "@tiptap/extension-text": "^2.1.13",
-    "@tiptap/react": "^2.1.13",
-    "nanoid": "^5.0.4",
+    "@marlinjai/email-editor-core": "workspace:^",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/react": "^18.2.45",
+    "mobx": "^6.12.0",
+    "mobx-state-tree": "^6.0.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.0",
     "vitest": "^1.0.4"
   },
-  "peerDependencies": {
-    "react": "^18.2.0 || ^19.0.0"
+  "engines": {
+    "node": ">=20.19.0"
   }
 }
-

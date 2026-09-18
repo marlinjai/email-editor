@@ -1,10 +1,33 @@
 {
   "name": "@marlinjai/email-editor-core",
-  "publishConfig": {
-    "access": "public"
+  "version": "0.1.0",
+  "description": "Framework-agnostic engine of the email editor: document schema, block registry, MobX State Tree store, and the server-only MJML compiler",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marlinjai/email-editor.git",
+    "directory": "packages/core"
   },
-  "version": "0.0.1",
-  "description": "Framework-agnostic core engine for email editor",
+  "homepage": "https://github.com/marlinjai/email-editor/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/marlinjai/email-editor/issues"
+  },
+  "keywords": [
+    "email",
+    "mjml",
+    "email-editor",
+    "newsletter"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -36,12 +59,13 @@
     "nanoid": "^5.0.4",
     "zod": "^3.22.4"
   },
-  "peerDependencies": {},
   "devDependencies": {
     "@types/mjml": "^4.7.4",
-    "@types/react": "^18.2.45",
     "tsup": "^8.0.1",
     "typescript": "^5.3.0",
     "vitest": "^1.0.4"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   }
 }
