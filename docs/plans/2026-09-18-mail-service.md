@@ -321,8 +321,8 @@ Built and verified:
   secrets through Terraform; the Coolify application `c60ld4gx620wemkvvj9l9p51`
   pulling `ghcr.io/marlinjai/email-editor-service`. `MAIL_SECRETS_KEY` and
   `DASHBOARD_SERVICE_TOKEN` minted per environment with `copy_secret op=generate`.
-- **auth-brain** (marlinjai/auth-brain#141): the `mail` app-grant, hidden until the
-  dashboard ships.
+- **auth-brain** (marlinjai/auth-brain#141, merged and deployed): the `mail`
+  app-grant, hidden until the dashboard ships, granted to Lumitra and ŌPUNTIA.
 
 Defaults taken in S0 (each can be overturned later):
 
@@ -341,8 +341,9 @@ Defaults taken in S0 (each can be overturned later):
    signed in, grants or removes the owner role, and anyone may leave.
 4. **Idempotency** is opt-in per request, stores every response below 500 sealed, keeps
    keys 24 hours, and clears a claim left `in_progress` for more than 5 minutes.
-5. **The auth-brain app slug is `mail`**, hidden until S3; the grant for the Lumitra
-   company (and ŌPUNTIA's) is written after that PR deploys.
+5. **The auth-brain app slug is `mail`**, hidden until S3. Granted on 2026-09-18
+   through the machine API to the Lumitra (`lumitra-core`) and ŌPUNTIA (`opuntia`)
+   companies, and read back.
 6. **Image** `ghcr.io/marlinjai/email-editor-service`, deployed by
    `.github/workflows/deploy-service.yml` on pushes to `main` that touch the service.
    `/healthz` reports the served commit, and the deploy waits until every reply
