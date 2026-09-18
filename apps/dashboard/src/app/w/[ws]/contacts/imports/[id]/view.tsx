@@ -90,7 +90,7 @@ function Rows({ ws, job, initial }: { ws: string; job: ImportJob; initial: Page<
   const [cursor, setCursor] = useState<string | null>(initial?.next_cursor ?? null);
   const load = useAction();
   const filterId = useId();
-  const fetch = (o: ImportRowOutcome | '', from: string | null) =>
+  const loadRows = (o: ImportRowOutcome | '', from: string | null) =>
     void load.run(
       () => importRows(ws, job.id, o || null, from),
       (page) => {
@@ -116,7 +116,7 @@ function Rows({ ws, job, initial }: { ws: string; job: ImportJob; initial: Page<
           onChange={(e) => {
             const o = e.target.value as ImportRowOutcome | '';
             setOutcome(o);
-            fetch(o, null);
+            loadRows(o, null);
           }}
           className="h-8 w-56"
         >
@@ -157,7 +157,7 @@ function Rows({ ws, job, initial }: { ws: string; job: ImportJob; initial: Page<
       )}
       {cursor ? (
         <div>
-          <Button onClick={() => fetch(outcome, cursor)} busy={load.pending}>
+          <Button onClick={() => loadRows(outcome, cursor)} busy={load.pending}>
             More rows
           </Button>
         </div>

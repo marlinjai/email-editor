@@ -13,7 +13,8 @@ import { SMTPServer } from 'smtp-server';
  * service as a subprocess of its built `dist/main.js` (API and send worker), a
  * Storage Brain stand-in for image uploads, and an SMTP sink with TLS that the
  * worker delivers to. A control server lets a test read the sink, slow it
- * down, make it refuse addresses, and restart the service mid-send.
+ * down, make it refuse addresses, restart the service mid-send, and set a
+ * workspace's plan (an operator's database action, as for a design partner).
  */
 
 export const PORTS = { service: 3910, dashboard: 3920, control: 3930 } as const;
@@ -205,6 +206,7 @@ export async function startStack() {
       s.kill(signal);
     });
   await startService();
+  const db = postgres(pg.url, { max: 1, onnotice: () => {} });
 
   const control = createServer(async (req, res) => {
     const url = new URL(req.url!, 'http://x');
@@ -225,6 +227,13 @@ export async function startStack() {
       smtp.state.reject = new Set(((body.reject as string[]) ?? []).map((a) => a.toLowerCase()));
       return reply({ ok: true });
     }
+    if (url.pathname === '/billing/plan') {
+      await db`
+        INSERT INTO workspace_billing (workspace_id, plan, billing_exempt)
+        VALUES (${body.workspaceId as string}, ${body.plan as string}, ${body.plan === 'design_partner'})
+        ON CONFLICT (workspace_id) DO UPDATE SET plan = EXCLUDED.plan, billing_exempt = EXCLUDED.billing_exempt`;
+      return reply({ ok: true });
+    }
     if (url.pathname === '/service/restart') {
       await stopService((body.signal as NodeJS.Signals) ?? 'SIGKILL');
       await startService();
@@ -239,6 +248,7 @@ export async function startStack() {
     smtpPort: smtp.port,
     stop: async () => {
       await new Promise<void>((r) => control.close(() => r()));
+      await db.end();
       await stopService('SIGTERM');
       await Promise.all([smtp.stop(), storage.stop()]);
       await pg.stop();

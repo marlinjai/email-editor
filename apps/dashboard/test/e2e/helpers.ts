@@ -31,6 +31,12 @@ export async function restartService(signal: 'SIGKILL' | 'SIGTERM' = 'SIGKILL') 
   expect(res.ok).toBe(true);
 }
 
+/** Puts a workspace on a plan directly in the database, as an operator does for a design partner. */
+export async function setPlan(workspaceId: string, plan: 'free' | 'design_partner') {
+  const res = await fetch(`${CONTROL_URL}/billing/plan`, { method: 'POST', body: JSON.stringify({ workspaceId, plan }) });
+  expect(res.ok).toBe(true);
+}
+
 export const SMTP_LOGIN = { user: SMTP_USER, password: SMTP_PASSWORD };
 
 const PLACEHOLDER_PNG =
