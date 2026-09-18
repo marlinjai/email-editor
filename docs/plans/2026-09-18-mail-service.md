@@ -322,3 +322,7 @@ later decision can overturn:
    route's access level; a mailing carries up to 20 string `metadata` values that
    every message webhook echoes (how ŌPUNTIA learns `sent_by`); webhook signatures
    are `v1=<hex>` over `${timestamp}.${rawBody}` with a 300 second tolerance.
+6. **`@marlinjai/mail-sdk`** (`packages/mail-sdk`, 0.1.0) is the typed client built
+   in this phase: it needs the same npm Trusted Publishing registration as
+   `@marlinjai/mail-contract` before its first publish succeeds. Add it to the same
+   npmjs.com trusted-publisher setup Marlin does for the other packages under item 4.
