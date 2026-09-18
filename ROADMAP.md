@@ -22,6 +22,11 @@
       (refused with `conflict` while a mailing uses the topic, which the schema
       already enforces) once a client needs to remove a topic; S2 ships without
       it [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Mail service: dashboard screens for the S4 platform features (tags and
+      properties, segments with the count preview, the CSV import's mapping,
+      dry run and report, signup forms and their embed, scheduling, A/B tests,
+      tracking settings and campaign analytics), over the API S4 ships; built
+      once the S3 dashboard has landed [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 - [ ] Decide whether hosts may add new block types (not only redefine the 14
       standard ones): it needs an open block type in the store and schema, a
       renderer hook for the canvas and a compile hook the server can trust.
