@@ -25,7 +25,9 @@
 - [ ] Mail dashboard: once #21 is merged and `https://app.mail.lumitra.co/api/health`
       serves its commit, merge auth-brain#142 (shows the `mail` card and subscribes
       the service to `tenant.erased`); registering the erasure before
-      `/internal/erasure` is deployed would hold every company erasure waiting. Marlin's
+      `/internal/erasure` is deployed would hold every company erasure waiting. The
+      first deploy creates the GHCR package `email-editor-dashboard` private; make it
+      public in its settings (the API cannot), as the service's is. Marlin's
       own sign-in needs a second factor enrolled at auth.lumitra.co (the dashboard
       requires it) [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 - [ ] Mail service: decide what `user.erased` means for workspace members (remove the
