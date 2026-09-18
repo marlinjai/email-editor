@@ -100,6 +100,22 @@ export function makeWorker(h: Harness, transport: MemoryTransport = h.transport,
   });
 }
 
+/**
+ * Drains until no recipient of the mailing is still queued. A retry scheduled
+ * "now" (the 0 ms delays above) is stamped on this process's clock and compared
+ * on the database's, which can lag by a few milliseconds, so one drain may find
+ * it not yet due and return.
+ */
+export async function drainUntilSettled(h: Harness, worker: SendWorker, workspaceId: string, mailingId: string, maxRounds = 100) {
+  for (let round = 0; round < maxRounds; round++) {
+    await worker.drain();
+    const rows = await recipientsOf(h, workspaceId, mailingId);
+    if (!rows.some((r) => r.status === 'queued' || r.status === 'sending')) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`mailing ${mailingId} still has queued recipients after ${maxRounds} drains`);
+}
+
 export async function recipientsOf(h: Harness, workspaceId: string, mailingId: string) {
   return repos(h.sql).recipients.list(workspaceId, mailingId, { limit: 1000 });
 }

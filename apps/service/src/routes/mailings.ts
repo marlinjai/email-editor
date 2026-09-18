@@ -10,6 +10,7 @@ import {
   type MailingTestResult,
   type RecipientBatchResult,
   type TemplateDocument,
+  USAGE_WARNING_HEADER,
 } from '@marlinjai/mail-contract';
 import { Hono, type Context } from 'hono';
 import { ApiError } from '../api-error.js';
@@ -22,6 +23,7 @@ import { repos, type Repos } from '../repo/index.js';
 import type { MailingRow } from '../repo/mailings.js';
 import type { RecipientRow } from '../repo/recipients.js';
 import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
+import { assertCanSend, assertCanTest, assertWithinLimit, computeUsage, usageWarningHeader } from '../billing/usage.js';
 
 /** The compiled form of a document; `errors` non-empty means it must not be sent. */
 export type CompiledDocument = { mjml: string; html: string; warnings: CompileMessage[]; errors: CompileMessage[] };
@@ -126,6 +128,12 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     toMailing(row, await repos(db).mailings.counts(workspaceId, row.id));
 
   const mailingId = (c: Context<AppEnv>, op: 'mailings.get') => rowId(params(c, op).id, 'mailing');
+
+  /** S5: the soft warning once a limit is at 80 percent (`x-mail-usage-warning`). */
+  const warnOnUsage = async (c: Context<AppEnv>, workspaceId: string) => {
+    const header = usageWarningHeader(await computeUsage(sql, workspaceId));
+    if (header) c.header(USAGE_WARNING_HEADER, header);
+  };
 
   /** Runs `fn` with the mailing locked, in one transaction; answers the mailing afterwards. */
   async function withLocked(
@@ -250,7 +258,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
       const seen = new Set<string>();
       const items: Array<{ email: string; contactId: string; merge: Record<string, unknown> }> = [];
       for (const [index, item] of input.recipients.entries()) {
-        const contact = await findOrCreateContact(r, access.workspaceId, mailing.topic_id, item);
+        const contact = await findOrCreateContact(tx, r, access.workspaceId, mailing.topic_id, item);
         if (!contact) {
           rejected.push({ index, reason: 'unknown_contact' });
           continue;
@@ -301,7 +309,10 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
       html = compiled.html;
     }
     const merge = { ...(input.merge ?? {}) };
+    // S5: a test is one more recipient on the plan's period.
+    await sql.begin((tx) => assertCanTest(tx, workspaceId));
     const result = await deps.sendTest({ workspaceId, mailing, html, to: input.to.toLowerCase(), merge });
+    await warnOnUsage(c, workspaceId);
     return c.json(result);
   });
 
@@ -326,7 +337,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
         { missing },
       );
     }
-    const mailing = await withLocked(access, id, async (r, _tx, row) => {
+    const mailing = await withLocked(access, id, async (r, tx, row) => {
       if (!canTransition(row.status, 'send')) invalidState(row, 'send');
       if (row.updated_at !== current.updated_at) {
         throw new ApiError('conflict', 'The mailing changed while it was being prepared. Send it again.');
@@ -338,6 +349,10 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
       }
       const counts = await r.mailings.counts(access.workspaceId, id);
       if (counts.total === 0) throw new ApiError('mailing_not_ready', 'The mailing has no recipients yet.');
+      // S5: the whole audience must fit the plan's period, or the mailing does
+      // not start. Once started it always finishes (resume and retry-failed are
+      // not checked), so a limit never cuts an audience in half.
+      await assertCanSend(tx, access.workspaceId, counts.queued);
       await r.mailings.setCompiled(access.workspaceId, id, { mjml: compiled.mjml, html: compiled.html });
       const moved = await r.mailings.transition(access.workspaceId, id, ['draft', 'scheduled'], 'sending', {
         startedAt: true,
@@ -351,6 +366,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
       });
       return moved!;
     });
+    await warnOnUsage(c, access.workspaceId);
     return c.json(mailing, 202);
   });
 
@@ -494,6 +510,7 @@ async function audit(
  * a person who left the topic stays out (the worker checks at claim time).
  */
 async function findOrCreateContact(
+  tx: Db,
   r: Repos,
   workspaceId: string,
   topicId: string,
@@ -512,6 +529,8 @@ async function findOrCreateContact(
   if (existing) return existing;
   const inserted = await r.contacts.insert(workspaceId, { email, externalId: item.external_id ?? null });
   if (!inserted) return r.contacts.byEmail(workspaceId, email);
+  // S5: a new contact counts against the plan; the whole batch rolls back when it does not fit.
+  await assertWithinLimit(tx, workspaceId, 'contacts');
   await r.contacts.subscribe(workspaceId, inserted.id, topicId);
   return inserted;
 }
