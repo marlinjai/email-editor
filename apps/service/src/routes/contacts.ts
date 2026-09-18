@@ -4,6 +4,7 @@ import { ApiError } from '../api-error.js';
 import { actorOf, type AppEnv } from '../context.js';
 import type { Db, Sql } from '../db.js';
 import { mount, type MountDeps } from '../mount.js';
+import { checkProperties } from '../platform/properties.js';
 import { repos } from '../repo/index.js';
 import type { ContactWithTopics } from '../repo/contacts.js';
 import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
@@ -50,6 +51,12 @@ type UpsertOutcome = { contact: ContactWithTopics; created: boolean };
  */
 async function upsertOnce(tx: Db, workspaceId: string, input: ContactUpsert): Promise<UpsertOutcome | null> {
   const r = repos(tx);
+  if (input.properties !== undefined) {
+    // Defined keys must have their type (S4); undefined keys stay free-form.
+    await r.contactProperties.lockDefinitions(workspaceId, 'shared');
+    const issues = checkProperties(await r.contactProperties.types(workspaceId), input.properties);
+    if (issues.length > 0) throw new ApiError('validation_failed', 'The request body is not valid.', { issues });
+  }
   const email = input.email === undefined ? undefined : normaliseEmail(input.email);
   const byExternal = input.external_id !== undefined ? await r.contacts.byExternalId(workspaceId, input.external_id) : null;
   const byEmail = email !== undefined ? await r.contacts.byEmail(workspaceId, email) : null;
