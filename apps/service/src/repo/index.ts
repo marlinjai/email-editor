@@ -2,6 +2,7 @@ import type { Db } from '../db.js';
 import { apiKeysRepo } from './api-keys.js';
 import { assetsRepo } from './assets.js';
 import { auditRepo } from './audit.js';
+import { billingRepo, stripeEventsRepo } from './billing.js';
 import { contactsRepo } from './contacts.js';
 import { idempotencyRepo } from './idempotency.js';
 import { mailingsRepo } from './mailings.js';
@@ -29,7 +30,9 @@ import { workspacesRepo } from './workspaces.js';
  * `/a/:id`, which returns the bytes' location and never the owning
  * workspace), and the worker's scans across workspaces, all suffixed
  * `ForWorker` (`mailings.listSendingForWorker`, `recipients.listStuckForWorker`,
- * `webhookDeliveries.claimDueForWorker`).
+ * `webhookDeliveries.claimDueForWorker`, `billing.listStaleForWorker`), and the
+ * Stripe webhook's `billing.workspaceForStripeForWebhook`, which turns a Stripe
+ * customer or subscription id into the workspace id.
  *
  * Built over a `Db`, which is either the pool or a transaction, so a route can
  * write a change and its audit row atomically: `sql.begin((tx) => repos(tx)...)`.
@@ -54,6 +57,8 @@ export function repos(db: Db) {
     webhookEndpoints: webhookEndpointsRepo(db),
     webhookEvents: webhookEventsRepo(db),
     webhookDeliveries: webhookDeliveriesRepo(db),
+    billing: billingRepo(db),
+    stripeEvents: stripeEventsRepo(db),
   };
 }
 export type Repos = ReturnType<typeof repos>;

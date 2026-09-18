@@ -8,6 +8,9 @@ import { migrate, MigrationError } from './migrate.js';
 import { repos } from './repo/index.js';
 import { createSealer } from './sealing.js';
 import { createUnsubscribeSigner } from './unsubscribe.js';
+import { ExemptionError, setExemption } from './billing/exempt.js';
+import { createStripeApi } from './billing/stripe.js';
+import { startReconcileLoop } from './billing/sync.js';
 import { startWebhookDeliveryLoop } from './webhooks/loop.js';
 import { SendWorker } from './worker/loop.js';
 import { createTransportCache } from './worker/transports.js';
@@ -17,6 +20,9 @@ import { createTransportCache } from './worker/transports.js';
  *
  *   main.js migrate   apply pending migrations, then exit
  *   main.js serve     start the HTTP API (does NOT migrate)
+ *   main.js billing-exempt <workspace id or slug> on|off "<reason>"
+ *                     put a workspace outside billing (a design partner) or
+ *                     back in; the only way to set billing_exempt
  *
  * The container entrypoint runs `migrate` and only on success `serve`.
  */
@@ -39,10 +45,27 @@ async function runMigrate(): Promise<void> {
   }
 }
 
+async function runBillingExempt(argv: string[]): Promise<void> {
+  const [workspace, mode, ...reason] = argv;
+  if (!workspace || (mode !== 'on' && mode !== 'off')) {
+    throw new ConfigError(['usage: main.js billing-exempt <workspace id or slug> on|off "<reason>"']);
+  }
+  const { databaseUrl } = loadMigrateConfig();
+  const sql = createSql(databaseUrl, { max: 1 });
+  try {
+    const row = await setExemption(sql, workspace, mode === 'on', reason.join(' '));
+    console.log(`[billing] workspace ${row.workspace_id}: billing_exempt=${row.billing_exempt}, plan=${row.plan}`);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
 async function runServe(): Promise<void> {
   const config = loadConfig();
   const sql = createSql(config.databaseUrl, { max: config.databasePoolMax });
   const unsubscribeSigner = createUnsubscribeSigner(config.unsubscribeKeys);
+  const stripe = config.billing.secretKey ? createStripeApi(config.billing.secretKey) : null;
+  if (!stripe) console.log('[billing] no STRIPE_SECRET_KEY: plans and limits apply, checkout and the Stripe webhook answer 503');
   // One transport per provider, shared by the worker and the test sends.
   const transports = createTransportCache(createSealer(config.secretsKeys));
   const webhookUrlPolicy = {
@@ -66,6 +89,8 @@ async function runServe(): Promise<void> {
     publicBaseUrl: config.publicBaseUrl,
     unsubscribeSigner,
     transportFor: transports.get,
+    billing: config.billing,
+    stripe,
   });
   // The send worker: one loop per process. It reconciles what a previous
   // process left mid-send before it claims anything new.
@@ -75,6 +100,9 @@ async function runServe(): Promise<void> {
     signer: unsubscribeSigner,
     publicBaseUrl: config.publicBaseUrl,
   });
+
+  // Re-reads stale subscriptions from Stripe, so a lost webhook still converges.
+  const reconcileLoop = stripe ? startReconcileLoop(sql, stripe, config.billing) : null;
 
   const webhookLoop = startWebhookDeliveryLoop(sql, createSealer(config.secretsKeys), { policy: webhookUrlPolicy });
 
@@ -106,7 +134,7 @@ async function runServe(): Promise<void> {
       .then(() => transports.closeAll())
       .catch((err) => console.error('[worker] stopping failed:', err));
     server.close(() => {
-      Promise.allSettled([workerStopped, webhookLoop.stop(), compiler.close()])
+      Promise.allSettled([workerStopped, webhookLoop.stop(), compiler.close(), reconcileLoop?.stop()])
         .then(() => sql.end({ timeout: 5 }))
         .catch((err) => console.error('[serve] shutdown failed:', err))
         .finally(() => process.exit(0));
@@ -125,13 +153,15 @@ async function main(argv: string[]): Promise<void> {
       return runMigrate();
     case 'serve':
       return runServe();
+    case 'billing-exempt':
+      return runBillingExempt(argv.slice(3));
     default:
-      throw new ConfigError([`unknown command "${command ?? ''}": use "migrate" or "serve"`]);
+      throw new ConfigError([`unknown command "${command ?? ''}": use "migrate", "serve" or "billing-exempt"`]);
   }
 }
 
 main(process.argv).catch((err) => {
-  if (err instanceof ConfigError || err instanceof MigrationError) {
+  if (err instanceof ConfigError || err instanceof MigrationError || err instanceof ExemptionError) {
     console.error(`FATAL: ${err.message}`);
   } else {
     console.error('FATAL:', err);
