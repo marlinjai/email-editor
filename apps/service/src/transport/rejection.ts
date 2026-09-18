@@ -8,11 +8,12 @@
  *   address: authentication, relaying, content or reputation policy, rate
  *   limits (5.7.x), or a bad sender address (5.1.7, 5.1.8). The recipient is not
  *   suppressed; the rejection is counted on the provider for the dashboard.
- * - `other`: anything else (mailbox full, message too large, a routing or
+ * - `unknown`: anything else (mailbox full, message too large, a routing or
  *   protocol error, a reply that names no cause). The message is marked failed
- *   and nothing else changes.
+ *   and nothing else changes. When in doubt, this: a false hard bounce blocks a
+ *   real person for good, a missed one only costs a later retry.
  */
-export type RejectionClass = 'recipient' | 'sender' | 'other';
+export type RejectionClass = 'recipient' | 'sender' | 'unknown';
 
 export type ParsedReply = {
   /** The basic reply code (RFC 5321), e.g. 550. */
@@ -53,6 +54,14 @@ const RECIPIENT_TEXT = new RegExp(
   'i',
 );
 
+/**
+ * Wording inside a 5.1.x reply that points at the sender's address or the
+ * setup, not the recipient's mailbox: such a reply is the sender's problem even
+ * though its status code is an address code.
+ */
+const SETUP_TEXT =
+  /sender|from address|from: address|mail from|not one of your addresses|relay|authenticat|not authori[sz]ed|not permitted to send|spf|dkim|dmarc/i;
+
 /** Wording that points at the sender, the content or a policy instead. */
 const SENDER_TEXT =
   /spam|block(ed|list)|blacklist|denylist|policy|reputation|relay(ing)? (denied|not permitted|access denied)|authenticat|spf|dkim|dmarc|rate limit|too many|access denied|not authori[sz]ed|sender/i;
@@ -62,8 +71,9 @@ const SENDER_TEXT =
  * test/unit/rejection.test.ts is its specification.
  *
  * The enhanced status code decides when there is one: 5.1.x is an address
- * problem (except 5.1.7 and 5.1.8, which are about the sender's address), 5.2.1
- * is a disabled mailbox, 5.7.x is policy. Without one, a classic 550, 551 or 553
+ * problem, except 5.1.7 and 5.1.8 (the sender's address) and any 5.1.x whose
+ * text names the sender or the setup; 5.1.0 and 5.1.2 count only when the text
+ * names the recipient's mailbox. 5.2.1 is a disabled mailbox, 5.7.x is policy. Without one, a classic 550, 551 or 553
  * reply counts as a hard bounce only when its text clearly names the recipient,
  * and as the sender's problem when its text names a policy.
  */
@@ -72,18 +82,25 @@ export function classifyRejection(code: number | null, text: string): RejectionC
   if (reply.code === 530 || reply.code === 535 || reply.code === 534) return 'sender';
   const e = reply.enhanced;
   if (e && e.cls === 5) {
-    if (e.subject === 1) return e.detail === 7 || e.detail === 8 ? 'sender' : 'recipient';
-    if (e.subject === 2) return e.detail === 1 ? 'recipient' : 'other';
+    if (e.subject === 1) {
+      if (e.detail === 7 || e.detail === 8 || SETUP_TEXT.test(text)) return 'sender';
+      // 5.1.0 (other address status) and 5.1.2 (bad destination system) do not
+      // say the mailbox is gone: only the text can.
+      if (e.detail === 0 || e.detail === 2) return RECIPIENT_TEXT.test(text) ? 'recipient' : 'unknown';
+      return 'recipient';
+    }
+    if (e.subject === 2 && e.detail === 1) return SETUP_TEXT.test(text) ? 'sender' : 'recipient';
+    if (e.subject === 2) return 'unknown';
     if (e.subject === 7) return 'sender';
-    return 'other';
+    return 'unknown';
   }
-  if (e && e.cls !== 5) return 'other';
+  if (e && e.cls !== 5) return 'unknown';
   if (reply.code === 550 || reply.code === 551 || reply.code === 553 || reply.code === 554) {
     // A policy word wins over a recipient word ("recipient rejected: spam").
     if (SENDER_TEXT.test(text)) return 'sender';
     if (reply.code !== 554 && RECIPIENT_TEXT.test(text)) return 'recipient';
   }
-  return 'other';
+  return 'unknown';
 }
 
 /**
@@ -110,4 +127,21 @@ export function rejectionAction(
   if (kind === 'resend') return error.code === 401 || error.code === 403 ? 'count' : 'none';
   const cls = classifyRejection(error.code, error.message);
   return cls === 'recipient' ? 'suppress' : cls === 'sender' ? 'count' : 'none';
+}
+
+/**
+ * A rejection's reply text reduced to what repeats across recipients: lower
+ * case, addresses and angle-bracketed tokens and long numbers removed,
+ * whitespace collapsed. Five recipients refused with the same signature in a row
+ * look like one cause, not five dead mailboxes.
+ */
+export function rejectionSignature(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[^\s<>()\[\];,"']+@[^\s<>()\[\];,"']+/g, ' ')
+    .replace(/\b[0-9a-f]{8,}\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 1000);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyRejection, parseSmtpReply, rejectionAction, type RejectionClass } from '../../src/transport/rejection.js';
+import { classifyRejection, parseSmtpReply, rejectionAction, rejectionSignature, type RejectionClass } from '../../src/transport/rejection.js';
 
 /** [reply code as nodemailer reports it (null when only the text has it), reply text, expected class] */
 const TABLE: Array<[number | null, string, RejectionClass]> = [
@@ -7,12 +7,14 @@ const TABLE: Array<[number | null, string, RejectionClass]> = [
   [550, '550 5.1.1 <nobody@example.com>: Recipient address rejected: User unknown in virtual mailbox table', 'recipient'],
   [550, "550-5.1.1 The email account that you tried to reach does not exist. Please try\n550-5.1.1 double-checking the recipient's email address", 'recipient'],
   [550, '550 5.1.10 RESOLVER.ADR.RecipientNotFound; Recipient not found by SMTP address lookup', 'recipient'],
-  [550, '550 5.1.2 Host unknown (Name server: example.invalid: host not found)', 'recipient'],
+  [550, '550 5.1.2 Host unknown (Name server: example.invalid: host not found)', 'unknown'],
+  [550, '550 5.1.2 The recipient mailbox does not exist on this domain', 'recipient'],
   [553, '553 5.1.3 Invalid address syntax', 'recipient'],
   [551, '551 5.1.6 User has moved; please try <new@example.com>', 'recipient'],
   [550, '550 5.2.1 The email account that you tried to reach is disabled.', 'recipient'],
   [null, 'every recipient was rejected: 550 5.1.1 <gone@example.com>: user unknown', 'recipient'],
-  [550, '550 #5.1.0 Address rejected.', 'recipient'],
+  [550, '550 #5.1.0 Address rejected.', 'unknown'],
+  [550, '550 5.1.0 <gone@example.com>: Recipient address rejected: User unknown', 'recipient'],
   // Classic replies without an enhanced code: only when the text names the recipient.
   [550, '550 No such user here', 'recipient'],
   [553, '553 sorry, that domain isn\'t in my list of allowed rcpthosts; no such mailbox', 'recipient'],
@@ -31,23 +33,30 @@ const TABLE: Array<[number | null, string, RejectionClass]> = [
   [554, '554 5.7.9 Message not accepted for policy reasons', 'sender'],
   [550, '550 5.1.7 Invalid sender address', 'sender'],
   [553, '553 5.1.8 Domain of sender address does not exist', 'sender'],
+  // A 5.1.x whose text names the sender or the setup is the sender's problem.
+  [550, '550 5.1.0 <me@example.com>: Sender address rejected: not owned by user me@example.com', 'sender'],
+  [553, '553 5.1.0 Sender rejected: from address not verified', 'sender'],
+  [550, '550 5.1.1 The from address is not one of your addresses', 'sender'],
+  [553, '553 5.1.1 <x@example.com>: Relay access denied', 'sender'],
+  [550, '550 5.1.1 Authentication required for this sender', 'sender'],
+  [550, '550 5.2.1 Sender mailbox disabled', 'sender'],
   [550, '550 Message rejected as spam by Content Filtering', 'sender'],
   [550, '550 Recipient rejected: your IP is on a blocklist', 'sender'],
   [554, '554 Sending rate limit exceeded', 'sender'],
 
   // Neither: failed, nothing else changes.
-  [552, '552 5.2.2 The email account that you tried to reach is over quota', 'other'],
-  [552, '552 5.3.4 Message size exceeds fixed maximum message size', 'other'],
-  [554, '554 5.4.4 Unable to route', 'other'],
-  [550, '550 Requested action not taken', 'other'],
+  [552, '552 5.2.2 The email account that you tried to reach is over quota', 'unknown'],
+  [552, '552 5.3.4 Message size exceeds fixed maximum message size', 'unknown'],
+  [554, '554 5.4.4 Unable to route', 'unknown'],
+  [550, '550 Requested action not taken', 'unknown'],
   // RFC 5321's stock text for any 550: it does not name the cause.
-  [550, '550 Requested action not taken: mailbox unavailable', 'other'],
-  [550, '550 Mailbox unavailable', 'other'],
-  [554, '554 Transaction failed', 'other'],
-  [554, '554 No such user here', 'other'],
-  [550, '550 4.2.0 Try again later', 'other'],
-  [null, 'simulated permanent rejection', 'other'],
-  [null, 'no credential is stored for this provider', 'other'],
+  [550, '550 Requested action not taken: mailbox unavailable', 'unknown'],
+  [550, '550 Mailbox unavailable', 'unknown'],
+  [554, '554 Transaction failed', 'unknown'],
+  [554, '554 No such user here', 'unknown'],
+  [550, '550 4.2.0 Try again later', 'unknown'],
+  [null, 'simulated permanent rejection', 'unknown'],
+  [null, 'no credential is stored for this provider', 'unknown'],
 ];
 
 describe('classifyRejection', () => {
@@ -95,5 +104,22 @@ describe('rejectionAction', () => {
   ];
   it.each(cases)('%s %s %j (handed over %s) is %s', (kind, code, message, handedOver, expected) => {
     expect(rejectionAction(kind, { code, message }, handedOver)).toBe(expected);
+  });
+});
+
+describe('rejectionSignature', () => {
+  it('is the same for the same cause at different addresses', () => {
+    const a = rejectionSignature('550 5.1.1 <ada@example.com>: Recipient address rejected: User unknown in virtual mailbox table');
+    const b = rejectionSignature('550 5.1.1 <BOB@example.org>: Recipient address rejected: User unknown in virtual mailbox table');
+    expect(a).toBe(b);
+    expect(a).not.toContain('@');
+  });
+
+  it('strips bare addresses and queue ids, keeps the codes', () => {
+    expect(rejectionSignature('550 5.1.1 cyd@example.com does not exist (queue 4F2A9C01BE)')).toBe('550 5.1.1 does not exist (queue )');
+  });
+
+  it('differs for different causes', () => {
+    expect(rejectionSignature('550 5.1.1 user unknown')).not.toBe(rejectionSignature('550 5.1.1 mailbox disabled'));
   });
 });
