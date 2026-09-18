@@ -48,6 +48,28 @@ describe('isDisallowedAddress', () => {
     ['fc00::1', 6],
     ['fd12:3456::1', 6],
     ['::ffff:127.0.0.1', 6],
+    // The WHATWG URL parser rewrites ::ffff:127.0.0.1 to this hex form.
+    ['::ffff:7f00:1', 6],
+    ['0:0:0:0:0:ffff:7f00:1', 6],
+    ['::ffff:a9fe:a9fe', 6], // 169.254.169.254, the cloud metadata address
+    ['::ffff:a00:1', 6], // 10.0.0.1
+    ['::7f00:1', 6], // IPv4-compatible
+    ['64:ff9b::7f00:1', 6], // NAT64 of 127.0.0.1
+    ['::', 6],
+    ['0:0:0:0:0:0:0:1', 6],
+    ['FE80::1%en0', 6],
+    ['febf::1', 6],
+    ['fec0::1', 6],
+    ['ff02::1', 6],
+    ['not-an-address', 6],
+    ['100.64.0.1', 4], // shared address space: the Tailscale network
+    ['100.124.97.31', 4],
+    ['100.127.255.255', 4],
+    ['192.0.0.8', 4],
+    ['198.18.0.1', 4],
+    ['224.0.0.1', 4],
+    ['255.255.255.255', 4],
+    ['256.1.1.1', 4],
   ] as const)('blocks %s', (address, family) => {
     expect(isDisallowedAddress(address, family)).toBe(true);
   });
@@ -57,6 +79,11 @@ describe('isDisallowedAddress', () => {
     ['1.1.1.1', 4],
     ['172.32.0.1', 4], // just outside the RFC 1918 172.16.0.0/12 range
     ['2001:4860:4860::8888', 6],
+    ['::ffff:808:808', 6], // 8.8.8.8, IPv4-mapped
+    ['64:ff9b::808:808', 6], // 8.8.8.8 through NAT64
+    ['100.63.255.255', 4], // just below the shared address space
+    ['100.128.0.1', 4], // just above it
+    ['2606:4700::6810:84e5', 6],
   ] as const)('allows %s', (address, family) => {
     expect(isDisallowedAddress(address, family)).toBe(false);
   });

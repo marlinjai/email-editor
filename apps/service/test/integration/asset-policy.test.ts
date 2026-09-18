@@ -409,6 +409,12 @@ describe('assets.import: the server-side request forgery guard', () => {
       'http://[fd00::1]/x.png',
       'http://localhost/x.png',
       'http://0.0.0.0/x.png',
+      // IPv4-mapped loopback, which the URL parser rewrites to ::ffff:7f00:1.
+      images.url('/secret.png').replace('127.0.0.1', '[::ffff:127.0.0.1]'),
+      'http://[::ffff:7f00:1]/x.png',
+      'http://[::ffff:a9fe:a9fe]/latest/meta-data/',
+      // The shared address space, where the service's Tailscale peers live.
+      'http://100.100.100.100/x.png',
     ]) {
       const res = await importUrl(url);
       expect(res.status, url).toBe(400);
