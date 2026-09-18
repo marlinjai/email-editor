@@ -41,10 +41,6 @@
       prod; rerun the setup command with `--live` and destinations in prod
       only; redeploy; then one real checkout, a plan switch in the portal and a
       cancellation, refunded [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
-- [ ] Mail service: exempt ŌPUNTIA's workspace from billing once it exists in
-      production: `node dist/main.js billing-exempt <its slug> on "OPUNTIA design
-      partner, decided 2026-09-18"` in the service container
-      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 - [ ] Mail service dashboard: the billing screens (plan, usage with the 80
       percent warning, checkout, the portal) over `billing.*`, after S3 lands
       [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
