@@ -10,6 +10,16 @@ date: 2026-02-10
 
 This example shows how a real host app embeds `@marlinjai/email-editor`: a Next.js 16 app on React 19 with its own Tailwind CSS 4 design, hosting the prebuilt editor and its scoped stylesheet.
 
+## Where it runs
+
+Only locally now. `email-editor.lumitra.co`, where this demo used to be public,
+permanently redirects (308) to `https://mail.lumitra.co/`, the landing page of
+Lumitra Mail, the product the editor became. The redirect is the small Worker in
+`redirect/` (script name `email-editor`, which owns the custom domain);
+`pnpm -F email-editor-nextjs-example deploy` deploys it. The demo's own OpenNext
+config is renamed `email-editor-demo` and carries no route, so building or
+previewing it can never take the domain back.
+
 ## Features
 
 - **Editor page** (`app/editor/page.tsx`): a `'use client'` page that loads `EmailEditorReact` with `next/dynamic` and `ssr: false`, imports `@marlinjai/email-editor/styles.css` once, and gives the editor a sized container. It wires `onChange`, `onSave`, `onExport`, `onNavigateBack`, `onRequestImage` and a `theme` that uses the app's font.
