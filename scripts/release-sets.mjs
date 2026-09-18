@@ -5,6 +5,8 @@
 // Print a set's packages (npm names, publish order) for a shell loop:
 //   node scripts/release-sets.mjs editor
 //   node scripts/release-sets.mjs --all
+// Or one line per package, `<set> <tag prefix> <dir> <npm name> <version>`, for scripts:
+//   node scripts/release-sets.mjs --table
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -44,14 +46,22 @@ export function setForTag(tag) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const manifest = (dir) => JSON.parse(readFileSync(join(root, 'packages', dir, 'package.json'), 'utf8'));
+  if (process.argv[2] === '--table') {
+    for (const [name, set] of Object.entries(RELEASE_SETS)) {
+      for (const dir of set.dirs) {
+        const pkg = manifest(dir);
+        console.log([name, set.tag, dir, pkg.name, pkg.version].join(' '));
+      }
+    }
+    process.exit(0);
+  }
   const wanted = process.argv[2] === '--all' ? Object.keys(RELEASE_SETS) : [process.argv[2]];
   const set = { dirs: wanted.flatMap((name) => RELEASE_SETS[name]?.dirs ?? []) };
   if (wanted.some((name) => !RELEASE_SETS[name])) {
     console.error(`release-sets: unknown set ${JSON.stringify(process.argv[2])}; known: ${Object.keys(RELEASE_SETS).join(', ')}`);
     process.exit(1);
   }
-  const root = fileURLToPath(new URL('..', import.meta.url));
-  for (const dir of set.dirs) {
-    console.log(JSON.parse(readFileSync(join(root, 'packages', dir, 'package.json'), 'utf8')).name);
-  }
+  for (const dir of set.dirs) console.log(manifest(dir).name);
 }

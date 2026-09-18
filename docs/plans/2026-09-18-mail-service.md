@@ -394,15 +394,17 @@ later decision can overturn:
    `@marlinjai/mail-sdk`, tag `mail-v*`). None of them exists on npm yet
    (checked 2026-09-18), and npm only lets a trusted publisher be attached to
    an existing package, so the very first publish is manual and Marlin's:
-   build, run `node scripts/check-packed-manifests.mjs --set editor --out
-   /tmp/editor-tarballs` (and `--set mail --out /tmp/mail-tarballs`), then
-   `npm publish <tarball> --access public` for each tarball in the order
-   `node scripts/release-sets.mjs <set>` prints (publish the checked
-   tarballs, never `npm publish` inside a package directory, which would ship
-   `workspace:` ranges). Then attach the trusted publisher to each package and
-   push the tags `editor-v0.1.0` and `mail-v0.1.0`: the workflow skips versions
-   already on the registry, so it verifies the setup without republishing,
-   and every later tag publishes through OpenID Connect with provenance.
+   after `npm login`, run `scripts/first-publish.sh` from a clean checkout of
+   main (try `scripts/first-publish.sh --dry-run` first). It builds, tests and
+   packs all six, publishes the checked tarballs in dependency order, asks for
+   the one-time password once if npm wants one, skips anything already
+   published (so it is safe to re-run), and ends by printing, per package,
+   the npmjs.com link and the exact trusted-publisher settings to enter
+   (GitHub Actions, `marlinjai` / `email-editor`, workflow `publish.yml`, no
+   environment), followed by the two tag commands (`editor-v0.1.0`,
+   `mail-v0.1.0`). The workflow skips versions already on the registry, so
+   those first tags only prove the registration works, and every later tag
+   publishes through OpenID Connect with provenance.
 5. **Contract details the plan left open** (fixed in `@marlinjai/mail-contract`,
    2026-09-18): a recipient whose outcome is unknown after a crash ends `skipped`
    with `skip_reason` `outcome_unknown` rather than `failed`, so `retry-failed`
