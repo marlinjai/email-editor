@@ -76,6 +76,7 @@ describe('route table', () => {
       'mailings.resume',
       'mailings.cancel',
       'mailings.retryFailed',
+      'mailings.duplicate',
       'mailings.get',
       'suppressions.create',
       'suppressions.delete',

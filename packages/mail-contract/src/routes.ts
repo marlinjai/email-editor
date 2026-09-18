@@ -622,6 +622,17 @@ export const sendingRoutes = {
     access: 'write',
     phase: 'S2',
   },
+  /** Copies any mailing, in any state, into a new `draft` with the same content, topic and provider (no recipients). */
+  'mailings.duplicate': {
+    method: 'POST',
+    path: '/v1/mailings/:id/duplicate',
+    params: IdParams,
+    body: MailingActionRequest,
+    response: Mailing,
+    status: 201,
+    access: 'write',
+    phase: 'S2',
+  },
   'messages.list': {
     method: 'GET',
     path: '/v1/messages',
