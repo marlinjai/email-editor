@@ -167,6 +167,8 @@ export const AUDIT_ACTIONS = [
   'member.added',
   'member.role_changed',
   'member.removed',
+  'member.invited',
+  'invite.revoked',
   'api_key.created',
   'api_key.revoked',
   'provider.created',

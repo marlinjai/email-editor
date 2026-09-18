@@ -9,6 +9,7 @@ export * from './common';
 export * from './errors';
 export * from './headers';
 export * from './workspace';
+export * from './invites';
 export * from './templates';
 export * from './providers';
 export * from './contacts';

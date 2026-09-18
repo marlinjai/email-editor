@@ -15,6 +15,7 @@ import { apiKeyRoutes } from './routes/api-keys.js';
 import { assetRoutes, publicAssetRoutes } from './routes/assets.js';
 import { auditRoutes } from './routes/audit.js';
 import { erasureRoutes } from './routes/erasure.js';
+import { inviteRoutes } from './routes/invites.js';
 import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { templateRoutes } from './routes/templates.js';
@@ -201,6 +202,7 @@ export function createApp({
   const deps = { pool, sealer };
   app.route('/', workspaceRoutes(sql, deps));
   app.route('/', memberRoutes(sql, deps));
+  app.route('/', inviteRoutes(sql, deps));
   app.route('/', apiKeyRoutes(sql, deps));
   app.route('/', auditRoutes(deps));
   const compileForWorkspace = workspaceCompile(pool, compiler, publicBaseUrl);

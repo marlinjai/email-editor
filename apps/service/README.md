@@ -122,6 +122,28 @@ Brain unreachable is 503 with `Retry-After`, never cached. With an
 `Idempotency-Key`, a retried upload replays the first answer; the fingerprint is
 the parsed parts (a new multipart boundary on the retry still matches).
 
+## Invitations (S3)
+
+A person who is not a member yet joins through an invitation (`src/routes/invites.ts`,
+migration `0009_workspace_invites`), since the service binds members by auth-brain
+subject and never looks anyone up by email.
+
+- **Create** (`invites.create`, admin, a person signed in: an API key is refused):
+  one address, one role, a lifetime of 1 to 30 days (7 by default). The answer
+  carries the token `inv_...` once; only its SHA-256 is stored. One pending
+  invitation per address; a current member cannot be invited. Only an owner
+  invites an owner. Audited as `member.invited`.
+- **Accept** (`invites.accept`, dashboard only, no workspace yet): the token names
+  the workspace; the dashboard sends the address auth-brain verified for the
+  signed-in person, and it must match the invited one case-insensitively. Refused
+  with `details.reason`: `email_mismatch` or `inviter_lacks_role` (403), `expired`,
+  `revoked` or `accepted` (409, single use). Accepting while already a member uses
+  the invitation up and succeeds with `already_member: true`. A new member is
+  audited as `member.added` with `via: invite`.
+- **Revoke** (`invites.revoke`, admin) ends a pending one (`invite.revoked`); **list**
+  (`invites.list`) shows them all with a derived status: pending, accepted, revoked
+  or expired.
+
 ## Company erasure (S3)
 
 Every workspace the dashboard creates carries the signed-in person's auth-brain

@@ -41,6 +41,18 @@ export function createNamespaces(config: CoreConfig) {
       remove: (id: string, opts?: RequestOpts) => execute(config, 'members.remove', { params: { id } }, opts),
     },
 
+    /**
+     * Invitations: an admin invites an address with a role (the token is in
+     * the create response only); the invited person accepts through the
+     * dashboard (`accept` is dashboard-only and names the signed-in person).
+     */
+    invites: {
+      create: (body: RouteBody<'invites.create'>, opts?: RequestOpts) => execute(config, 'invites.create', { body }, opts),
+      list: (query?: RouteQuery<'invites.list'>, opts?: RequestOpts) => execute(config, 'invites.list', { query }, opts),
+      revoke: (id: string, opts?: RequestOpts) => execute(config, 'invites.revoke', { params: { id } }, opts),
+      accept: (body: RouteBody<'invites.accept'>, opts?: RequestOpts) => execute(config, 'invites.accept', { body }, opts),
+    },
+
     apiKeys: {
       list: (query?: RouteQuery<'apiKeys.list'>, opts?: RequestOpts) => execute(config, 'apiKeys.list', { query }, opts),
       create: (body: RouteBody<'apiKeys.create'>, opts?: RequestOpts) => execute(config, 'apiKeys.create', { body }, opts),

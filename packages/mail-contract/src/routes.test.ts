@@ -7,6 +7,7 @@ import {
   billingRoutes,
   buildPath,
   foundationRoutes,
+  inviteRoutes,
   matchRoute,
   platformRoutes,
   routes,
@@ -32,6 +33,7 @@ describe('route table', () => {
       [foundationRoutes, 'S0'],
       [templateRoutes, 'S1'],
       [sendingRoutes, 'S2'],
+      [inviteRoutes, 'S3'],
       [platformRoutes, 'S4'],
       [billingRoutes, 'S5'],
     ];
@@ -87,8 +89,8 @@ describe('route table', () => {
     }
   });
 
-  it('only workspace creation and listing are dashboard-only', () => {
-    expect(all.filter(([, r]) => r.access === 'dashboard').map(([id]) => id).sort()).toEqual(['workspaces.create', 'workspaces.list']);
+  it('only workspace creation, listing and accepting an invitation are dashboard-only', () => {
+    expect(all.filter(([, r]) => r.access === 'dashboard').map(([id]) => id).sort()).toEqual(['invites.accept', 'workspaces.create', 'workspaces.list']);
   });
 
   it('only signup submission is public', () => {
