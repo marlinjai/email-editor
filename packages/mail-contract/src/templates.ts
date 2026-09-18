@@ -166,7 +166,7 @@ export const MAX_IMPORT_URL_LENGTH = 2048;
 
 /**
  * Copying a remote image into the workspace's assets: the service fetches
- * `url` (`https`, or `http`; never a private, loopback or link-local address,
+ * `url` (`https` only, as for webhooks: a plain `http` fetch can be altered in transit, and a hosted asset is content the service vouches for; never a private, loopback or link-local address,
  * never following a redirect), checks the bytes the way an upload is checked
  * (PNG, JPEG, GIF or WebP, at most `MAX_ASSET_BYTES`) and answers with the new
  * `Asset`, whose `url` is the service's own.
@@ -182,7 +182,15 @@ export const AssetImport = z.object({
     .string()
     .max(MAX_IMPORT_URL_LENGTH)
     .url()
-    .refine((u) => /^https?:\/\//i.test(u), 'must be an http or https address'),
+    .refine((u) => {
+      try {
+        const url = new URL(u);
+        if (url.protocol === 'https:') return true;
+        return url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+      } catch {
+        return false;
+      }
+    }, 'must be https (http only for localhost)'),
   /** The stored file name; derived from the address when omitted. */
   filename: z.string().min(1).max(255).optional(),
 });

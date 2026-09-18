@@ -360,7 +360,7 @@ describe('assets.import', () => {
   });
 
   it('refuses addresses the contract does not accept', async () => {
-    for (const url of ['ftp://cdn.example.com/a.png', 'file:///etc/passwd', 'not a url']) {
+    for (const url of ['ftp://cdn.example.com/a.png', 'file:///etc/passwd', 'not a url', 'http://cdn.example.com/a.png']) {
       const res = await h.call({ method: 'POST', path: '/v1/assets/import', key: A.key, body: { url } });
       expect(res.body.error.code, url).toBe('validation_failed');
     }
@@ -396,38 +396,64 @@ describe('assets.import: the server-side request forgery guard', () => {
   const importUrl = (url: string, harness: Harness = strict, key = W.key) =>
     harness.call({ method: 'POST', path: '/v1/assets/import', key, body: { url } });
 
-  it('refuses loopback, private and link-local targets, as literals and by name, and never connects', async () => {
-    images.on('/secret.png', { body: pngBytes(1, 1) });
+  it('refuses plain http, even to a public host, and never connects', async () => {
+    // Beyond localhost the contract already refuses http; for localhost the service does.
+    const publicHttp = await importUrl('http://cdn.example.com/a.png');
+    expect(publicHttp.status).toBe(400);
+    expect(publicHttp.body.error.code).toBe('validation_failed');
+    images.on('/plain.png', { body: pngBytes(1, 1) });
     images.hits.length = 0;
+    const local = await importUrl(images.url('/plain.png'));
+    expect(local.status).toBe(400);
+    expect(local.body.error.code).toBe('invalid_request');
+    expect(local.body.error.message).toMatch(/Only https/);
+    expect(images.hits).toEqual([]);
+  });
+
+  it('refuses loopback, private and link-local targets over https, as literals and by name', async () => {
     for (const url of [
-      images.url('/secret.png'),
-      'http://10.0.0.5/x.png',
-      'http://192.168.1.1/x.png',
-      'http://172.16.0.1/x.png',
-      'http://169.254.169.254/latest/meta-data/',
-      'http://[::1]/x.png',
-      'http://[fd00::1]/x.png',
-      'http://localhost/x.png',
-      'http://0.0.0.0/x.png',
+      'https://127.0.0.1/x.png',
+      'https://10.0.0.5/x.png',
+      'https://192.168.1.1/x.png',
+      'https://172.16.0.1/x.png',
+      'https://169.254.169.254/latest/meta-data/',
+      'https://[::1]/x.png',
+      'https://[fd00::1]/x.png',
+      'https://localhost/x.png',
+      'https://0.0.0.0/x.png',
       // IPv4-mapped loopback, which the URL parser rewrites to ::ffff:7f00:1.
-      images.url('/secret.png').replace('127.0.0.1', '[::ffff:127.0.0.1]'),
-      'http://[::ffff:7f00:1]/x.png',
-      'http://[::ffff:a9fe:a9fe]/latest/meta-data/',
+      'https://[::ffff:127.0.0.1]/x.png',
+      'https://[::ffff:7f00:1]/x.png',
+      'https://[::ffff:a9fe:a9fe]/latest/meta-data/',
       // The shared address space, where the service's Tailscale peers live.
-      'http://100.100.100.100/x.png',
+      'https://100.100.100.100/x.png',
     ]) {
       const res = await importUrl(url);
       expect(res.status, url).toBe(400);
       expect(res.body.error.code, url).toBe('invalid_request');
+      expect(res.body.error.message, url).toMatch(/private, loopback or link-local|could not resolve/);
     }
-    expect(images.hits).toEqual([]);
+  });
+
+  it('with only the http flag lifted, the address guard still keeps it off loopback and never connects', async () => {
+    const httpOnly = await startHarness({ webhookUrlPolicy: { allowInsecureHttp: true } });
+    try {
+      const H = await httpOnly.seedWorkspace('http-only');
+      images.on('/secret.png', { body: pngBytes(1, 1) });
+      images.hits.length = 0;
+      const res = await importUrl(images.url('/secret.png'), httpOnly, H.key);
+      expect(res.body.error.code).toBe('invalid_request');
+      expect(res.body.error.message).toMatch(/private, loopback or link-local/);
+      expect(images.hits).toEqual([]);
+    } finally {
+      await httpOnly.drop();
+    }
   });
 
   it('refuses a name that resolves to a private address, and one that changes its answer after the first check', async () => {
     let calls = 0;
     const rebinding = await startHarness({
       webhookUrlPolicy: {
-        allowInsecureHttp: true,
         resolve: async (host) => {
           if (host === 'private.example.test') return [{ address: '10.1.2.3', family: 4 }];
           // Public on the first look, loopback when the socket connects.
@@ -438,10 +464,10 @@ describe('assets.import: the server-side request forgery guard', () => {
     });
     try {
       const R = await rebinding.seedWorkspace('rebind');
-      const priv = await importUrl('http://private.example.test/x.png', rebinding, R.key);
+      const priv = await importUrl('https://private.example.test/x.png', rebinding, R.key);
       expect(priv.body.error.code).toBe('invalid_request');
       expect(priv.body.error.message).toContain('10.1.2.3');
-      const rebound = await importUrl('http://rebind.example.test/x.png', rebinding, R.key);
+      const rebound = await importUrl('https://rebind.example.test/x.png', rebinding, R.key);
       expect(rebound.body.error.code).toBe('invalid_request');
       expect(rebound.body.error.message).toContain('127.0.0.1');
       expect(calls).toBe(2);

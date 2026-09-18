@@ -10,7 +10,9 @@ import { assertResolvesToPublicAddress, isDisallowedAddress, SsrfBlockedError, t
  * so it carries the server-side request forgery (SSRF) guard of webhook
  * endpoints (`SsrfPolicy`, the same `WEBHOOK_ALLOW_INSECURE_TARGETS` flag):
  *
- * - `http` and `https` only.
+ * - `https` only, as for webhooks: a plain `http` fetch can be altered in
+ *   transit, and a hosted asset is content the service vouches for. `http` is
+ *   accepted only with the development flag (`allowInsecureHttp`).
  * - The hostname must resolve to public addresses only. The check runs before
  *   the request and again inside the socket's own DNS lookup, on the very
  *   addresses the connection then uses, so a name that changes its answer
@@ -76,8 +78,8 @@ export async function fetchRemoteImage(rawUrl: string, options: RemoteFetchOptio
   } catch {
     throw new ApiError('invalid_request', 'The address is not a valid URL.');
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new ApiError('invalid_request', 'Only http and https addresses can be imported.');
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && options.policy.allowInsecureHttp)) {
+    throw new ApiError('invalid_request', 'Only https addresses can be imported. http is only accepted with an explicit development flag.');
   }
   if (url.username || url.password) {
     throw new ApiError('invalid_request', 'An address with credentials in it cannot be imported.');

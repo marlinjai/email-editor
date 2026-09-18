@@ -127,7 +127,10 @@ copies an image from the web into the workspace and answers with the same
 `Asset` as an upload (`asset.imported` in the audit log, with the source
 address). The fetch runs from the service's network, so it carries the
 webhooks' server-side request forgery (SSRF) guard (`src/assets/remote.ts`):
-`http` and `https` only, no credentials in the address, and no private,
+`https` only, as for webhooks (a plain `http` fetch can be altered in
+transit, and a hosted asset is content the service vouches for; the contract
+allows `http` for localhost only, and the service refuses it too unless the
+development flag is set), no credentials in the address, and no private,
 loopback or link-local target, checked before the request and again inside
 the socket's own DNS lookup on the addresses it then connects to (a name that
 changes its answer in between cannot slip through). A redirect is refused,
@@ -136,8 +139,8 @@ reading; the deadline is 10 seconds. The remote `Content-Type` is ignored: the
 bytes are sniffed exactly as an upload's. Blocked addresses, redirects and a
 remote 4xx are `invalid_request` (with `details.status`); a network failure, a
 timeout or a remote 5xx is `provider_error` with `details.service =
-"asset_import"`. `WEBHOOK_ALLOW_INSECURE_TARGETS=true` lifts the private-target
-check here too, for local development only.
+"asset_import"`. `WEBHOOK_ALLOW_INSECURE_TARGETS=true` lifts the https requirement and the
+private-target check here too, for local development only.
 
 **Asset policy.** `settings.asset_policy` decides where a workspace's mails may
 load images, stylesheets and fonts from: `any` (the default) or

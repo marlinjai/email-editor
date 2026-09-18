@@ -107,9 +107,11 @@ describe('assets', () => {
 });
 
 describe('asset import', () => {
-  it('takes an http or https address and an optional file name', () => {
-    expect(AssetImport.safeParse({ url: 'https://cdn.example.com/hero.png' }).success).toBe(true);
-    expect(AssetImport.safeParse({ url: 'http://cdn.example.com/hero.png', filename: 'hero.png' }).success).toBe(true);
+  it('takes an https address and an optional file name; http only for localhost, as for webhooks', () => {
+    expect(AssetImport.safeParse({ url: 'https://cdn.example.com/hero.png', filename: 'hero.png' }).success).toBe(true);
+    expect(AssetImport.safeParse({ url: 'http://cdn.example.com/hero.png' }).success).toBe(false);
+    expect(AssetImport.safeParse({ url: 'http://127.0.0.1:8080/hero.png' }).success).toBe(true);
+    expect(AssetImport.safeParse({ url: 'http://localhost/hero.png' }).success).toBe(true);
   });
 
   it('refuses other schemes, relative and overlong addresses', () => {
