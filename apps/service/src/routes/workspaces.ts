@@ -26,7 +26,12 @@ export function workspaceRoutes(sql: Sql, deps: MountDeps) {
 
     const workspace = await sql.begin(async (tx) => {
       const r = repos(tx);
-      const created = await r.workspaces.create({ slug: input.slug, name: input.name, settings });
+      const created = await r.workspaces.create({
+        slug: input.slug,
+        name: input.name,
+        settings,
+        companyId: input.company_id ?? null,
+      });
       if (!created) throw new ApiError('already_exists', `A workspace with the slug "${input.slug}" already exists.`);
       const owner = await r.members.create(created.id, {
         subject,
@@ -41,7 +46,7 @@ export function workspaceRoutes(sql: Sql, deps: MountDeps) {
         actor,
         targetType: 'workspace',
         targetId: created.id,
-        details: { slug: created.slug, name: created.name },
+        details: { slug: created.slug, name: created.name, company_id: created.company_id },
       });
       await r.audit.record(created.id, {
         action: 'member.added',

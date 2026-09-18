@@ -96,6 +96,7 @@ import {
   TagCreate,
   TrackingSettings,
 } from './platform';
+import { Invite, InviteAccept, InviteAccepted, InviteCreate, InviteCreated, InviteListQuery } from './invites';
 import { CheckoutRequest, CheckoutSession, Plan, PortalRequest, PortalSession, Subscription, Usage } from './billing';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -112,7 +113,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  */
 export type RouteAccess = 'read' | 'write' | 'admin' | 'dashboard' | 'public';
 
-export type Phase = 'S0' | 'S1' | 'S2' | 'S4' | 'S5';
+export type Phase = 'S0' | 'S1' | 'S2' | 'S3' | 'S4' | 'S5';
 
 export interface RouteDef {
   method: HttpMethod;
@@ -1107,11 +1108,53 @@ export const billingRoutes = {
   },
 } as const satisfies Record<string, RouteDef>;
 
+// S3: invitations (how a person who is not a member yet joins a workspace)
+
+export const inviteRoutes = {
+  'invites.create': {
+    method: 'POST',
+    path: '/v1/invites',
+    body: InviteCreate,
+    response: InviteCreated,
+    status: 201,
+    access: 'admin',
+    phase: 'S3',
+  },
+  'invites.list': {
+    method: 'GET',
+    path: '/v1/invites',
+    query: InviteListQuery,
+    response: list(Invite),
+    status: 200,
+    access: 'admin',
+    phase: 'S3',
+  },
+  'invites.revoke': {
+    method: 'DELETE',
+    path: '/v1/invites/:id',
+    params: IdParams,
+    response: Invite,
+    status: 200,
+    access: 'admin',
+    phase: 'S3',
+  },
+  'invites.accept': {
+    method: 'POST',
+    path: '/v1/invites/accept',
+    body: InviteAccept,
+    response: InviteAccepted,
+    status: 200,
+    access: 'dashboard',
+    phase: 'S3',
+  },
+} as const satisfies Record<string, RouteDef>;
+
 /** Every v1 operation, keyed by operation id. */
 export const routes = {
   ...foundationRoutes,
   ...templateRoutes,
   ...sendingRoutes,
+  ...inviteRoutes,
   ...platformRoutes,
   ...billingRoutes,
 } as const satisfies Record<string, RouteDef>;

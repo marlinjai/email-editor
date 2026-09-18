@@ -95,6 +95,7 @@ async function runServe(): Promise<void> {
     platformKeys: config.unsubscribeKeys,
     billing: config.billing,
     stripe,
+    erasureWebhookSecret: config.erasureWebhookSecret,
   });
   // The send worker: one loop per process. It reconciles what a previous
   // process left mid-send before it claims anything new.

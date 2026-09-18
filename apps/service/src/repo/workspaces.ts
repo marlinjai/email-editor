@@ -7,6 +7,7 @@ export type Workspace = {
   slug: string;
   name: string;
   settings: WorkspaceSettings;
+  company_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -21,18 +22,24 @@ function complete<T extends Workspace>(row: T | undefined): T | null {
 export function workspacesRepo(db: Db) {
   return {
     /** Creating is the one write with no workspace yet; it returns the new id. */
-    async create(input: { slug: string; name: string; settings: WorkspaceSettings }): Promise<Workspace | null> {
+    async create(input: {
+      slug: string;
+      name: string;
+      settings: WorkspaceSettings;
+      /** The auth-brain company; omitted means none. */
+      companyId?: string | null;
+    }): Promise<Workspace | null> {
       const rows = await db<Workspace[]>`
-        INSERT INTO workspaces (slug, name, settings)
-        VALUES (${input.slug}, ${input.name}, ${db.json(input.settings)})
+        INSERT INTO workspaces (slug, name, settings, company_id)
+        VALUES (${input.slug}, ${input.name}, ${db.json(input.settings)}, ${input.companyId ?? null})
         ON CONFLICT (slug) DO NOTHING
-        RETURNING id, slug, name, settings, created_at, updated_at`;
+        RETURNING id, slug, name, settings, company_id, created_at, updated_at`;
       return complete(rows[0]);
     },
 
     async get(workspaceId: string): Promise<Workspace | null> {
       const rows = await db<Workspace[]>`
-        SELECT id, slug, name, settings, created_at, updated_at
+        SELECT id, slug, name, settings, company_id, created_at, updated_at
         FROM workspaces WHERE id = ${workspaceId}`;
       return complete(rows[0]);
     },
@@ -47,7 +54,7 @@ export function workspacesRepo(db: Db) {
           settings = COALESCE(${patch.settings ? db.json(patch.settings) : null}::jsonb, settings),
           updated_at = now()
         WHERE id = ${workspaceId}
-        RETURNING id, slug, name, settings, created_at, updated_at`;
+        RETURNING id, slug, name, settings, company_id, created_at, updated_at`;
       return complete(rows[0]);
     },
 
@@ -62,7 +69,7 @@ export function workspacesRepo(db: Db) {
       page: { afterId?: string; limit: number },
     ): Promise<Array<Workspace & { role: string }>> {
       const rows = await db<Array<Workspace & { role: string }>>`
-        SELECT w.id, w.slug, w.name, w.settings, w.created_at, w.updated_at, m.role
+        SELECT w.id, w.slug, w.name, w.settings, w.company_id, w.created_at, w.updated_at, m.role
         FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id
         WHERE m.subject = ${subject}
         ${

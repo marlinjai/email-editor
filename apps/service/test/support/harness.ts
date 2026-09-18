@@ -15,6 +15,8 @@ export const DASHBOARD_TOKEN = 'a'.repeat(64);
 export const SECRETS_KEYS = new Map([[1, Buffer.alloc(32, 7)]]);
 export const UNSUBSCRIBE_KEYS = new Map([[1, Buffer.alloc(32, 9)]]);
 export const PUBLIC_BASE_URL = 'https://mail.test';
+/** The HMAC secret the harness's app verifies auth-brain erasure webhooks with. */
+export const ERASURE_SECRET = '5e'.repeat(32);
 export const COMPILE_WORKER_URL = new URL('../../src/compile-worker.js', import.meta.url);
 
 type Json = Record<string, any>;
@@ -53,7 +55,19 @@ export async function startHarness(
   const log = { error: (...a: unknown[]) => errors.push(a) };
   /** A second, independent app over the same database: a service restart. */
   const restart = () =>
-    createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, webhookUrlPolicy: options.webhookUrlPolicy, log, ...appDeps, unsubscribeSigner: options.unsubscribeSigner ?? signer, transportFor: () => transport, platformKeys: UNSUBSCRIBE_KEYS, signup: options.signup });
+    createApp({
+      sql: db.sql,
+      dashboardServiceToken: DASHBOARD_TOKEN,
+      secretsKeys: SECRETS_KEYS,
+      webhookUrlPolicy: options.webhookUrlPolicy,
+      erasureWebhookSecret: ERASURE_SECRET,
+      log,
+      ...appDeps,
+      unsubscribeSigner: options.unsubscribeSigner ?? signer,
+      transportFor: () => transport,
+      platformKeys: UNSUBSCRIBE_KEYS,
+      signup: options.signup,
+    });
   let app = restart();
   const sealer: Sealer = createSealer(SECRETS_KEYS);
 

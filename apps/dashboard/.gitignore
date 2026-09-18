@@ -1,0 +1,8 @@
+.next/
+next-env.d.ts
+test-results/
+playwright-report/
+*.tsbuildinfo
+# Written by `next dev` on every start (agent hints); not source.
+AGENTS.md
+CLAUDE.md

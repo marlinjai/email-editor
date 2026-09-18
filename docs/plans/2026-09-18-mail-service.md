@@ -443,6 +443,82 @@ stated defaults, open to change:
 - **Compiling** goes through S1's compile pool and document validation, the same
   path as the compile API.
 
+### S3, the dashboard (built 2026-09-18, branch `feat/s3-dashboard`)
+
+Built and verified (details in `apps/dashboard/README.md`):
+
+- **`apps/dashboard`** (`@email-editor/dashboard`, private): Next.js 16, React 19,
+  Tailwind CSS 4, dark only in the Lumitra black and brushed gold. Sign-in is
+  auth-brain OpenID Connect (OIDC) with the `mail` app grant and a required second
+  factor, the ŌPUNTIA Studio's pattern (popup landing, silent sign-in, `/no-access`).
+  Every call to the service goes through the SDK's dashboard client in server
+  components and server actions; the browser never holds the service token or a key.
+- **Screens**: workspace switcher and creation; settings (general with languages and
+  the tracking choice, members with roles and invitations, API keys shown once and
+  revoked, providers with a write-only secret, verify and usage against the daily
+  budget, topics with translations, webhooks with the secret shown once, deliveries
+  and redelivery); templates with the editor (conflict handling on `base_version`,
+  history and restore, a sandboxed compile preview, image upload through the assets
+  API via `onRequestImage`); mailings (compose from a template, provider and topic,
+  recipients pasted or from a CSV with the service's added, already present and
+  rejected counts, test send, send with a preflight, live counts, pause, resume,
+  cancel, retry failed, duplicate); the sent archive with a sandboxed preview;
+  suppressions; contacts with their messages and erasure; the audit log.
+- **Company erasure**: migration `0008_workspace_company` (`workspaces.company_id`,
+  the `erasure_events` ledger) and `POST /internal/erasure` on the service, which
+  verifies auth-brain's `x-lumitra-erasure-signature`, deletes the company's images in
+  Storage Brain and every workspace row in one transaction, idempotent by event id.
+  `MAIL_ERASURE_WEBHOOK_SECRET` is minted into both Infisical projects.
+- **Infrastructure** (marlinjai/infra#41, applied): the Coolify application
+  `e6fm7v8mv1nfaj3jg5w4n5ib` pulling `ghcr.io/marlinjai/email-editor-dashboard`, the
+  `app.mail.lumitra.co` A record (not proxied), the `COOLIFY_WEBHOOK_DASHBOARD` GitHub
+  secret. Infisical "Lumitra Mail" `/dashboard` (prod and dev) holds the dashboard's
+  secrets; the OIDC client "Lumitra Mail dashboard" is registered in auth-brain.
+  auth-brain#142 (draft) shows the `mail` card, points it at the dashboard and
+  subscribes the service to `tenant.erased`; it merges only after this phase deploys.
+- **Tests**: vitest for the server actions (mocked SDK) and the helpers; Playwright end
+  to end against the real service and send worker on Postgres 17, an SMTP sink and a
+  Storage Brain stand-in, covering the mailing flow on all four paths of the
+  stateful-flow standard, and a production guard proving the test sign-in cannot be
+  enabled in production. CI runs all of it (`verify.yml`, job `dashboard`), and builds
+  the image.
+
+Defaults taken in S3 (each can be overturned later):
+
+1. **Members join by invitation, a resource of the service** (decided with the
+   orchestrator 2026-09-18, replacing a first stateless signed link, which could not
+   be revoked or listed): migration `0009_workspace_invites` and the routes
+   `invites.create`, `invites.list`, `invites.revoke`, `invites.accept`. The token is
+   shown once and stored as a SHA-256; an invitation is single use, revocable and
+   expires (7 days by default, at most 30). Accepting needs the signed-in auth-brain
+   address to match the invited one, the invitation to be pending, and the inviter
+   to still be a member able to grant the role; accepting while already a member is
+   a no-op success. Only a person signed in can invite (an API key cannot), since
+   acceptance re-checks the inviter. Audited as `member.invited`, `invite.revoked`
+   and `member.added`. Nothing is emailed: the admin sends the link. Tested on the
+   four paths (accept; revoke first; expiry, then a new invitation; a second
+   acceptance, and a return after leaving).
+2. **`company_id` is nullable and optional on create**: workspaces created before S3,
+   or by a path with no company, carry none, and no company erasure reaches them. The
+   dashboard always sends the signed-in person's company (their choice when they have
+   several with the grant).
+3. **The erasure endpoint is on the service** (`/internal/erasure`, outside `/v1`),
+   not the dashboard, since the service holds the data. It acknowledges `user.erased`
+   and unknown companies as no-ops (auth-brain waits for every subscribed app); only
+   `tenant.erased` is subscribed.
+4. **A mailing's content is a snapshot**: editing the template never changes it; the
+   mailing screen offers "Use its current version" while the mailing is a draft.
+5. **The last test result is read from the archive** (the newest test message of the
+   mailing) and marked out of date when the mailing changed after it, so it survives a
+   reload and needs no state of its own.
+6. **The end-to-end suite runs `next dev`**: only a non-production process honours
+   the test sign-in, which is the property the production guard proves.
+7. **Times are shown in Europe/Berlin** for now; per-person time zones wait for a
+   profile setting.
+8. **A restart mid-send in the end-to-end suite is graceful (SIGTERM)**, as a deploy
+   does; a hard crash leaves a row `sending` that the worker settles only after its
+   15-minute stuck window, which the service's own sending-flow suite covers.
+
 ### S4, the platform features (built 2026-09-18, branch `feat/s4-platform`)
 
 The service side of the marketing platform: tags, typed contact properties,

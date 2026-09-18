@@ -7,6 +7,9 @@ import { Email, Id, PageQuery, Slug, Timestamp } from './common';
 
 // Workspaces
 
+/** An auth-brain company (tenant) id, opaque to the service. */
+export const CompanyId = z.string().min(1).max(64);
+
 /**
  * Where the images, stylesheets and web fonts in a workspace's mails may load
  * from.
@@ -37,6 +40,12 @@ export const Workspace = z.object({
   slug: Slug,
   name: z.string().min(1).max(120),
   settings: WorkspaceSettings,
+  /**
+   * The auth-brain company (tenant) the workspace was created for, or null for
+   * a workspace created without one. When auth-brain erases that company, every
+   * workspace carrying its id is erased with it.
+   */
+  company_id: CompanyId.nullable(),
   created_at: Timestamp,
   updated_at: Timestamp,
 });
@@ -55,6 +64,13 @@ export const WorkspaceCreate = z.object({
     email: Email,
     name: z.string().max(200).nullable().optional(),
   }),
+  /**
+   * The signed-in person's active auth-brain company. The dashboard always
+   * sends it, which is what links the workspace to auth-brain's company
+   * erasure; omitted, the workspace belongs to no company and no company
+   * erasure reaches it.
+   */
+  company_id: CompanyId.optional(),
 });
 export type WorkspaceCreate = z.infer<typeof WorkspaceCreate>;
 
@@ -151,6 +167,8 @@ export const AUDIT_ACTIONS = [
   'member.added',
   'member.role_changed',
   'member.removed',
+  'member.invited',
+  'invite.revoked',
   'api_key.created',
   'api_key.revoked',
   'provider.created',

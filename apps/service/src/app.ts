@@ -14,6 +14,8 @@ import { createSealer, type SecretsKeys } from './sealing.js';
 import { apiKeyRoutes } from './routes/api-keys.js';
 import { assetRoutes, publicAssetRoutes } from './routes/assets.js';
 import { auditRoutes } from './routes/audit.js';
+import { erasureRoutes } from './routes/erasure.js';
+import { inviteRoutes } from './routes/invites.js';
 import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { templateRoutes } from './routes/templates.js';
@@ -102,6 +104,11 @@ export type AppOptions = {
   billing?: BillingConfig;
   /** S5: the Stripe client (null without a key). Tests pass a fake. */
   stripe?: StripeApi | null;
+  /**
+   * S3: the HMAC secret auth-brain signs its erasure webhook with
+   * (MAIL_ERASURE_WEBHOOK_SECRET). Without it `/internal/erasure` answers 503.
+   */
+  erasureWebhookSecret?: string;
 };
 
 const PUBLIC_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -138,6 +145,7 @@ export function createApp({
   signup,
   billing = { prices: {} },
   stripe = null,
+  erasureWebhookSecret,
 }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
@@ -161,6 +169,7 @@ export function createApp({
   if (signupService) app.route('/', signupPageRoutes(sql, { service: signupService, publicBaseUrl, log: { error: log.error, log: console.log } }));
   // Public and outside /v1 too: Stripe signs its requests, it holds no API key.
   app.route('/', stripeWebhookRoutes(sql, { config: billing, stripe, log: { error: log.error, log: console.log } }));
+  app.route('/', erasureRoutes(sql, { secret: erasureWebhookSecret, storage: assetStorage, log: { error: log.error, log: console.log } }));
 
   const limit = (maxSize: number) =>
     bodyLimit({
@@ -193,6 +202,7 @@ export function createApp({
   const deps = { pool, sealer };
   app.route('/', workspaceRoutes(sql, deps));
   app.route('/', memberRoutes(sql, deps));
+  app.route('/', inviteRoutes(sql, deps));
   app.route('/', apiKeyRoutes(sql, deps));
   app.route('/', auditRoutes(deps));
   const compileForWorkspace = workspaceCompile(pool, compiler, publicBaseUrl);

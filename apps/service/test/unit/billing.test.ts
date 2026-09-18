@@ -207,6 +207,7 @@ describe('billing configuration', () => {
     PUBLIC_BASE_URL: 'https://mail.lumitra.co',
     STORAGE_BRAIN_API_KEY: `sk_test_${'x'.repeat(32)}`,
     MAIL_UNSUBSCRIBE_KEY: 'ef'.repeat(32),
+    MAIL_ERASURE_WEBHOOK_SECRET: '12'.repeat(32),
   };
 
   it('treats unset, empty and the Infisical placeholder as not configured', () => {

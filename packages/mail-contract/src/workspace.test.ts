@@ -21,6 +21,7 @@ const workspace = {
   slug: 'opuntia',
   name: 'ŌPUNTIA',
   settings: { default_locale: 'de', locales: ['de', 'en', 'fr', 'it', 'es'], tracking_enabled: false, asset_policy: 'any' },
+  company_id: 'tenant_opuntia',
   created_at: TS,
   updated_at: TS,
 };
@@ -42,6 +43,13 @@ describe('workspace', () => {
     expect(Workspace.safeParse({ ...workspace, settings: { ...workspace.settings, locales: [] } }).success).toBe(false);
   });
 
+  it('carries the auth-brain company, null for a workspace created without one', () => {
+    expect(Workspace.safeParse({ ...workspace, company_id: null }).success).toBe(true);
+    const { company_id: _c, ...noCompany } = workspace;
+    expect(Workspace.safeParse(noCompany).success).toBe(false);
+    expect(Workspace.safeParse({ ...workspace, company_id: '' }).success).toBe(false);
+  });
+
   it('WorkspaceCreate needs a slug, a name and the owner email', () => {
     const ok = { slug: 'opuntia', name: 'ŌPUNTIA', owner: { email: 'a@b.de' } };
     expect(WorkspaceCreate.safeParse(ok).success).toBe(true);
@@ -50,6 +58,8 @@ describe('workspace', () => {
     expect(WorkspaceCreate.safeParse({ ...ok, slug: 'ŌPUNTIA' }).success).toBe(false);
     const { owner: _o, ...noOwner } = ok;
     expect(WorkspaceCreate.safeParse(noOwner).success).toBe(false);
+    expect(WorkspaceCreate.safeParse({ ...ok, company_id: 'tenant_1' }).success).toBe(true);
+    expect(WorkspaceCreate.safeParse({ ...ok, company_id: '' }).success).toBe(false);
   });
 
   it('WorkspaceMembership adds the person\'s role', () => {

@@ -4,6 +4,8 @@ import { assetsRepo } from './assets.js';
 import { auditRepo } from './audit.js';
 import { billingRepo, stripeEventsRepo } from './billing.js';
 import { contactsRepo } from './contacts.js';
+import { erasureRepo } from './erasure.js';
+import { invitesRepo } from './invites.js';
 import { idempotencyRepo } from './idempotency.js';
 import { mailingsRepo } from './mailings.js';
 import { membersRepo } from './members.js';
@@ -38,7 +40,10 @@ import { signupRepo } from './signup.js';
  * `ForWorker` (`mailings.listSendingForWorker`, `recipients.listStuckForWorker`,
  * `webhookDeliveries.claimDueForWorker`, `billing.listStaleForWorker`), and the
  * Stripe webhook's `billing.workspaceForStripeForWebhook`, which turns a Stripe
- * customer or subscription id into the workspace id.
+ * customer or subscription id into the workspace id, and `erasure`, which finds
+ * and removes every workspace of an auth-brain company that was erased, and
+ * `invites.byTokenHashForAccept`, which finds the workspace an invitation token
+ * names for a person who is not a member of it yet.
  *
  * Built over a `Db`, which is either the pool or a transaction, so a route can
  * write a change and its audit row atomically: `sql.begin((tx) => repos(tx)...)`.
@@ -73,6 +78,8 @@ export function repos(db: Db) {
     signup: signupRepo(db),
     billing: billingRepo(db),
     stripeEvents: stripeEventsRepo(db),
+    erasure: erasureRepo(db),
+    invites: invitesRepo(db),
   };
 }
 export type Repos = ReturnType<typeof repos>;

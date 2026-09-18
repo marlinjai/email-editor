@@ -40,6 +40,12 @@ const EnvSchema = z.object({
    * MAIL_UNSUBSCRIBE_KEY_V2, and links signed under v1 keep working while v1 is held.
    */
   MAIL_UNSUBSCRIBE_KEY: hex64,
+  /**
+   * S3: the secret auth-brain signs its GDPR erasure webhook with
+   * (POST /internal/erasure). Shared with auth-brain's Infisical project, minted
+   * there and here in one copy_secret op=generate call.
+   */
+  MAIL_ERASURE_WEBHOOK_SECRET: hex64,
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   /**
    * Development-only escape hatch for the webhook endpoint URL policy
@@ -89,6 +95,7 @@ export type Config = {
   dashboardServiceToken: string;
   secretsKeys: ReadonlyMap<number, Buffer>;
   unsubscribeKeys: ReadonlyMap<number, Buffer>;
+  erasureWebhookSecret: string;
   databasePoolMax: number;
   webhookAllowInsecureTargets: boolean;
   publicBaseUrl: string;
@@ -122,6 +129,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dashboardServiceToken: e.DASHBOARD_SERVICE_TOKEN.toLowerCase(),
     secretsKeys: new Map([[1, Buffer.from(e.MAIL_SECRETS_KEY, 'hex')]]),
     unsubscribeKeys: new Map([[1, Buffer.from(e.MAIL_UNSUBSCRIBE_KEY, 'hex')]]),
+    erasureWebhookSecret: e.MAIL_ERASURE_WEBHOOK_SECRET,
     databasePoolMax: e.DATABASE_POOL_MAX,
     webhookAllowInsecureTargets: e.WEBHOOK_ALLOW_INSECURE_TARGETS,
     publicBaseUrl: e.PUBLIC_BASE_URL,
