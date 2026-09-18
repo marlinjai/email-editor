@@ -162,7 +162,7 @@ footer ul{list-style:none;margin:.25rem 0 0;padding:0;display:flex;flex-wrap:wra
 footer li a{display:inline-flex;align-items:center;min-height:44px;color:var(--ink)}
 footer a[aria-current]{color:var(--focus);font-weight:650;text-decoration:none}
 .family a{color:var(--ink);font-weight:600}
-@media (min-width:48rem){footer .wrap{grid-template-columns:2fr 1fr 1fr}.family,.footer-line{grid-column:1/-1}}
+@media (min-width:48rem){footer .wrap{grid-template-columns:1fr auto auto;column-gap:4rem}.family,.footer-line{grid-column:1/-1}}
 @media (prefers-reduced-motion:no-preference){.mock{animation:rise 280ms cubic-bezier(.16,1,.3,1) 60ms both}@keyframes rise{from{opacity:.35;transform:translateY(10px)}}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (forced-colors:active){.btn,.plan,.mock,.recipients{border:1px solid CanvasText}h1 .gold{-webkit-text-fill-color:currentColor;background:none}}
@@ -232,9 +232,7 @@ function planCard(locale: PageLocale, { plan, sellable }: LandingPlan, index: nu
     features.ab_testing ? lt(locale, 'feature_ab') : null,
   ].filter((l): l is string => l !== null);
   const headingId = `plan-${escapeHtml(plan.id)}`;
-  const price = free
-    ? `<p class="price">${lt(locale, 'price_free')}</p>`
-    : `<p class="price">${escapeHtml(formatPrice(locale, plan))}<small>${lt(locale, 'per_month')}</small></p>`;
+  const price = `<p class="price">${escapeHtml(formatPrice(locale, plan))}<small>${lt(locale, 'per_month')}</small></p>`;
   const action = sellable
     ? `<a class="btn${free ? '' : ' ghost'}" href="${SIGN_IN_URL}" aria-describedby="${headingId}">${
         free ? lt(locale, 'cta_free') : lt(locale, 'cta_plan', { plan: plan.name })
