@@ -12,6 +12,12 @@ import { auditRoutes } from './routes/audit.js';
 import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { workspaceRoutes } from './routes/workspaces.js';
+import { mailingRoutes } from './routes/mailings.js';
+import { messageRoutes } from './routes/messages.js';
+import type { UnsubscribeSigner } from './unsubscribe.js';
+import { createInProcessCompiler, type Compiler } from './worker/compile.js';
+import { createTestSender } from './worker/test-send.js';
+import { createTransportCache, type TransportFor } from './worker/transports.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -21,9 +27,18 @@ export type AppOptions = {
   /** MAIL_SECRETS_KEY by version; seals what the service stores at rest. */
   secretsKeys: SecretsKeys;
   log?: Pick<Console, 'error'>;
+  /** Signs the hosted unsubscribe links (MAIL_UNSUBSCRIBE_KEY), built once in main.ts. */
+  unsubscribeSigner?: UnsubscribeSigner;
+  /** The provider transports for test sends; main.ts shares the worker's. Tests pass a MemoryTransport. */
+  transportFor?: TransportFor;
+  /** Validates and compiles documents; the in-process editor core compiler by default. */
+  compiler?: Compiler;
+  /** Base of the hosted unsubscribe page in links; https://mail.lumitra.co by default. */
+  publicBaseUrl?: string;
 };
 
-export function createApp({ sql, dashboardServiceToken, secretsKeys, log = console }: AppOptions) {
+export function createApp(options: AppOptions) {
+  const { sql, dashboardServiceToken, secretsKeys, log = console } = options;
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
   const sealer = createSealer(secretsKeys);
@@ -62,6 +77,26 @@ export function createApp({ sql, dashboardServiceToken, secretsKeys, log = conso
   app.route('/', memberRoutes(sql, deps));
   app.route('/', apiKeyRoutes(sql, deps));
   app.route('/', auditRoutes(deps));
+
+  const compiler = options.compiler ?? createInProcessCompiler();
+  app.route(
+    '/',
+    mailingRoutes(sql, {
+      ...deps,
+      compile: (document) => compiler.compile(document),
+      sendTest: options.unsubscribeSigner
+        ? createTestSender({
+            sql,
+            transportFor: options.transportFor ?? createTransportCache(sealer, log).get,
+            signer: options.unsubscribeSigner,
+            publicBaseUrl: options.publicBaseUrl,
+          })
+        : async () => {
+            throw new ApiError('service_unavailable', 'Sending is not configured on this instance (no unsubscribe key).');
+          },
+    }),
+  );
+  app.route('/', messageRoutes(deps));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 
