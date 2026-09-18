@@ -22,6 +22,16 @@
       (refused with `conflict` while a mailing uses the topic, which the schema
       already enforces) once a client needs to remove a topic; S2 ships without
       it [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Mail dashboard: once #21 is merged and `https://app.mail.lumitra.co/api/health`
+      serves its commit, merge auth-brain#142 (shows the `mail` card and subscribes
+      the service to `tenant.erased`); registering the erasure before
+      `/internal/erasure` is deployed would hold every company erasure waiting. Marlin's
+      own sign-in needs a second factor enrolled at auth.lumitra.co (the dashboard
+      requires it) [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Mail service: decide what `user.erased` means for workspace members (remove the
+      person's member rows, and what happens to a workspace whose last owner is
+      erased); today the service acknowledges it as a no-op and is subscribed only to
+      `tenant.erased` [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 - [ ] Decide whether hosts may add new block types (not only redefine the 14
       standard ones): it needs an open block type in the store and schema, a
       renderer hook for the canvas and a compile hook the server can trust.
