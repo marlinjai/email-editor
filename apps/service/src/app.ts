@@ -50,8 +50,11 @@ export type AppOptions = {
    * Overrides the webhook endpoint URL policy (https-only, no private
    * targets). Only ever relaxed by an explicit development flag, never in
    * production; the integration tests use it to reach a local receiver.
+   * `assets.import` fetches remote images under the same policy.
    */
   webhookUrlPolicy?: SsrfPolicy;
+  /** How long `assets.import` waits for a remote image (10 seconds by default). */
+  assetImportTimeoutMs?: number;
   /** Compiles documents off the request thread (a CompilePool in production). */
   compiler: Compiler;
   /** Where uploaded images are stored (Storage Brain in production). */
@@ -84,6 +87,7 @@ export function createApp({
   dashboardServiceToken,
   secretsKeys,
   webhookUrlPolicy,
+  assetImportTimeoutMs,
   compiler,
   assetStorage,
   publicBaseUrl,
@@ -146,7 +150,17 @@ export function createApp({
   app.route('/', auditRoutes(deps));
   const compileForWorkspace = workspaceCompile(pool, compiler, publicBaseUrl);
   app.route('/', templateRoutes(sql, { ...deps, compiler: compileForWorkspace }));
-  app.route('/', assetRoutes(sql, { ...deps, storage: assetStorage, publicBaseUrl, log }));
+  app.route(
+    '/',
+    assetRoutes(sql, {
+      ...deps,
+      storage: assetStorage,
+      publicBaseUrl,
+      log,
+      importPolicy: webhookUrlPolicy ?? {},
+      importTimeoutMs: assetImportTimeoutMs,
+    }),
+  );
   app.route('/', webhookRoutes(sql, deps, webhookUrlPolicy));
   app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch }));
   app.route('/', topicRoutes(sql, deps));
