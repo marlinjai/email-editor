@@ -97,7 +97,7 @@ publish_tarball() {
   local tarball="$1"
   local log
   log="$(mktemp "${TMPDIR:-/tmp}/first-publish-log.XXXXXX")"
-  for _ in 1 2 3; do
+  for _ in 1 2 3 4 5; do
     local args=(publish "$tarball" --access public --provenance=false)
     [ "$DRY_RUN" -eq 1 ] && args+=(--dry-run)
     [ -n "$otp" ] && args+=(--otp "$otp")
@@ -114,8 +114,12 @@ publish_tarball() {
         echo "npm did not accept that one-time password (it may have expired)."
       fi
       [ "$tty_in" = /dev/tty ] || fail "npm asks for a one-time password, but there is no terminal to type it in. Run this from a terminal."
-      read -r -s -p "npm one-time password: " otp </dev/tty
-      echo
+      otp=""
+      while [ -z "$otp" ]; do
+        read -r -s -p "npm one-time password: " otp </dev/tty || fail "no one-time password entered."
+        echo
+        otp="${otp//[[:space:]]/}"
+      done
       continue
     fi
     rm -f "$log"
