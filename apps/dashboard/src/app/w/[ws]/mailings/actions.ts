@@ -9,6 +9,7 @@ import {
   Slug,
   type CompileResult,
   type Mailing,
+  type MailingAnalytics,
   type MailingTestResult,
   type MessageSummary,
   type RecipientBatchResult,
@@ -231,4 +232,127 @@ export async function preflight(ws: string, id: string): Promise<ActionResult<{ 
       hasUnsubscribe: missingRequiredMergeFields(compiled.html).length === 0,
     };
   });
+}
+
+// S4: an audience from a segment, scheduling, A/B tests and analytics.
+
+/** Queues whoever the segment matches now and is subscribed to the mailing's topic. */
+export async function addSegmentAudience(ws: string, id: string, segmentId: string): Promise<ActionResult<RecipientBatchResult>> {
+  if (!segmentId) return { ok: false, error: { code: 'validation_failed', message: 'Choose a segment.', fields: { segment: 'Choose a segment' } } };
+  return act('mailings.addSegment', async () => {
+    const { api } = await mail(ws);
+    const result = await api.mailings.addSegment(id, { segment_id: segmentId });
+    revalidatePath(`${mailingsPath(ws)}/${id}`);
+    return result;
+  });
+}
+
+const ScheduleInput = z.object({
+  sendAt: z
+    .string()
+    .datetime({ offset: true, message: 'Choose a date and time' })
+    .refine((v) => Date.parse(v) > Date.now(), 'Choose a time in the future'),
+});
+
+/** Schedules a draft, or moves a scheduled mailing to another time. The service runs the send checks now. */
+export async function scheduleMailing(ws: string, id: string, input: z.input<typeof ScheduleInput>): Promise<ActionResult<Mailing>> {
+  const parsed = parseInput(ScheduleInput, input);
+  if (!parsed.ok) return parsed;
+  return act('mailings.schedule', async () => {
+    const { api } = await mail(ws);
+    const mailing = await api.mailings.schedule(id, { send_at: new Date(parsed.data.sendAt).toISOString() });
+    revalidatePath(`${mailingsPath(ws)}/${id}`);
+    revalidatePath(mailingsPath(ws));
+    return mailing;
+  });
+}
+
+export async function unscheduleMailing(ws: string, id: string): Promise<ActionResult<Mailing>> {
+  return act('mailings.unschedule', async () => {
+    const { api } = await mail(ws);
+    const mailing = await api.mailings.unschedule(id);
+    revalidatePath(`${mailingsPath(ws)}/${id}`);
+    revalidatePath(mailingsPath(ws));
+    return mailing;
+  });
+}
+
+const AbInput = z
+  .object({
+    variants: z
+      .array(
+        z.object({
+          key: z.string().regex(/^[a-z]$/),
+          subject: z.string().trim().max(998),
+          templateId: z.string(),
+        }),
+      )
+      .min(2, 'A test needs at least two variants')
+      .max(5, 'At most five variants'),
+    testPercent: z.number({ invalid_type_error: 'A share between 1 and 100 percent' }).int().min(1, 'At least 1 percent').max(100, 'At most 100 percent'),
+    winnerMetric: z.enum(['opens', 'clicks', 'manual']),
+    decideAfterMinutes: z.number().int().min(15, 'At least 15 minutes').max(10_080, 'At most 7 days').nullable(),
+  })
+  .superRefine((v, ctx) => {
+    v.variants.forEach((variant, i) => {
+      if (variant.subject === '' && variant.templateId === '') {
+        ctx.addIssue({ code: 'custom', path: ['variants', i], message: 'Give this variant its own subject, its own content, or both' });
+      }
+    });
+    if (v.winnerMetric !== 'manual' && v.decideAfterMinutes === null) {
+      ctx.addIssue({ code: 'custom', path: ['decideAfterMinutes'], message: 'Say when the winner is decided' });
+    }
+  });
+
+/**
+ * Sets the mailing's A/B test. A variant's content comes from a template's
+ * current version; without one it keeps the mailing's content and differs in
+ * the subject only.
+ */
+export async function saveAbTest(ws: string, id: string, input: z.input<typeof AbInput>): Promise<ActionResult<Mailing>> {
+  const parsed = parseInput(AbInput, input);
+  if (!parsed.ok) return parsed;
+  const a = parsed.data;
+  return act('mailings.setAbTest', async () => {
+    const { api } = await mail(ws);
+    const documents = new Map<string, Record<string, unknown>>();
+    for (const templateId of new Set(a.variants.map((v) => v.templateId).filter(Boolean))) {
+      const template = await api.templates.get(templateId);
+      documents.set(templateId, template.document as unknown as Record<string, unknown>);
+    }
+    const mailing = await api.mailings.setAbTest(id, {
+      variants: a.variants.map((v) => ({
+        key: v.key,
+        ...(v.subject ? { subject: v.subject } : {}),
+        ...(v.templateId ? { document: documents.get(v.templateId)! } : {}),
+      })),
+      test_fraction: a.testPercent / 100,
+      winner_metric: a.winnerMetric,
+      ...(a.winnerMetric === 'manual' ? {} : { decide_after_minutes: a.decideAfterMinutes! }),
+    });
+    revalidatePath(`${mailingsPath(ws)}/${id}`);
+    return mailing;
+  });
+}
+
+export async function removeAbTest(ws: string, id: string): Promise<ActionResult<Mailing>> {
+  return act('mailings.clearAbTest', async () => {
+    const { api } = await mail(ws);
+    const mailing = await api.mailings.clearAbTest(id);
+    revalidatePath(`${mailingsPath(ws)}/${id}`);
+    return mailing;
+  });
+}
+
+export async function pickAbWinner(ws: string, id: string, variant: string): Promise<ActionResult<Mailing>> {
+  return act('mailings.pickAbWinner', async () => {
+    const { api } = await mail(ws);
+    const mailing = await api.mailings.pickAbWinner(id, { variant });
+    revalidatePath(`${mailingsPath(ws)}/${id}`);
+    return mailing;
+  });
+}
+
+export async function mailingAnalytics(ws: string, id: string): Promise<ActionResult<MailingAnalytics>> {
+  return act('mailings.analytics', async () => (await mail(ws)).api.mailings.analytics(id));
 }

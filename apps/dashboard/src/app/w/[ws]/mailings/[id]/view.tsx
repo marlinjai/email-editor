@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type { CompileResult, Mailing, MessageSummary, Page, Provider, Recipient, RecipientStatus, TemplateSummary, Topic } from '@marlinjai/mail-contract';
+import type { CompileResult, Mailing, MessageSummary, Page, Provider, Recipient, RecipientStatus, Segment, TemplateSummary, Topic } from '@marlinjai/mail-contract';
 import { CompileMessages, EmailPreview } from '@/components/email-preview';
 import { FormError } from '@/components/form-error';
 import { Badge, Button, EmptyState, ErrorPanel, LinkButton, Mono, Notice, PageHeader, Section, Select, Table, Td, Th, When } from '@/components/ui';
@@ -13,6 +13,7 @@ import type { ActionResult } from '@/lib/result';
 import { getMailing, refreshFromTemplate } from '../actions';
 import { MailingContentForm } from '../content-form';
 import { AddRecipients, Controls, ProgressRail, TestSend } from './parts';
+import { AbTestSection, AnalyticsSection, ScheduledNotice, SegmentAudience } from './platform';
 
 /** How often a live mailing asks for fresh counts. */
 const POLL_MS = 2500;
@@ -68,7 +69,7 @@ export function MailingView({
   initial: Mailing;
   canWrite: boolean;
   viewerEmail: string;
-  lookups: ActionResult<{ topics: Topic[]; providers: Provider[]; templates: TemplateSummary[] }>;
+  lookups: ActionResult<{ topics: Topic[]; providers: Provider[]; templates: TemplateSummary[]; segments: Segment[]; trackingOn: boolean }>;
   recipients: ActionResult<Page<Recipient>>;
   recipientFilter: RecipientStatus | null;
   compiled: ActionResult<CompileResult>;
@@ -153,6 +154,8 @@ export function MailingView({
         actions={canWrite ? <Controls ws={ws} mailing={mailing} allowed={controls} outcomeUnknown={outcomeUnknown} onChange={onChange} /> : null}
       />
 
+      <ScheduledNotice ws={ws} mailing={mailing} canWrite={canWrite} onChange={onChange} />
+
       {mailing.status !== 'draft' || mailing.counts.total > 0 ? (
         <section className="mb-6 rounded-xl border border-line bg-panel p-5" aria-label="Progress">
           <ProgressRail counts={mailing.counts} live={controls.live} />
@@ -206,6 +209,21 @@ export function MailingView({
         )}
       </Section>
 
+      <Section
+        title="A/B test"
+        description={controls.editable ? 'Optional. Set up before sending; the test group goes first, the winner to the rest.' : undefined}
+      >
+        <AbTestSection
+          ws={ws}
+          mailing={mailing}
+          templates={lookups.ok ? lookups.data.templates : []}
+          trackingOn={lookups.ok ? lookups.data.trackingOn : false}
+          canWrite={canWrite}
+          editable={controls.editable}
+          onChange={onChange}
+        />
+      </Section>
+
       <Section title="Test">
         <TestSend ws={ws} mailing={mailing} lastTest={lastTest} defaultTo={viewerEmail} canWrite={canWrite} />
       </Section>
@@ -213,6 +231,18 @@ export function MailingView({
       {canWrite && controls.editable ? (
         <Section title="Add recipients" description="Each address becomes a contact in this workspace if it is not one yet. Adding the same address twice does nothing.">
           <AddRecipients ws={ws} mailingId={mailing.id} />
+        </Section>
+      ) : null}
+
+      {canWrite && controls.editable && lookups.ok ? (
+        <Section title="Add a segment" description="Everyone the segment matches now who is subscribed to this mailing's topic.">
+          <SegmentAudience ws={ws} mailing={mailing} segments={lookups.data.segments} />
+        </Section>
+      ) : null}
+
+      {mailing.started_at ? (
+        <Section title="Analytics">
+          <AnalyticsSection ws={ws} mailing={mailing} />
         </Section>
       ) : null}
 

@@ -11,6 +11,7 @@ import { useAction } from '@/components/use-action';
 import { formatCount, percent } from '@/lib/format';
 import { parseRecipients, PROBLEM_LABELS, type ParseResult } from '@/lib/recipients';
 import { billingPath, usageWarningSummary } from '@/lib/usage';
+import { ScheduleDialog } from './platform';
 import { addRecipients, controlMailing, duplicateMailing, preflight, retryFailed, sendMailing, sendTest } from '../actions';
 
 /** The plan's usage warning the service sent with a send or a test (its `x-mail-usage-warning` header). */
@@ -152,13 +153,14 @@ export function Controls({
 }: {
   ws: string;
   mailing: Mailing;
-  allowed: { send: boolean; pause: boolean; resume: boolean; cancel: boolean; retryFailed: boolean; duplicate: boolean };
+  allowed: { send: boolean; schedule: boolean; pause: boolean; resume: boolean; cancel: boolean; retryFailed: boolean; duplicate: boolean };
   outcomeUnknown: number;
   onChange: (m: Mailing) => void;
 }) {
   const router = useRouter();
   const act = useAction();
   const [sending, setSending] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [includeUnknown, setIncludeUnknown] = useState(false);
@@ -190,9 +192,10 @@ export function Controls({
             Cancel mailing
           </Button>
         ) : null}
+        {allowed.schedule && mailing.status === 'draft' ? <Button onClick={() => setScheduling(true)}>Schedule</Button> : null}
         {allowed.send ? (
           <Button variant="primary" onClick={() => setSending(true)}>
-            Send
+            {mailing.status === 'scheduled' ? 'Send now' : 'Send'}
           </Button>
         ) : null}
       </div>
@@ -209,6 +212,7 @@ export function Controls({
           onChange(sent.mailing);
         }}
       />
+      <ScheduleDialog ws={ws} mailing={mailing} open={scheduling} onClose={() => setScheduling(false)} onDone={onChange} />
       <ConfirmDialog
         open={cancelling}
         onClose={() => setCancelling(false)}

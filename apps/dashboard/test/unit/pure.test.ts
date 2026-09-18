@@ -52,8 +52,9 @@ describe('describeError: every contract error becomes a sentence a person can ac
 
 describe('mailing controls follow the contract table', () => {
   it('offers exactly what MAILING_TRANSITIONS allows', () => {
-    expect(mailingControls('draft')).toMatchObject({ editable: true, send: true, cancel: true, pause: false, duplicate: false, live: false });
-    expect(mailingControls('sending')).toMatchObject({ editable: false, send: false, pause: true, cancel: true, live: true, duplicate: true });
+    expect(mailingControls('draft')).toMatchObject({ editable: true, send: true, schedule: true, unschedule: false, cancel: true, pause: false, duplicate: false, live: false });
+    expect(mailingControls('scheduled')).toMatchObject({ editable: true, send: true, schedule: true, unschedule: true, cancel: true, live: true });
+    expect(mailingControls('sending')).toMatchObject({ editable: false, send: false, schedule: false, pause: true, cancel: true, live: true, duplicate: true });
     expect(mailingControls('paused')).toMatchObject({ resume: true, cancel: true, pause: false, live: true });
     expect(mailingControls('partially_failed')).toMatchObject({ retryFailed: true, cancel: false, live: false, duplicate: true });
     // A cancelled mailing is read-only: nothing but duplicating it.

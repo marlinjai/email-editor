@@ -30,6 +30,8 @@ export function mailingControls(status: MailingStatus) {
   return {
     editable: EDITABLE_MAILING_STATUSES.includes(status),
     send: allowed('send'),
+    schedule: allowed('schedule'),
+    unschedule: allowed('unschedule'),
     pause: allowed('pause'),
     resume: allowed('resume'),
     cancel: allowed('cancel'),

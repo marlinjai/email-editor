@@ -39,12 +39,20 @@ export default async function MailingPage({
   const [lookups, recipients, compiled, lastTest, unknown] = await Promise.all([
     act('mailings.lookups', async () => {
       const { api } = await mail(ws);
-      const [topics, providers, templates] = await Promise.all([
+      const [topics, providers, templates, segments, workspace] = await Promise.all([
         api.topics.list({ limit: 100 }),
         api.providers.list({ limit: 100 }),
         api.templates.list({ archived: 'false', limit: 100 }),
+        api.segments.list({ limit: 100 }),
+        api.workspace.get(),
       ]);
-      return { topics: topics.data, providers: providers.data, templates: templates.data };
+      return {
+        topics: topics.data,
+        providers: providers.data,
+        templates: templates.data,
+        segments: segments.data,
+        trackingOn: workspace.settings.tracking_enabled,
+      };
     }),
     act('mailings.listRecipients', async () => (await mail(ws)).api.mailings.listRecipients(id, { status: rstatus, limit: 50, cursor: sp.rcursor })),
     act('mailings.compile', async () => (await mail(ws)).api.compile({ document: mailing.data.document })),
