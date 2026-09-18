@@ -10,7 +10,7 @@ import {
   TagAssignment,
   filterDepth,
 } from './platform';
-import { CheckoutRequest, PlanLimits, Usage } from './billing';
+import { CheckoutRequest, PlanLimits, PortalRequest, Usage, UsageWarning } from './billing';
 import { TS } from './test-fixtures';
 
 describe('segment filter AST', () => {
@@ -108,7 +108,7 @@ describe('billing', () => {
   });
 
   it('usage is keyed by known metrics', () => {
-    const u = { period_start: TS, period_end: TS, metrics: { messages: { used: 10, limit: 1000 } } };
+    const u = { plan: 'free', period_start: TS, period_end: TS, metrics: { messages: { used: 10, limit: 1000 } }, warnings: [] };
     expect(Usage.safeParse(u).success).toBe(true);
     expect(Usage.safeParse({ ...u, metrics: { opens: { used: 1, limit: null } } }).success).toBe(false);
   });
@@ -117,5 +117,15 @@ describe('billing', () => {
     const c = { plan: 'starter', success_url: 'https://x.de/ok', cancel_url: 'https://x.de/no' };
     expect(CheckoutRequest.safeParse(c).success).toBe(true);
     expect(CheckoutRequest.safeParse({ ...c, plan: 'design_partner' }).success).toBe(false);
+  });
+
+  it('usage warnings name a known metric with a level', () => {
+    expect(UsageWarning.safeParse({ metric: 'messages', used: 800, limit: 1000, level: 'approaching' }).success).toBe(true);
+    expect(UsageWarning.safeParse({ metric: 'messages', used: 800, limit: 1000, level: 'close' }).success).toBe(false);
+  });
+
+  it('the portal takes a return url', () => {
+    expect(PortalRequest.safeParse({ return_url: 'https://x.de/billing' }).success).toBe(true);
+    expect(PortalRequest.safeParse({ return_url: 'not a url' }).success).toBe(false);
   });
 });
