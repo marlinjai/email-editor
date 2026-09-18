@@ -18,7 +18,7 @@ import { applyMirror, ForeignSubscriptionError, mirrorOf, readCurrentSubscriptio
 /** Where Stripe posts events; outside /v1 and the contract, like the unsubscribe page. */
 export const STRIPE_WEBHOOK_PATH = '/stripe/webhook';
 
-/** The events the endpoint is registered for (scripts/stripe-webhook-endpoint.mjs registers exactly these). */
+/** The events the endpoint is registered for (scripts/stripe-setup.mjs registers exactly these; a unit test holds the lists equal). */
 export const STRIPE_WEBHOOK_EVENTS = [
   'checkout.session.completed',
   'customer.subscription.created',

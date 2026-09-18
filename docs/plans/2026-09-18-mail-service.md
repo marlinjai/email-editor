@@ -464,10 +464,12 @@ Built and verified (details in `apps/service/README.md`, section "Billing (S5)")
   `billing.subscription` re-read the subscription from Stripe.
 - **The operator command** `main.js billing-exempt <workspace> on|off "<reason>"`,
   the only writer of `billing_exempt`.
-- **Scripts** `apps/service/scripts/stripe-catalogue.mjs` and
-  `stripe-webhook-endpoint.mjs`, run through the secrets proxy; the webhook
-  secret goes only to the proxy's capture.
-- **Tests**: 33 billing integration tests over a stateful Stripe stand-in at the
+- **One setup command**: `apps/service/scripts/stripe-setup.mjs`, run as a
+  single `execute_with_secrets` call (README, "Stripe setup: one command"),
+  creates the catalogue, the portal configuration and the webhook endpoint and
+  stores every id and the webhook secret in Infisical dev and prod through the
+  proxy's captures; nothing secret is printed.
+- **Tests**: 33 billing integration tests, 4 for the setup script, over a stateful Stripe stand-in at the
   fetch level (so the real client runs), 5 against stripe-mock (in CI as a
   service container), 17 unit tests. The four paths of the subscription
   lifecycle: forward (checkout, payment, webhook); backtrack and revise (up to
@@ -485,7 +487,7 @@ Defaults taken in S5 (each can be overturned later):
    tests). Monthly only, EUR, final prices under paragraph 19 UStG as for
    Lumitra QR. Custom domains are in no sold plan yet (a later phase). These are
    Marlin's to change: the limits in `src/billing/plans.ts`, the amounts there
-   and in `scripts/stripe-catalogue.mjs`.
+   and in `scripts/stripe-setup.mjs`.
 2. **"Messages a month" counts recipients handed to a provider**, from the send
    ledger (`provider_sends`), test sends included, per Stripe period (paid) or
    calendar month in UTC (free, exempt). The contract's metric name stays
@@ -518,9 +520,13 @@ Defaults taken in S5 (each can be overturned later):
 10. **Test-mode Stripe waits on a key.** No Infisical project holds a Stripe
     test key (Lumitra QR and Ultra Power hold only the live one), so
     `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are `PLACEHOLDER_REPLACE_ME`
-    in "Lumitra Mail" dev, and the test catalogue and endpoint are not created
-    yet; the live key was deliberately not copied. Both are ROADMAP lines with
-    exact steps.
+    in "Lumitra Mail" dev and prod, and the test catalogue and endpoint are not
+    created yet; the live key was deliberately not copied. Once Marlin puts the
+    test key in both, one command does the rest (ROADMAP.md).
+12. **Production runs in Stripe test mode until launch**, with the test
+    endpoint at `https://mail.lumitra.co/stripe/webhook`, so the whole flow can
+    be tried on the real deployment without real money; going live replaces
+    the key and reruns the setup with `--live`.
 11. **The suites of earlier phases seed design-partner workspaces**, so they stay
     about their own features; the billing suites seed free ones.
 

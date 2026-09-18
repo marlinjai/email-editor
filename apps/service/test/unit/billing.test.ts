@@ -251,17 +251,14 @@ describe('billing configuration', () => {
 
 describe('the Stripe scripts', () => {
   it('register exactly the events the webhook handles, on the pinned API version', () => {
-    const script = readFileSync(new URL('../../scripts/stripe-webhook-endpoint.mjs', import.meta.url), 'utf8');
+    const script = readFileSync(new URL('../../scripts/stripe-setup.mjs', import.meta.url), 'utf8');
     const events = /const EVENTS = \[([^\]]*)\]/.exec(script)![1]!.match(/'([^']+)'/g)!.map((e) => e.slice(1, -1));
     expect(events).toEqual([...STRIPE_WEBHOOK_EVENTS]);
-    for (const file of ['stripe-webhook-endpoint.mjs', 'stripe-catalogue.mjs']) {
-      const text = readFileSync(new URL(`../../scripts/${file}`, import.meta.url), 'utf8');
-      expect(text).toContain(`const API_VERSION = '${STRIPE_API_VERSION}'`);
-    }
+    expect(script).toContain(`const API_VERSION = '${STRIPE_API_VERSION}'`);
   });
 
   it('the catalogue amounts are the plans\' displayed prices', () => {
-    const script = readFileSync(new URL('../../scripts/stripe-catalogue.mjs', import.meta.url), 'utf8');
+    const script = readFileSync(new URL('../../scripts/stripe-setup.mjs', import.meta.url), 'utf8');
     expect(script).toContain(`lookupKey: 'mail-starter-monthly', product: 'mail-starter', amount: ${PLANS.starter.monthly_price_cents},`);
     expect(script).toContain(`lookupKey: 'mail-growth-monthly', product: 'mail-growth', amount: ${PLANS.growth.monthly_price_cents},`);
   });

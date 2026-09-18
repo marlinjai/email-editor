@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createStripeApi, type StripeApi } from '../../src/billing/stripe.js';
+import { startStripeMock } from '../support/stripe-mock.js';
 
 /**
  * The real Stripe client against stripe-mock (Stripe's own mock, which
@@ -7,36 +8,16 @@ import { createStripeApi, type StripeApi } from '../../src/billing/stripe.js';
  * with fixture objects). It proves the parameters this service sends are ones
  * Stripe accepts; the lifecycle itself is in billing.test.ts over a stateful
  * fake, because stripe-mock keeps no state.
- *
- * STRIPE_MOCK_URL (CI: a service container) or Testcontainers. Neither
- * reachable fails the run, never skips it.
  */
 let stop: (() => Promise<void>) | undefined;
 let stripe: StripeApi;
 let mockBase = '';
 
 beforeAll(async () => {
-  let base = process.env.STRIPE_MOCK_URL;
-  if (!base) {
-    const { GenericContainer, Wait } = await import('testcontainers');
-    try {
-      const container = await new GenericContainer('stripe/stripe-mock:latest')
-        .withExposedPorts(12111)
-        .withWaitStrategy(Wait.forListeningPorts())
-        .start();
-      stop = async () => {
-        await container.stop();
-      };
-      base = `http://${container.getHost()}:${container.getMappedPort(12111)}`;
-    } catch (err) {
-      throw new Error(
-        'The stripe-mock suite needs STRIPE_MOCK_URL or Docker for Testcontainers (see the README, "Test it"). Cause: ' +
-          (err instanceof Error ? err.message : String(err)),
-      );
-    }
-  }
-  mockBase = base;
-  stripe = createStripeApi('sk_test_123', { baseUrl: `${base}/v1` });
+  const mock = await startStripeMock();
+  stop = mock.stop;
+  mockBase = mock.base;
+  stripe = createStripeApi('sk_test_123', { baseUrl: `${mockBase}/v1` });
 }, 120_000);
 afterAll(() => stop?.());
 
