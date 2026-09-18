@@ -5,7 +5,8 @@
 // loader has to follow it into a worker thread. It only ever receives documents
 // that already passed validation (migrateTemplate) on the main thread.
 //
-// Protocol: in `{ id, document }`, out `{ id, ok: true, result: { mjml, html,
+// Protocol: in `{ id, document, options }` (options as the core's
+// `MJMLCompiler.compile` takes them, e.g. `{ webFonts: false }`), out `{ id, ok: true, result: { mjml, html,
 // errors } }` or `{ id, ok: false, error }`.
 
 import { parentPort } from 'node:worker_threads';
@@ -20,9 +21,9 @@ const { createMJMLCompiler } = await import('@marlinjai/email-editor-core/server
 const port = parentPort;
 const compiler = createMJMLCompiler();
 
-port.on('message', (/** @type {{ id: number, document: unknown }} */ message) => {
+port.on('message', (/** @type {{ id: number, document: unknown, options?: { webFonts?: boolean } }} */ message) => {
   try {
-    const result = compiler.compile(/** @type {any} */ (message.document));
+    const result = compiler.compile(/** @type {any} */ (message.document), message.options ?? {});
     port.postMessage({
       id: message.id,
       ok: true,
