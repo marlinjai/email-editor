@@ -11,7 +11,9 @@ import { apiKeyRoutes } from './routes/api-keys.js';
 import { auditRoutes } from './routes/audit.js';
 import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
+import { webhookRoutes } from './routes/webhooks.js';
 import { workspaceRoutes } from './routes/workspaces.js';
+import type { SsrfPolicy } from './webhooks/ssrf.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -20,10 +22,16 @@ export type AppOptions = {
   dashboardServiceToken: string;
   /** MAIL_SECRETS_KEY by version; seals what the service stores at rest. */
   secretsKeys: SecretsKeys;
+  /**
+   * Overrides the webhook endpoint URL policy (https-only, no private
+   * targets). Only ever relaxed by an explicit development flag, never in
+   * production; the integration tests use it to reach a local receiver.
+   */
+  webhookUrlPolicy?: SsrfPolicy;
   log?: Pick<Console, 'error'>;
 };
 
-export function createApp({ sql, dashboardServiceToken, secretsKeys, log = console }: AppOptions) {
+export function createApp({ sql, dashboardServiceToken, secretsKeys, webhookUrlPolicy, log = console }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
   const sealer = createSealer(secretsKeys);
@@ -62,6 +70,7 @@ export function createApp({ sql, dashboardServiceToken, secretsKeys, log = conso
   app.route('/', memberRoutes(sql, deps));
   app.route('/', apiKeyRoutes(sql, deps));
   app.route('/', auditRoutes(deps));
+  app.route('/', webhookRoutes(sql, deps, webhookUrlPolicy));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 

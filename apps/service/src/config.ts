@@ -28,6 +28,16 @@ const EnvSchema = z.object({
    */
   MAIL_UNSUBSCRIBE_KEY: hex64,
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  /**
+   * Development-only escape hatch for the webhook endpoint URL policy
+   * (src/webhooks/ssrf.ts): allows `http://` endpoints and endpoints that
+   * resolve to a private, loopback or link-local address. Never set in
+   * production; unset or "false" keeps the default, strict policy.
+   */
+  WEBHOOK_ALLOW_INSECURE_TARGETS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 export type Config = {
@@ -37,6 +47,7 @@ export type Config = {
   secretsKeys: ReadonlyMap<number, Buffer>;
   unsubscribeKeys: ReadonlyMap<number, Buffer>;
   databasePoolMax: number;
+  webhookAllowInsecureTargets: boolean;
 };
 
 export class ConfigError extends Error {
@@ -65,6 +76,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     secretsKeys: new Map([[1, Buffer.from(e.MAIL_SECRETS_KEY, 'hex')]]),
     unsubscribeKeys: new Map([[1, Buffer.from(e.MAIL_UNSUBSCRIBE_KEY, 'hex')]]),
     databasePoolMax: e.DATABASE_POOL_MAX,
+    webhookAllowInsecureTargets: e.WEBHOOK_ALLOW_INSECURE_TARGETS,
   };
 }
 

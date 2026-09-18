@@ -24,11 +24,20 @@ export type Call = {
 export type Result = { status: number; body: Json; headers: Headers };
 
 /** A migrated database and the app over it, driven in-process through app.request. */
-export async function startHarness() {
+export async function startHarness(options: { allowInsecureWebhookTargets?: boolean } = {}) {
   const db = await freshDatabase();
   await migrate(db.sql, { log: () => {} });
   const errors: unknown[] = [];
-  const app = createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, log: { error: (...a) => errors.push(a) } });
+  const webhookUrlPolicy = options.allowInsecureWebhookTargets
+    ? { allowInsecureHttp: true, allowPrivateTargets: true }
+    : undefined;
+  const app = createApp({
+    sql: db.sql,
+    dashboardServiceToken: DASHBOARD_TOKEN,
+    secretsKeys: SECRETS_KEYS,
+    webhookUrlPolicy,
+    log: { error: (...a) => errors.push(a) },
+  });
 
   async function call(c: Call): Promise<Result> {
     const headers: Record<string, string> = { ...(c.headers ?? {}) };

@@ -238,15 +238,15 @@ export function webhookDeliveriesRepo(db: Db) {
       workspaceId: string,
       deliveryId: string,
       result:
-        | { status: 'succeeded'; statusCode: number; responseSnippet: string | null; durationMs: number }
-        | { status: 'failed'; statusCode: number | null; error: string; responseSnippet: string | null; durationMs: number | null }
+        | { status: 'succeeded'; statusCode: number; responseSnippet?: string | null; durationMs?: number | null }
+        | { status: 'failed'; statusCode: number | null; error: string; responseSnippet?: string | null; durationMs?: number | null }
         | {
             status: 'pending';
             statusCode: number | null;
             error: string;
             nextAttemptAt: Date;
-            responseSnippet: string | null;
-            durationMs: number | null;
+            responseSnippet?: string | null;
+            durationMs?: number | null;
           },
     ): Promise<WebhookDeliveryRow | null> {
       const rows = await db<WebhookDeliveryRow[]>`
@@ -255,8 +255,8 @@ export function webhookDeliveriesRepo(db: Db) {
           attempts = attempts + 1,
           last_status_code = ${result.statusCode},
           last_error = ${result.status === 'succeeded' ? null : result.error},
-          last_response_snippet = ${result.responseSnippet},
-          last_duration_ms = ${result.durationMs},
+          last_response_snippet = ${result.responseSnippet ?? null},
+          last_duration_ms = ${result.durationMs ?? null},
           next_attempt_at = ${result.status === 'pending' ? result.nextAttemptAt : null},
           delivered_at = ${result.status === 'succeeded' ? db`now()` : db`NULL`}
         WHERE workspace_id = ${workspaceId} AND id = ${deliveryId}
