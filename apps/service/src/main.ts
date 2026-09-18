@@ -68,6 +68,7 @@ async function runServe(): Promise<void> {
     publicBaseUrl: config.publicBaseUrl,
     unsubscribeSigner,
     transportFor: transports.get,
+    platformKeys: config.unsubscribeKeys,
   });
   // The send worker: one loop per process. It reconciles what a previous
   // process left mid-send before it claims anything new.
