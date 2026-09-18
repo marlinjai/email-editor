@@ -3,6 +3,7 @@
 // file (vitest runs each file in its own worker), trusts any certificate.
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
+import { randomBytes } from 'node:crypto';
 import { createServer, type AddressInfo } from 'node:net';
 import { ICLOUD_SMTP_POLICY, routes } from '@marlinjai/mail-contract';
 import { generate } from 'selfsigned';
@@ -12,8 +13,10 @@ import { repos } from '../../src/repo/index.js';
 import { appOver } from '../support/app-call.js';
 import { startHarness, type Harness } from '../support/harness.js';
 
-const PASSWORD = 'Sup3r-Secret-Pa55word-4711';
-const RESEND_KEY = 're_Sup3rSecretResendKey4711';
+// Minted per run, so no credential-shaped literal lives in the repository, and
+// a leak check cannot pass by accident on a value that happens to be absent.
+const PASSWORD = randomBytes(18).toString('base64url');
+const RESEND_KEY = `re_${randomBytes(18).toString('base64url')}`;
 const USER = 'news@example.com';
 
 let h: Harness;
@@ -230,7 +233,7 @@ describe('providers.verify against a real SMTP server', () => {
 
   it('reports auth_failed for a wrong password', async () => {
     const p = await createSmtp(tlsPort, {
-      config: { host: '127.0.0.1', port: tlsPort, security: 'tls', username: USER, password: 'wrong-password' },
+      config: { host: '127.0.0.1', port: tlsPort, security: 'tls', username: USER, password: `${PASSWORD}-wrong` },
     });
     const res = await verifyApp().call({ method: 'POST', path: `/v1/providers/${p.id}/verify`, key: A.key });
     expect(res.status).toBe(200);
