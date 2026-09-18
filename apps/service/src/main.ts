@@ -4,6 +4,7 @@ import { ConfigError, loadConfig, loadMigrateConfig } from './config.js';
 import { createSql } from './db.js';
 import { migrate, MigrationError } from './migrate.js';
 import { repos } from './repo/index.js';
+import { createUnsubscribeSigner } from './unsubscribe.js';
 
 /**
  * The service's one entry point, with two commands:
@@ -33,6 +34,7 @@ async function runServe(): Promise<void> {
     sql,
     dashboardServiceToken: config.dashboardServiceToken,
     secretsKeys: config.secretsKeys,
+    unsubscribeSigner: createUnsubscribeSigner(config.unsubscribeKeys),
   });
 
   const purge = setInterval(() => {

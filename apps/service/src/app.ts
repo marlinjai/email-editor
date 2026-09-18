@@ -11,7 +11,9 @@ import { apiKeyRoutes } from './routes/api-keys.js';
 import { auditRoutes } from './routes/audit.js';
 import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
+import { unsubscribeRoutes } from './routes/unsubscribe.js';
 import { workspaceRoutes } from './routes/workspaces.js';
+import type { UnsubscribeSigner } from './unsubscribe.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -20,10 +22,16 @@ export type AppOptions = {
   dashboardServiceToken: string;
   /** MAIL_SECRETS_KEY by version; seals what the service stores at rest. */
   secretsKeys: SecretsKeys;
+  /**
+   * Signs and verifies hosted unsubscribe links (MAIL_UNSUBSCRIBE_KEY). The
+   * public page `/u/<token>` is served only when it is given; `main.ts` always
+   * passes it.
+   */
+  unsubscribeSigner?: UnsubscribeSigner;
   log?: Pick<Console, 'error'>;
 };
 
-export function createApp({ sql, dashboardServiceToken, secretsKeys, log = console }: AppOptions) {
+export function createApp({ sql, dashboardServiceToken, secretsKeys, unsubscribeSigner, log = console }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
   const sealer = createSealer(secretsKeys);
@@ -37,6 +45,9 @@ export function createApp({ sql, dashboardServiceToken, secretsKeys, log = conso
   });
 
   app.route('/', healthRoutes(sql));
+  // Public and outside /v1: a browser page (HTML, its own body limit, no API
+  // credentials), so none of the API middleware below applies to it.
+  if (unsubscribeSigner) app.route('/', unsubscribeRoutes(sql, { signer: unsubscribeSigner, log }));
 
   app.use(
     '/v1/*',
