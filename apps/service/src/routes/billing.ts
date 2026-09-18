@@ -6,7 +6,7 @@ import type { Sql } from '../db.js';
 import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
 import type { BillingRow } from '../repo/billing.js';
-import { PAID_PLANS, PLANS, type BillingConfig } from '../billing/plans.js';
+import { checkoutPriceId, LISTED_PLANS, type BillingConfig } from '../billing/plans.js';
 import { StripeRequestError, type StripeApi } from '../billing/stripe.js';
 import { reconcileWorkspace } from '../billing/sync.js';
 import { computeUsage, periodOf } from '../billing/usage.js';
@@ -67,7 +67,7 @@ export function billingRoutes(sql: Sql, deps: BillingRouteDeps) {
   const staleAfterMs = deps.staleAfterMs ?? 60 * 60_000;
 
   mount(app, 'billing.plans', deps, async (c) => {
-    return c.json({ data: [PLANS.free, ...PAID_PLANS.map((p) => PLANS[p])] });
+    return c.json({ data: [...LISTED_PLANS] });
   });
 
   mount(app, 'billing.subscription', deps, async (c) => {
@@ -96,7 +96,7 @@ export function billingRoutes(sql: Sql, deps: BillingRouteDeps) {
     const access = c.get('access');
     const input = await body(c, 'billing.checkout');
     if (!stripe) notConfigured('no Stripe key');
-    const priceId = config.prices[input.plan];
+    const priceId = checkoutPriceId(config, stripe, input.plan);
     if (!priceId) notConfigured(`no Stripe Price for the ${input.plan} plan`);
 
     const row = (await pool.billing.get(access.workspaceId))!;

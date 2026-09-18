@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "deploy": "wrangler deploy -c redirect/wrangler.jsonc"
   },
   "dependencies": {
     "@marlinjai/email-editor": "workspace:^",

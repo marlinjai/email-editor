@@ -1,4 +1,5 @@
 import type { Plan, PlanFeature, PlanId, PlanLimits, UsageMetric } from '@marlinjai/mail-contract';
+import type { StripeApi } from './stripe.js';
 
 /**
  * The plan catalogue. Limits and features are the service's own (what it
@@ -48,6 +49,9 @@ export const PLANS: Readonly<Record<PlanId, Plan>> = {
 export type PaidPlanId = 'starter' | 'growth';
 export const PAID_PLANS: readonly PaidPlanId[] = ['starter', 'growth'];
 
+/** The plans offered to the public, in order: `billing.plans` and the landing page list exactly these. */
+export const LISTED_PLANS: readonly Plan[] = [PLANS.free, ...PAID_PLANS.map((p) => PLANS[p])];
+
 /** The limit of a usage metric in a plan's limits (null is unlimited). */
 export function limitOf(limits: PlanLimits, metric: UsageMetric): number | null {
   switch (metric) {
@@ -87,6 +91,17 @@ export type BillingConfig = {
   /** A customer-portal configuration allowing switches between the plans' Prices; Stripe's default when unset. */
   portalConfigurationId?: string;
 };
+
+/**
+ * The Stripe Price a paid plan is sold with on this instance, or null when it
+ * cannot be sold: no Stripe client (no key) or no Price id configured for it.
+ * Checkout fails closed on null, and the public landing page shows the plan as
+ * "coming soon" on the same answer, so the two can never disagree.
+ */
+export function checkoutPriceId(config: BillingConfig, stripe: StripeApi | null, plan: PaidPlanId): string | null {
+  if (!stripe) return null;
+  return config.prices[plan] ?? null;
+}
 
 /** The paid plan a Stripe Price id sells, or null for a Price this service does not know. */
 export function planForPrice(config: BillingConfig, priceId: string): PaidPlanId | null {

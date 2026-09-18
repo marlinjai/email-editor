@@ -61,6 +61,23 @@
 - [ ] Mail service dashboard: the billing screens (plan, usage with the 80
       percent warning, checkout, the portal) over `billing.*`, after S3 lands
       [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Redirect `email-editor.lumitra.co` to the landing page: once the landing
+      PR is merged and `curl -sI https://mail.lumitra.co/en` answers 200, run
+      `pnpm -F email-editor-nextjs-example deploy` (wrangler, logged in on
+      Marlin's Mac with Workers write) and check that
+      `curl -sI https://email-editor.lumitra.co/editor` answers 308 with
+      `location: https://mail.lumitra.co/`. If wrangler fails on the custom
+      domain, delete the `routes` block from `redirect/wrangler.jsonc` and retry:
+      the domain stays bound to the script name `email-editor`. Deploying earlier
+      would send old links to a 404 [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
+- [ ] Lumitra Mail privacy notice (needs Marlin's legal review): lumitra.co/datenschutz
+      covers the landing page but defers product-specific processing to a notice on
+      the product's own domain, and Mail has none. Write `mail.lumitra.co/privacy`
+      (what the service stores for workspaces and recipients, the processor role,
+      sub-processors Hetzner, the workspace's provider and Storage Brain, erasure),
+      publish the Art. 28 processing agreement template from "Legal shape", point the
+      landing footer's privacy link at it, and add mail.lumitra.co to the subdomain
+      list of lumitra.co/impressum [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
 
 ## Recently shipped
 
