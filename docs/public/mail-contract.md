@@ -56,7 +56,10 @@ to `full`, `send` or `read`.
 
 The dashboard calls server-side with its service token in `Authorization`, plus
 `x-mail-subject` (the signed-in person's auth-brain subject) and `x-mail-workspace`.
-The service checks that person's membership and role on every call.
+The service checks that person's membership and role on every call. Members are
+bound by auth-brain subject: the dashboard resolves the person and posts
+`{ subject, email, name, role }`, since the service never sees a login. The
+liveness probe is `GET /healthz`, outside `/v1` and without credentials.
 
 Every route declares an `access` level:
 
@@ -65,6 +68,7 @@ Every route declares an `access` level:
 | `read` | any | viewer or above |
 | `write` | `send` or `full` | editor or above |
 | `admin` | `full` | admin or above |
+| `dashboard` | refused | dashboard token plus `x-mail-subject`, no workspace yet (create a workspace, list the person's workspaces) |
 | `public` | none | none (signup form submission only) |
 
 ## Errors

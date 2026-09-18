@@ -27,6 +27,22 @@ export const Workspace = z.object({
 });
 export type Workspace = z.infer<typeof Workspace>;
 
+/**
+ * Creating a workspace (dashboard only). The signed-in person named by
+ * `x-mail-subject` becomes its owner; the dashboard supplies their email and
+ * name, because the service never talks to auth-brain itself.
+ */
+export const WorkspaceCreate = z.object({
+  slug: Slug,
+  name: z.string().min(1).max(120),
+  settings: WorkspaceSettings.partial().optional(),
+  owner: z.object({
+    email: Email,
+    name: z.string().max(200).nullable().optional(),
+  }),
+});
+export type WorkspaceCreate = z.infer<typeof WorkspaceCreate>;
+
 export const WorkspaceUpdate = z
   .object({
     name: z.string().min(1).max(120),
@@ -43,6 +59,10 @@ export const MEMBER_ROLES = ['owner', 'admin', 'editor', 'viewer'] as const;
 export const MemberRole = z.enum(MEMBER_ROLES);
 export type MemberRole = z.infer<typeof MemberRole>;
 
+/** A workspace as listed for the signed-in person, with their role in it. */
+export const WorkspaceMembership = Workspace.extend({ role: MemberRole });
+export type WorkspaceMembership = z.infer<typeof WorkspaceMembership>;
+
 export const Member = z.object({
   id: Id,
   /** The person's auth-brain subject. */
@@ -54,11 +74,18 @@ export const Member = z.object({
 });
 export type Member = z.infer<typeof Member>;
 
-export const MemberInvite = z.object({
+/**
+ * Adding a member. The service binds people by auth-brain subject only (it never
+ * sees a login), so the dashboard resolves the person first and sends the subject
+ * with their email and name. The same subject twice is `already_exists` (409).
+ */
+export const MemberCreate = z.object({
+  subject: z.string().min(1).max(255),
   email: Email,
+  name: z.string().max(200).nullable().optional(),
   role: MemberRole,
 });
-export type MemberInvite = z.infer<typeof MemberInvite>;
+export type MemberCreate = z.infer<typeof MemberCreate>;
 
 /**
  * Changing a role. Only an owner may grant or revoke `owner`, and the last owner
@@ -104,8 +131,9 @@ export type ApiKeyCreated = z.infer<typeof ApiKeyCreated>;
 // Audit log
 
 export const AUDIT_ACTIONS = [
+  'workspace.created',
   'workspace.updated',
-  'member.invited',
+  'member.added',
   'member.role_changed',
   'member.removed',
   'api_key.created',
