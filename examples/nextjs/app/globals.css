@@ -1,6 +1,8 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* The editor brings its own stylesheet (@marlinjai/email-editor/styles.css,
+   imported by the editor page), scoped under .ee-root. Nothing below styles
+   the editor: this file is the host's own design. */
 
 /* ─── Unified "Refined Midnight" palette ─── */
 :root {
@@ -50,49 +52,15 @@
 
 /* ─── Base layer ─── */
 @layer base {
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    @apply border-brand-border;
-  }
-
   html,
   body {
     height: 100%;
-    @apply font-sans text-brand-text;
+    font-family: var(--font-jakarta), system-ui, sans-serif;
   }
 
   body {
     background: var(--background);
     color: var(--foreground);
-  }
-}
-
-/* ─── Editor component styles ─── */
-@layer components {
-  .email-editor {
-    @apply w-full h-screen flex flex-col bg-canvas-1 text-brand-text;
-  }
-
-  .btn {
-    @apply px-4 py-2 rounded font-medium transition-colors;
-  }
-
-  .btn-primary {
-    @apply bg-brand-primary text-white hover:bg-opacity-90;
-  }
-
-  .btn-secondary {
-    @apply bg-canvas-2 border border-brand-border hover:bg-canvas-3;
-  }
-
-  .input {
-    @apply w-full px-3 py-2 border border-brand-border rounded focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-opacity-50;
-  }
-
-  .panel {
-    @apply bg-canvas-2 border-r border-brand-border overflow-y-auto;
   }
 }
 
@@ -472,7 +440,7 @@ body::after {
 }
 
 /* Hide atmosphere effects on editor page */
-body:has(.email-editor)::before,
-body:has(.email-editor)::after {
+body:has(.ee-root)::before,
+body:has(.ee-root)::after {
   display: none;
 }

@@ -7,6 +7,7 @@ import { X } from 'lucide-react';
 import clsx from 'clsx';
 import type { PrebuiltTemplate } from '@marlinjai/email-editor-core';
 import { PrebuiltTemplateCard } from './PrebuiltTemplateCard';
+import { useEditorHost } from '../host/EditorHostContext';
 
 interface PrebuiltTemplateModalProps {
   open: boolean;
@@ -23,6 +24,7 @@ export function PrebuiltTemplateModal({
   templates,
   onSelect,
 }: PrebuiltTemplateModalProps) {
+  const { portalContainer } = useEditorHost();
   const [activeCategory, setActiveCategory] = useState<string>(ALL);
 
   // Build category list from the actual templates so new categories show up automatically.
@@ -49,7 +51,7 @@ export function PrebuiltTemplateModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
+      <Dialog.Portal container={portalContainer ?? undefined}>
         <Dialog.Overlay
           className={clsx(
             'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',

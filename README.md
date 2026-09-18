@@ -18,7 +18,7 @@ Replace GrapesJS and Unlayer with a fully controllable, customizable email edito
 - **Device Preview** - Desktop and mobile views
 - **Rich Text** - TipTap editor for text blocks
 - **Themeable** - Customize colors and fonts
-- **Extensible** - Add custom blocks easily
+- **Adjustable blocks** - Redefine the label, icon and defaults of any standard block
 - **14 Block Types** - Text, Image, Button, Divider, Spacer, Social, Navbar, Carousel, Accordion, Table, Header, Footer, Hero, Raw HTML
 
 ### Platform
@@ -35,26 +35,32 @@ Replace GrapesJS and Unlayer with a fully controllable, customizable email edito
 
 ```bash
 # Install
-pnpm add @marlinjai/email-editor
+pnpm add @marlinjai/email-editor @marlinjai/email-editor-core react react-dom
 ```
 
 ```tsx
 // Use in React
-import { EmailEditorReact } from '@marlinjai/email-editor/react';
+'use client';
+
+import { useState } from 'react';
+import { EmailEditorReact, type TemplateSnapshotOut } from '@marlinjai/email-editor/react';
 import '@marlinjai/email-editor/styles.css';
 
-function App() {
-  const [template, setTemplate] = useState({
-    version: '1.0',
-    metadata: { subject: 'My Email' },
-    sections: [],
-  });
+function App({ initial }: { initial?: TemplateSnapshotOut }) {
+  const [doc, setDoc] = useState(initial);
 
-  return <EmailEditorReact value={template} onChange={setTemplate} />;
+  // The editor fills its container, so the container needs a height.
+  return (
+    <div style={{ height: '80vh' }}>
+      <EmailEditorReact initialTemplate={initial} onChange={setDoc} />
+    </div>
+  );
 }
 ```
 
-See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
+The editor is uncontrolled: `initialTemplate` is read once on mount, and `onChange` receives the whole document (debounced by 300 ms). Import `styles.css` once; it is scoped under `.ee-root`, so it is safe beside Tailwind CSS 4 with no Tailwind configuration change. Compile documents on your server: validate with `migrateTemplate` (from `@marlinjai/email-editor-core`), then `createMJMLCompiler().compile(doc)` (from `@marlinjai/email-editor-core/server`). Next.js setup, theming and the `onRequestImage` image picker hook are in [packages/editor/README.md](packages/editor/README.md).
+
+See [docs/public/quickstart.md](docs/public/quickstart.md)
 
 ---
 
@@ -71,7 +77,7 @@ See [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md)
 ### Infrastructure
 | Package | Description |
 |---------|-------------|
-| `@email-editor/shared` | Client factories, context providers, schema bootstrapper |
+| `@email-editor/shared` | Client factories, context providers, schema bootstrapper (private, workspace-only, not published to npm) |
 
 ### Platform
 | Package | Description |
@@ -189,17 +195,18 @@ cd examples/nextjs
 pnpm run dev
 ```
 
-See [docs/guides/development.md](docs/guides/development.md)
+Commands and architecture for working on this repository: [CLAUDE.md](CLAUDE.md) and [docs/public/architecture.md](docs/public/architecture.md).
 
 ---
 
 ## Documentation
 
-- [Getting Started](docs/getting-started/integration.md) - Installation and basic usage
-- [API Reference](docs/guides/api.md) - Complete API documentation
-- [Development Guide](docs/guides/development.md) - Contributing and architecture
-- [Installation](docs/getting-started/installation.md) - Setup instructions
-- [Quick Start](docs/getting-started/quickstart.md) - 5-minute overview
+- [Editor package README](packages/editor/README.md) - Host setup: Next.js, styles, image hook, server compilation
+- [Integration](docs/public/integration.md) - Installation and basic usage
+- [API Reference](docs/public/api.md) - Complete API documentation
+- [Architecture](docs/public/architecture.md) - How the packages fit together
+- [Installation](docs/public/installation.md) - Setup instructions
+- [Quick Start](docs/public/quickstart.md) - 5-minute overview
 
 ---
 
@@ -213,8 +220,8 @@ See [docs/guides/development.md](docs/guides/development.md)
 - MJML (email compilation)
 
 **UI**
-- React 18
-- Tailwind CSS
+- React 18 or 19
+- Tailwind CSS 3 (compiled into a stylesheet scoped under `.ee-root`, safe in Tailwind CSS 4 hosts)
 - Radix UI (accessible components)
 - dnd-kit (drag and drop)
 - TipTap (rich text editing)
@@ -261,7 +268,7 @@ MIT License - See LICENSE file for details
 
 ## Contributing
 
-Contributions welcome! See [docs/guides/development.md](docs/guides/development.md) for guidelines.
+Contributions welcome! See [CLAUDE.md](CLAUDE.md) for commands and conventions.
 
 ---
 

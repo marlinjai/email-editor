@@ -10,6 +10,17 @@
       topics, webhooks, a hosted unsubscribe page, and the editor published as an
       SDK. The Phase 0 to 7 "complete" marks below describe UI over mock adapters,
       not a running service (2026-09-18)
+- [ ] npm: first-publish `@marlinjai/email-editor-core`, `-blocks`, `-ui` and
+      `@marlinjai/email-editor` 0.1.0 by hand from the checked tarballs (npm
+      cannot attach a trusted publisher to a package that does not exist yet),
+      then register each as a trusted publisher (repository
+      `marlinjai/email-editor`, workflow `publish-editor.yml`) and push the tag
+      `editor-v0.1.0`; needs Marlin's npm account, steps in the
+      [plan](docs/plans/2026-09-18-mail-service.md) under question 4 (2026-09-18)
+- [ ] Decide whether hosts may add new block types (not only redefine the 14
+      standard ones): it needs an open block type in the store and schema, a
+      renderer hook for the canvas and a compile hook the server can trust.
+      Until then the editor refuses a new type at setup (2026-09-18)
 
 ## Recently shipped
 

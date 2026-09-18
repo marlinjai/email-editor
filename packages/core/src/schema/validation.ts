@@ -53,8 +53,9 @@ export const TemplateMetadataSchema = z.object({
   subject: z.string().optional(),
   previewText: z.string().optional(),
   title: z.string().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
+  // Epoch milliseconds (what the editor's store emits) or an ISO 8601 string.
+  createdAt: z.union([z.string(), z.number()]).optional(),
+  updatedAt: z.union([z.string(), z.number()]).optional(),
   // Head component settings
   fonts: z.array(CustomFontSchema).optional(),
   breakpoint: z.string().optional(),

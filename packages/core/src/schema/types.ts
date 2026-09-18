@@ -38,8 +38,10 @@ export interface TemplateMetadata {
   subject?: string;
   previewText?: string;
   title?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  /** Epoch milliseconds (what the editor emits) or an ISO 8601 string */
+  createdAt?: string | number;
+  /** Epoch milliseconds (what the editor emits) or an ISO 8601 string */
+  updatedAt?: string | number;
   fonts?: FontDefinition[];
   themeColors?: ThemeColor[];
   breakpoint?: string;

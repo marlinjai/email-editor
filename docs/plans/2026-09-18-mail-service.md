@@ -266,6 +266,15 @@ Written once so the phases built in parallel cannot drift apart:
 - **S1, editor and templates.** Templates and compile API; the editor packages
   updated for React 19 and Next 16, given the image hook and migration entry
   point, published; the SDK published. ŌPUNTIA can compose and preview.
+  Reality (2026-09-18, editor half, branch `feat/editor-packages-0.1`): the
+  four editor packages are at `0.1.0` and publishable (checked on the packed
+  tarballs in CI by `scripts/check-packed-manifests.mjs`); `onRequestImage` and
+  `migrateTemplate` exist; the prebuilt stylesheet is scoped under `.ee-root`
+  and verified in a Next 16, React 19, Tailwind CSS 4 host (`examples/nextjs`);
+  `publish-editor.yml` publishes on a tag `editor-v*`. The document's schema
+  field is `version` (today `"1.0"`); the service's `schema_version` column
+  stores that value. Not yet published: waits on the npm steps in question 4
+  below.
 - **S2, sending.** Providers with encrypted secrets and policies; contacts, topics,
   suppressions; mailings, recipients, the worker, the unsubscribe page, webhooks.
   ŌPUNTIA can send. Tested on all four paths of a stateful flow (forward,
@@ -314,6 +323,21 @@ later decision can overturn:
    package still has to be registered as a trusted publisher on npmjs.com by
    Marlin before the first publish succeeds (a 404 on the upload means it is not
    registered yet). Until then hosts consume the packages from the workspace.
+   For the editor that is four registrations on npmjs.com, each with repository
+   `marlinjai/email-editor` and workflow file `publish-editor.yml`:
+   `@marlinjai/email-editor-core`, `@marlinjai/email-editor-blocks`,
+   `@marlinjai/email-editor-ui` and `@marlinjai/email-editor`. None of them
+   exists on npm yet (checked 2026-09-18), and npm only lets a trusted
+   publisher be attached to an existing package, so the very first publish is
+   manual and Marlin's: build, run
+   `node scripts/check-packed-manifests.mjs --out /tmp/editor-tarballs`, then
+   `npm publish <tarball> --access public` for core, blocks, ui and editor in
+   that order (publish the checked tarballs, never `npm publish` inside a
+   package directory, which would ship `workspace:` ranges). Then attach the
+   trusted publisher to each package and push the tag `editor-v0.1.0`: the
+   workflow skips versions already on the registry, so it verifies the setup
+   without republishing, and every later `editor-v*` tag publishes through
+   OpenID Connect with provenance.
 5. **Contract details the plan left open** (fixed in `@marlinjai/mail-contract`,
    2026-09-18): a recipient whose outcome is unknown after a crash ends `skipped`
    with `skip_reason` `outcome_unknown` rather than `failed`, so `retry-failed`

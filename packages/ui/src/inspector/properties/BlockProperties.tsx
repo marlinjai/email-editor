@@ -15,6 +15,7 @@ import {
   SpacingField,
   FormattingToolbar,
 } from '../fields';
+import { ImageSourceField } from './ImageSourceField';
 
 /**
  * Hook to get theme colors from template metadata
@@ -207,12 +208,7 @@ const ImageBlockProperties = observer(function ImageBlockProperties({
 }) {
   return (
     <>
-      <TextField
-        label="Image URL"
-        value={block.src || ''}
-        onChange={(src) => block.updateStyle('src', src)}
-        placeholder="https://..."
-      />
+      <ImageSourceField block={block} />
       <TextField
         label="Alt Text"
         value={block.alt || ''}

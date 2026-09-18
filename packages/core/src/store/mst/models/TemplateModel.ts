@@ -111,7 +111,24 @@ export const TemplateMetadataModel = types
     touch() {
       self.updatedAt = new Date();
     },
-  }));
+  }))
+  // A stored document may carry its dates as ISO strings (a host that set
+  // `updatedAt: new Date()` and serialized to JSON writes one). The store keeps
+  // dates as `Date`, so parse strings on the way in and drop unparseable ones,
+  // letting the default (now) apply, instead of refusing to open the document.
+  .preProcessSnapshot((snapshot) => {
+    if (!snapshot) return snapshot;
+    const toDate = (value: unknown) => {
+      if (typeof value !== 'string') return value;
+      const ms = Date.parse(value);
+      return Number.isNaN(ms) ? undefined : ms;
+    };
+    return {
+      ...snapshot,
+      createdAt: toDate(snapshot.createdAt),
+      updatedAt: toDate(snapshot.updatedAt),
+    } as typeof snapshot;
+  });
 
 /**
  * TemplateModel - The root model for an email template

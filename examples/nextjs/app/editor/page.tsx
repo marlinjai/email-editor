@@ -4,8 +4,33 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { EmailEditorReact, type TemplateSnapshotIn, type TemplateSnapshotOut } from '@marlinjai/email-editor/react';
+import type {
+  TemplateSnapshotIn,
+  TemplateSnapshotOut,
+  OnRequestImage,
+} from '@marlinjai/email-editor/react';
+// The editor's stylesheet is scoped under .ee-root, so it sits beside this
+// app's Tailwind 4 styles without either one restyling the other.
+import '@marlinjai/email-editor/styles.css';
+import { ImagePickerDialog, type PendingImageRequest } from './ImagePickerDialog';
+
+// The editor is browser-only (drag and drop, rich text, MobX): load it on the
+// client only. MJML compilation happens server-side in /api/compile.
+const EmailEditorReact = dynamic(
+  () => import('@marlinjai/email-editor/react').then((mod) => mod.EmailEditorReact),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: 'var(--muted)' }}>Loading editor...</div>
+    ),
+  }
+);
+
+// The editor chrome uses this app's font: a theme sets design tokens on the
+// editor's root element only.
+const editorTheme = { fonts: { body: 'var(--font-jakarta), system-ui, sans-serif' } };
 
 /**
  * Default template
@@ -25,6 +50,13 @@ export default function EditorPage() {
   const router = useRouter();
   const [currentTemplate, setCurrentTemplate] = useState<TemplateSnapshotOut | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>('');
+  const [imageRequest, setImageRequest] = useState<PendingImageRequest | null>(null);
+
+  // The editor asks for an image; this host answers from its own picker.
+  const handleRequestImage = useCallback<OnRequestImage>(
+    (request) => new Promise((resolve, reject) => setImageRequest({ request, resolve, reject })),
+    []
+  );
 
   // Handle template changes
   const handleTemplateChange = useCallback((newTemplate: TemplateSnapshotOut) => {
@@ -115,13 +147,18 @@ export default function EditorPage() {
           {saveStatus}
         </div>
       )}
-      <EmailEditorReact
-        initialTemplate={defaultTemplate}
-        onChange={handleTemplateChange}
-        onSave={handleSave}
-        onExport={handleExport}
-        onNavigateBack={() => router.push('/dashboard')}
-      />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <EmailEditorReact
+          initialTemplate={defaultTemplate}
+          onChange={handleTemplateChange}
+          onSave={handleSave}
+          onExport={handleExport}
+          onNavigateBack={() => router.push('/dashboard')}
+          onRequestImage={handleRequestImage}
+          theme={editorTheme}
+        />
+      </div>
+      {imageRequest && <ImagePickerDialog pending={imageRequest} onDone={() => setImageRequest(null)} />}
     </div>
   );
 }
