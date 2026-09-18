@@ -410,6 +410,25 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
 - **Suppressions.** Adding one is idempotent per address and topic; a new
   `unsubscribed` block unsubscribes the contact and emits `contact.unsubscribed`
   (source `api` or `dashboard`) in the same transaction. Lifting needs `admin`.
+- **Bounces and complaints** (`src/bounces.ts`). A permanent SMTP rejection
+  goes through `rejectionAction` (`src/transport/rejection.ts`): a hard bounce
+  (5.1.x except 5.1.7 and 5.1.8, 5.2.1, or a 550/551/553 whose text names the
+  recipient) blocks the address on every topic as `bounced` with the message as
+  `source_message_id` and emits `contact.bounced`; the sender's problem (5.7.x,
+  530/534/535, a Resend 401/403, no transport) increments the provider's
+  `rejections_count` and keeps its `last_rejection`; anything else only fails
+  the message. All of it runs in the transaction that archives the message.
+  Resend providers also receive `email.bounced` (type `Permanent` only) and
+  `email.complained` at `POST /providers/:id/events/resend`
+  (`src/routes/provider-events.ts`), Svix-signed with the endpoint's secret
+  (sealed in `events_secret_sealed`), once per `svix-id` (`provider_events`,
+  pruned after 30 days). Create and verify register the endpoint at Resend
+  (`registerResendEvents`); when that fails (a sending-only key, no public
+  https address, Resend unreachable) `events.error` says why and
+  `providers.set_events_secret` takes the secret pasted from Resend's
+  dashboard. Bounces an SMTP server reports later by email (iCloud+) are not
+  detected. Tests: `test/unit/rejection.test.ts` (the classification table),
+  `test/integration/bounces.test.ts`.
 - Tests: `test/integration/providers.test.ts` verifies against a real in-process
   SMTP server (`smtp-server`, self-signed TLS, so that one file sets
   `NODE_TLS_REJECT_UNAUTHORIZED=0`); `test/integration/contacts.test.ts` covers the
