@@ -365,3 +365,36 @@ describe('contract conformance, phase S4: imports', () => {
     expect([...covered].sort()).toEqual(imports.sort());
   });
 });
+
+describe('contract conformance, phase S4: signup forms', () => {
+  it('every signupForms.* operation answers with its declared status and response schema', async () => {
+    const { repos } = await import('../../src/repo/index.js');
+    const { createPurposeSigner } = await import('../../src/platform/tokens.js');
+    const { UNSUBSCRIBE_KEYS } = await import('../support/harness.js');
+    const { seedSending } = await import('../support/sending.js');
+    const w = await h.seedWorkspace('contract-signup');
+    const { provider } = await seedSending(h, w.id, { topic: 'signup-news' });
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+    const input = { name: 'Newsletter', title: 'Stay in touch', consent_text: 'I agree.', topics: ['signup-news'], provider_id: provider.id };
+    const form = await run('signupForms.create', await h.call({ method: 'POST', path: '/v1/signup-forms', key: w.key, body: input }));
+    await run('signupForms.list', await h.call({ path: '/v1/signup-forms', key: w.key }));
+    await run('signupForms.get', await h.call({ path: `/v1/signup-forms/${form.body.id}`, key: w.key }));
+    await run('signupForms.update', await h.call({ method: 'PUT', path: `/v1/signup-forms/${form.body.id}`, key: w.key, body: { ...input, fields: ['first_name'] } }));
+    await run('signupForms.embed', await h.call({ path: `/v1/signup-forms/${form.body.id}/embed`, key: w.key }));
+    const token = createPurposeSigner(UNSUBSCRIBE_KEYS, 'signup-render').sign(`${form.body.id}.${Date.now() - 10_000}`);
+    await run(
+      'signupForms.submit',
+      await h.call({ method: 'POST', path: `/v1/signup-forms/${form.body.id}/submit`, body: { email: 'conform@example.com', form_token: token } }),
+    );
+    await run('signupForms.delete', await h.call({ method: 'DELETE', path: `/v1/signup-forms/${form.body.id}`, key: w.key }));
+    expect(await repos(h.sql).signup.getForm(w.id, form.body.id)).toBeNull();
+
+    const ops = Object.keys(routes).filter((id) => id.startsWith('signupForms.')) as OperationId[];
+    expect([...covered].sort()).toEqual(ops.sort());
+  });
+});

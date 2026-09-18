@@ -1,4 +1,4 @@
-import { MAX_ASSET_BYTES, MAX_IMPORT_BYTES, REQUEST_ID_HEADER, routes } from '@marlinjai/mail-contract';
+import { MAX_ASSET_BYTES, MAX_IMPORT_BYTES, REQUEST_ID_HEADER, matchRoute, routes, type HttpMethod } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AssetStorage } from './assets/storage.js';
@@ -39,6 +39,9 @@ import { segmentRoutes } from './routes/segments.js';
 import { importRoutes } from './routes/imports.js';
 import { createSmtpTransport, type SmtpSettings } from './transport/smtp.js';
 import type { Transport } from './transport/types.js';
+import { signupFormRoutes } from './routes/signup-forms.js';
+import { signupPageRoutes } from './routes/signup-pages.js';
+import { createSignupService, type SignupOptions } from './signup/service.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 /** An image upload: the file itself plus room for the multipart framing around it. */
@@ -81,10 +84,28 @@ export type AppOptions = {
   /**
    * S4: MAIL_UNSUBSCRIBE_KEY by version, from which the S4 token signers derive
    * their keys (src/platform/tokens.ts). The public S4 endpoints (tracking,
-   * signup pages) are served only when it is given.
+   * the hosted signup pages `/f/...`) are served, and signup submissions
+   * accepted, only when it is given.
    */
   platformKeys?: RootKeys;
+  /** S4: the time check and rate limits of the signup forms (defaults in src/signup/service.ts). */
+  signup?: SignupOptions;
 };
+
+const PUBLIC_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+/**
+ * Whether a request is for a route the contract marks `public` (the signup
+ * submission), which takes no credential. An OPTIONS preflight counts when any
+ * method of that path is public.
+ */
+export function isPublicRequest(method: string, path: string): boolean {
+  const methods = method === 'OPTIONS' ? PUBLIC_METHODS : [method as HttpMethod];
+  return methods.some((m) => {
+    const match = matchRoute(m, path);
+    return match !== null && routes[match.id].access === 'public';
+  });
+}
 
 export function createApp({
   sql,
@@ -101,6 +122,7 @@ export function createApp({
   unsubscribeSigner,
   transportFor,
   platformKeys,
+  signup,
 }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
@@ -120,6 +142,8 @@ export function createApp({
   // credentials), so none of the API middleware below applies to it.
   if (unsubscribeSigner) app.route('/', unsubscribeRoutes(sql, { signer: unsubscribeSigner, log }));
   if (platformKeys) app.route('/', trackingRoutes(sql, { tokens: createTrackingTokens(platformKeys) }));
+  const signupService = platformKeys ? createSignupService({ sql, keys: platformKeys, options: signup }) : null;
+  if (signupService) app.route('/', signupPageRoutes(sql, { service: signupService, publicBaseUrl, log: { error: log.error, log: console.log } }));
 
   const limit = (maxSize: number) =>
     bodyLimit({
@@ -140,15 +164,14 @@ export function createApp({
         ? importLimit(c, next)
         : jsonLimit(c, next),
   );
-  app.use(
-    '/v1/*',
-    authenticate({
-      dashboardServiceToken,
-      findCredentialByHash: (hash) => pool.apiKeys.findCredentialByHash(hash),
-      touchApiKey: (ws, id) => pool.apiKeys.touch(ws, id),
-      findMember: (ws, subject) => pool.members.bySubject(ws, subject),
-    }),
-  );
+  const auth = authenticate({
+    dashboardServiceToken,
+    findCredentialByHash: (hash) => pool.apiKeys.findCredentialByHash(hash),
+    touchApiKey: (ws, id) => pool.apiKeys.touch(ws, id),
+    findMember: (ws, subject) => pool.members.bySubject(ws, subject),
+  });
+  // Routes the contract marks `public` take no credential.
+  app.use('/v1/*', (c, next) => (isPublicRequest(c.req.method, c.req.path) ? next() : auth(c, next)));
 
   const deps = { pool, sealer };
   app.route('/', workspaceRoutes(sql, deps));
@@ -188,6 +211,15 @@ export function createApp({
   app.route('/', tagRoutes(sql, deps));
   app.route('/', contactPropertyRoutes(sql, deps));
   app.route('/', segmentRoutes(sql, deps));
+  app.route(
+    '/',
+    signupFormRoutes(sql, {
+      ...deps,
+      compile: (document) => compiler.compile(document),
+      publicBaseUrl,
+      service: signupService,
+    }),
+  );
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 

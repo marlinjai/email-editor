@@ -7,6 +7,7 @@ import type { RootKeys } from './tokens.js';
 import { createAbDecisionJob } from './ab-job.js';
 import { createScheduleJob } from './schedule-job.js';
 import type { PlatformJob } from './worker.js';
+import { signupConfirmationJob } from '../signup/mail-job.js';
 
 /** What the S4 jobs are built from; main.ts passes the same objects the API and the send worker use. */
 export type PlatformDeps = {
@@ -27,5 +28,12 @@ export function platformJobs(deps: PlatformDeps): PlatformJob[] {
     createScheduleJob({ sql: deps.sql, compile, log: deps.log }),
     createAbDecisionJob({ sql: deps.sql, log: deps.log }),
     createImportJob({ sql: deps.sql, log: deps.log }),
+    signupConfirmationJob({
+      sql: deps.sql,
+      transportFor: deps.transportFor,
+      rootKeys: deps.rootKeys,
+      publicBaseUrl: deps.publicBaseUrl,
+      log: deps.log,
+    }),
   ];
 }
