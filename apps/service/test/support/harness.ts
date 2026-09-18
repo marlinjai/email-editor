@@ -2,6 +2,8 @@ import { createApp } from '../../src/app.js';
 import { CompilePool } from '../../src/compile/pool.js';
 import type { Sql } from '../../src/db.js';
 import { migrate } from '../../src/migrate.js';
+import { createSealer, type Sealer } from '../../src/sealing.js';
+import type { SsrfPolicy } from '../../src/webhooks/ssrf.js';
 import { freshDatabase } from './db.js';
 import { MemoryAssetStorage } from './fakes.js';
 
@@ -30,7 +32,7 @@ export type Call = {
 export type Result = { status: number; body: Json; headers: Headers };
 
 /** A migrated database and the app over it, driven in-process through app.request. */
-export async function startHarness() {
+export async function startHarness(options: { webhookUrlPolicy?: SsrfPolicy } = {}) {
   const db = await freshDatabase();
   await migrate(db.sql, { log: () => {} });
   const errors: unknown[] = [];
@@ -40,8 +42,10 @@ export async function startHarness() {
   const appDeps = { compiler, assetStorage: storage, publicBaseUrl: PUBLIC_BASE_URL };
   const log = { error: (...a: unknown[]) => errors.push(a) };
   /** A second, independent app over the same database: a service restart. */
-  const restart = () => createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, log, ...appDeps });
+  const restart = () =>
+    createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, webhookUrlPolicy: options.webhookUrlPolicy, log, ...appDeps });
   let app = restart();
+  const sealer: Sealer = createSealer(SECRETS_KEYS);
 
   async function call(c: Call): Promise<Result> {
     const headers: Record<string, string> = { ...(c.headers ?? {}) };
@@ -103,6 +107,7 @@ export async function startHarness() {
       await db.drop();
     },
     url: db.url,
+    sealer,
   };
 }
 export type Harness = Awaited<ReturnType<typeof startHarness>>;

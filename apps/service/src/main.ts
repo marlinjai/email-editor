@@ -6,6 +6,8 @@ import { ConfigError, loadConfig, loadMigrateConfig } from './config.js';
 import { createSql } from './db.js';
 import { migrate, MigrationError } from './migrate.js';
 import { repos } from './repo/index.js';
+import { createSealer } from './sealing.js';
+import { startWebhookDeliveryLoop } from './webhooks/loop.js';
 
 /**
  * The service's one entry point, with two commands:
@@ -37,6 +39,10 @@ async function runMigrate(): Promise<void> {
 async function runServe(): Promise<void> {
   const config = loadConfig();
   const sql = createSql(config.databaseUrl, { max: config.databasePoolMax });
+  const webhookUrlPolicy = {
+    allowInsecureHttp: config.webhookAllowInsecureTargets,
+    allowPrivateTargets: config.webhookAllowInsecureTargets,
+  };
   const compiler = new CompilePool({
     workerUrl: COMPILE_WORKER_URL,
     size: config.compile.workers,
@@ -48,10 +54,13 @@ async function runServe(): Promise<void> {
     sql,
     dashboardServiceToken: config.dashboardServiceToken,
     secretsKeys: config.secretsKeys,
+    webhookUrlPolicy,
     compiler,
     assetStorage: new StorageBrainAssetStorage(config.storageBrain),
     publicBaseUrl: config.publicBaseUrl,
   });
+
+  const webhookLoop = startWebhookDeliveryLoop(sql, createSealer(config.secretsKeys), { policy: webhookUrlPolicy });
 
   const purge = setInterval(() => {
     repos(sql)
@@ -74,7 +83,10 @@ async function runServe(): Promise<void> {
     console.log(`[serve] ${signal}: draining`);
     clearInterval(purge);
     server.close(() => {
-      Promise.allSettled([compiler.close(), sql.end({ timeout: 5 })]).finally(() => process.exit(0));
+      Promise.allSettled([webhookLoop.stop(), compiler.close()])
+        .then(() => sql.end({ timeout: 5 }))
+        .catch((err) => console.error('[serve] shutdown failed:', err))
+        .finally(() => process.exit(0));
     });
     setTimeout(() => process.exit(1), 10_000).unref();
   };

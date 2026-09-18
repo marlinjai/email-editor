@@ -15,7 +15,9 @@ import { auditRoutes } from './routes/audit.js';
 import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { templateRoutes } from './routes/templates.js';
+import { webhookRoutes } from './routes/webhooks.js';
 import { workspaceRoutes } from './routes/workspaces.js';
+import type { SsrfPolicy } from './webhooks/ssrf.js';
 import { providerRoutes } from './routes/providers.js';
 import { contactRoutes } from './routes/contacts.js';
 import { suppressionRoutes } from './routes/suppressions.js';
@@ -32,6 +34,12 @@ export type AppOptions = {
   dashboardServiceToken: string;
   /** MAIL_SECRETS_KEY by version; seals what the service stores at rest. */
   secretsKeys: SecretsKeys;
+  /**
+   * Overrides the webhook endpoint URL policy (https-only, no private
+   * targets). Only ever relaxed by an explicit development flag, never in
+   * production; the integration tests use it to reach a local receiver.
+   */
+  webhookUrlPolicy?: SsrfPolicy;
   /** Compiles documents off the request thread (a CompilePool in production). */
   compiler: Compiler;
   /** Where uploaded images are stored (Storage Brain in production). */
@@ -51,6 +59,7 @@ export function createApp({
   sql,
   dashboardServiceToken,
   secretsKeys,
+  webhookUrlPolicy,
   compiler,
   assetStorage,
   publicBaseUrl,
@@ -104,6 +113,7 @@ export function createApp({
   app.route('/', auditRoutes(deps));
   app.route('/', templateRoutes(sql, { ...deps, compiler }));
   app.route('/', assetRoutes(sql, { ...deps, storage: assetStorage, publicBaseUrl, log }));
+  app.route('/', webhookRoutes(sql, deps, webhookUrlPolicy));
   app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch }));
   app.route('/', topicRoutes(sql, deps));
   app.route('/', contactRoutes(sql, deps));

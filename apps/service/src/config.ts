@@ -29,6 +29,16 @@ const EnvSchema = z.object({
   MAIL_UNSUBSCRIBE_KEY: hex64,
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   /**
+   * Development-only escape hatch for the webhook endpoint URL policy
+   * (src/webhooks/ssrf.ts): allows `http://` endpoints and endpoints that
+   * resolve to a private, loopback or link-local address. Never set in
+   * production; unset or "false" keeps the default, strict policy.
+   */
+  WEBHOOK_ALLOW_INSECURE_TARGETS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /**
    * The service's public origin, e.g. https://mail.lumitra.co. Asset URLs put
    * into mail are built on it, so it is configured, never guessed from a Host
    * header a client controls.
@@ -57,6 +67,7 @@ export type Config = {
   secretsKeys: ReadonlyMap<number, Buffer>;
   unsubscribeKeys: ReadonlyMap<number, Buffer>;
   databasePoolMax: number;
+  webhookAllowInsecureTargets: boolean;
   publicBaseUrl: string;
   storageBrain: { apiKey: string; baseUrl?: string };
   compile: { workers: number; timeoutMs: number; maxQueue: number };
@@ -88,6 +99,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     secretsKeys: new Map([[1, Buffer.from(e.MAIL_SECRETS_KEY, 'hex')]]),
     unsubscribeKeys: new Map([[1, Buffer.from(e.MAIL_UNSUBSCRIBE_KEY, 'hex')]]),
     databasePoolMax: e.DATABASE_POOL_MAX,
+    webhookAllowInsecureTargets: e.WEBHOOK_ALLOW_INSECURE_TARGETS,
     publicBaseUrl: e.PUBLIC_BASE_URL,
     storageBrain: { apiKey: e.STORAGE_BRAIN_API_KEY, baseUrl: e.STORAGE_BRAIN_URL },
     compile: { workers: e.COMPILE_WORKERS, timeoutMs: e.COMPILE_TIMEOUT_MS, maxQueue: e.COMPILE_MAX_QUEUE },
