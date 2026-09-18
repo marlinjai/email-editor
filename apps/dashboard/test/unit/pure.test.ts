@@ -115,3 +115,20 @@ describe('the end-to-end sign-in bypass cannot be enabled in production', () => 
     expect(decodeTestIdentity(undefined)).toBeNull();
   });
 });
+
+describe('offServiceAddresses: the images a service_only workspace must import', () => {
+  it('reads the addresses from the compile errors, each once, http and https only', async () => {
+    const { offServiceAddresses } = await import('@/lib/asset-policy');
+    const errors = [
+      { message: 'img src: "https://cdn.example.com/a.png" loads from cdn.example.com. This workspace only allows images, stylesheets and fonts from mail.test: upload the file or import it with assets.import.' },
+      { message: 'background: "https://cdn.example.com/a.png" loads from cdn.example.com. This workspace only allows ...' },
+      { message: 'link href: "http://fonts.example.org/f.css" loads from fonts.example.org. ...' },
+      { message: 'img src: "data:image/png;base64,xx" uses data, not http or https. ...' },
+      { message: 'mj-section: Attribute foo is illegal' },
+      { message: 'img src: "https://cdn.example.com/very-long..." loads from cdn.example.com. ...' },
+      { message: 'And 3 more addresses outside mail.test.' },
+    ];
+    expect(offServiceAddresses(errors)).toEqual(['https://cdn.example.com/a.png', 'http://fonts.example.org/f.css']);
+    expect(offServiceAddresses([])).toEqual([]);
+  });
+});

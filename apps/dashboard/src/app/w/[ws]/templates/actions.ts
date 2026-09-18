@@ -166,3 +166,12 @@ export async function uploadImage(ws: string, form: FormData): Promise<ActionRes
     return api.assets.upload(file, file.name);
   });
 }
+
+/**
+ * Copies a remote image into the workspace's assets (the service's
+ * `assets.import`), so a workspace that allows only service-hosted images can
+ * send the mail: the editor then swaps the old address for the asset's.
+ */
+export async function importAsset(ws: string, url: string): Promise<ActionResult<Asset>> {
+  return act('assets.import', async () => (await mail(ws)).api.assets.import({ url }));
+}

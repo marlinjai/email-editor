@@ -24,6 +24,9 @@ export const DASHBOARD_TOKEN = 'e2'.repeat(32);
 export const SMTP_USER = 'sender@example.com';
 export const SMTP_PASSWORD = 'e2e-smtp-password';
 const STORAGE_KEY = `sk_test_${'e'.repeat(32)}`;
+/** A 1x1 PNG. */
+const REMOTE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+export const REMOTE_IMAGE_URL = `http://127.0.0.1:${PORTS.control}/remote/logo.png`;
 const REPO = path.resolve(import.meta.dirname, '../../../..');
 
 export type SinkMessage = { to: string[]; raw: string; at: number };
@@ -210,6 +213,12 @@ export async function startStack() {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(value));
     };
+    // A remote image for the asset import test (the service may fetch http from
+    // 127.0.0.1 only because the e2e stack sets its development flag).
+    if (url.pathname === '/remote/logo.png') {
+      res.writeHead(200, { 'content-type': 'image/png' });
+      return res.end(REMOTE_PNG);
+    }
     if (url.pathname === '/smtp/messages') return reply({ port: smtp.port, messages: smtp.messages });
     if (url.pathname === '/smtp/configure') {
       smtp.state.delayMs = Number(body.delayMs ?? 0);

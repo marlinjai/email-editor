@@ -13,7 +13,8 @@ import { FormError } from '@/components/form-error';
 import { IconClose } from '@/components/icons';
 import { Badge, Button, Spinner } from '@/components/ui';
 import { useAction } from '@/components/use-action';
-import { compileDocument, reloadTemplate, saveTemplate } from '../actions';
+import { compileDocument, importAsset, reloadTemplate, saveTemplate } from '../actions';
+import { offServiceAddresses } from '@/lib/asset-policy';
 import { ImageDialog, type PendingImage } from './image-dialog';
 
 // The editor is browser-only (drag and drop, rich text, MobX): it is loaded on
@@ -63,6 +64,9 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
   const save = useAction();
   const compile = useAction();
   const reload = useAction();
+  const importing = useAction();
+  const [importingUrl, setImportingUrl] = useState<string | null>(null);
+
 
   // The latest document the editor reported, and whether the person has touched
   // it yet: the editor may report its normalised snapshot once on mount, which
@@ -92,6 +96,32 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     return latest.current;
   }, []);
+
+  /**
+   * Copies a remote image into the workspace's assets and points the document
+   * at the copy: every occurrence of the old address is replaced, the editor is
+   * reopened on the result, and the preview is compiled again.
+   */
+  const importIntoAssets = useCallback(
+    async (url: string) => {
+      setImportingUrl(url);
+      const current = await settled();
+      await importing.run(
+        () => importAsset(ws, url),
+        (asset) => {
+          const replaced = JSON.parse(JSON.stringify(current).split(JSON.stringify(url).slice(1, -1)).join(JSON.stringify(asset.url).slice(1, -1)));
+          latest.current = replaced;
+          setTemplate((t) => ({ ...t, document: replaced as Template['document'] }));
+          setEditorKey((k) => k + 1);
+          touched.current = true;
+          setDirty(true);
+          void compile.run(() => compileDocument(ws, replaced), setPreview);
+        },
+      );
+      setImportingUrl(null);
+    },
+    [importing, settled, ws, compile],
+  );
 
   const doSave = useCallback(
     (baseVersion: number) =>
@@ -247,6 +277,24 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
             {preview ? (
               <>
                 <CompileMessages errors={preview.errors} warnings={preview.warnings} />
+                {offServiceAddresses(preview.errors).length > 0 ? (
+                  <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
+                    <p className="text-[12.5px] text-muted">
+                      This workspace sends only images hosted by Lumitra Mail. Import each one into the workspace; the template then uses the copy.
+                    </p>
+                    {offServiceAddresses(preview.errors).map((url) => (
+                      <div key={url} className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink" title={url}>
+                          {url}
+                        </span>
+                        <Button busy={importingUrl === url} disabled={importingUrl !== null} onClick={() => void importIntoAssets(url)}>
+                          Import into assets
+                        </Button>
+                      </div>
+                    ))}
+                    <FormError error={importing.error} />
+                  </div>
+                ) : null}
                 {missingRequiredMergeFields(preview.html).length > 0 ? (
                   <p className="rounded-lg border border-[rgba(240,192,90,0.22)] bg-warn-wash px-3 py-2 text-[12.5px] text-warn">
                     No <span className="font-mono">{'{{unsubscribe_url}}'}</span> link yet. A mailing cannot be sent without one; add it to

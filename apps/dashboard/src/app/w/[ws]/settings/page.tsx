@@ -21,6 +21,7 @@ export default async function GeneralSettings({ params }: { params: Promise<{ ws
         locales: workspace.settings.locales,
         defaultLocale: workspace.settings.default_locale,
         trackingEnabled: workspace.settings.tracking_enabled,
+        assetPolicy: workspace.settings.asset_policy,
       }}
     />
   );

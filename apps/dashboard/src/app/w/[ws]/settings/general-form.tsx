@@ -7,7 +7,7 @@ import { Button, describedBy, Field, Input, Mono, Select } from '@/components/ui
 import { useAction } from '@/components/use-action';
 import { updateGeneral } from './actions';
 
-type General = { name: string; slug: string; locales: string[]; defaultLocale: string; trackingEnabled: boolean };
+type General = { name: string; slug: string; locales: string[]; defaultLocale: string; trackingEnabled: boolean; assetPolicy: 'any' | 'service_only' };
 
 export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: General; canEdit: boolean }) {
   const { run, pending, error, fields } = useAction();
@@ -16,6 +16,7 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
   const [localesText, setLocalesText] = useState(initial.locales.join(', '));
   const [defaultLocale, setDefaultLocale] = useState(initial.defaultLocale);
   const [tracking, setTracking] = useState(initial.trackingEnabled);
+  const [assetPolicy, setAssetPolicy] = useState(initial.assetPolicy);
   const locales = [
     ...new Set(
       localesText
@@ -30,7 +31,7 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
       className="flex max-w-[560px] flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
-        void run(() => updateGeneral(ws, { name, locales, defaultLocale, trackingEnabled: tracking }), saved.mark);
+        void run(() => updateGeneral(ws, { name, locales, defaultLocale, trackingEnabled: tracking, assetPolicy }), saved.mark);
       }}
     >
       <fieldset disabled={!canEdit} className="contents">
@@ -73,6 +74,34 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
             ))}
           </Select>
         </Field>
+        <fieldset className="flex flex-col gap-2 rounded-xl border border-line bg-panel p-4">
+          <legend className="px-1 text-[13.5px] font-medium text-ink">Images and fonts in mail</legend>
+          {(
+            [
+              ['any', 'From anywhere', 'Images, stylesheets and web fonts load from wherever the template points.'],
+              [
+                'service_only',
+                'Only from Lumitra Mail',
+                'Mail may load images and fonts only from this service. Anything hosted elsewhere is a compile error, so the mail cannot be sent until it is uploaded or imported into the workspace, and Google Fonts are left out. No third party learns when a mail is opened.',
+              ],
+            ] as const
+          ).map(([value, label, hint]) => (
+            <label key={value} className="flex items-start gap-3">
+              <input
+                type="radio"
+                name="asset-policy"
+                value={value}
+                checked={assetPolicy === value}
+                onChange={() => setAssetPolicy(value)}
+                className="mt-1 size-4 accent-[var(--gold)]"
+              />
+              <span>
+                <span className="block text-[13.5px] text-ink">{label}</span>
+                <span className="block text-[12.5px] text-muted">{hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
         <div className="flex items-start gap-3 rounded-xl border border-line bg-panel p-4">
           <input
             id="g-tracking"

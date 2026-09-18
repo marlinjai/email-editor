@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { REMOTE_IMAGE_URL } from './stack';
 import { EDITOR, OWNER, configureSink, newsletterDocument, restartService, serviceFor, signIn, sink, SMTP_LOGIN, waitForMailing, workspaceIdOf } from './helpers';
 
 /*
@@ -183,6 +184,54 @@ test('templates: the editor saves, a concurrent save is caught, an image uploads
   await page.getByRole('button', { name: 'Restore', exact: true }).click();
   await expect(page.getByText('Restored as version 5.')).toBeVisible();
   expect((await api.templates.get(templateId)).version).toBe(5);
+});
+
+test('asset policy: a service_only workspace imports a remote image before the mail can go out', async ({ page }) => {
+  await open(page, '/settings');
+  await page.getByLabel('Only from Lumitra Mail').check();
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Saved')).toBeVisible();
+  const api = serviceFor(OWNER, ws);
+  expect((await api.workspace.get()).settings.asset_policy).toBe('service_only');
+
+  const doc = {
+    version: '1.0' as const,
+    metadata: { title: 'Remote' },
+    sections: [
+      {
+        id: 'sec-1',
+        type: 'section',
+        columns: [
+          {
+            id: 'col-1',
+            blocks: [
+              { id: 'img-r', type: 'image', src: REMOTE_IMAGE_URL, alt: 'Logo', width: '40px', align: 'center' },
+              { id: 'txt-r', type: 'text', content: '<p><a href="{{unsubscribe_url}}">Unsubscribe</a></p>' },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const remote = await api.templates.create({ name: 'Remote image', document: doc });
+  try {
+    await open(page, `/templates/${remote.id}`);
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    await expect(page.getByText(REMOTE_IMAGE_URL, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Import into assets' }).click();
+    // The document now points at the imported copy, and the preview compiles clean.
+    await expect(page.getByRole('button', { name: 'Import into assets' })).toHaveCount(0);
+    await expect(page.getByText('Unsaved changes')).toBeVisible();
+    await page.getByTestId('save-template').click();
+    await expect(page.getByText('Saved as v2')).toBeVisible();
+    const saved = JSON.stringify((await api.templates.get(remote.id)).document);
+    expect(saved).not.toContain(REMOTE_IMAGE_URL);
+    expect(saved).toMatch(/\/a\/[0-9a-f-]+/);
+    expect((await api.templates.compile(remote.id)).errors).toEqual([]);
+  } finally {
+    // The later flows use an inline image, which service_only refuses.
+    await api.workspace.update({ settings: { asset_policy: 'any' } });
+  }
 });
 
 test('mailing, forward: compose, add recipients, test, send, see it in the archive', async ({ page }) => {

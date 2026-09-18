@@ -42,6 +42,7 @@ const GeneralInput = z
     locales: z.array(Locale).min(1, 'At least one language').max(20),
     defaultLocale: Locale,
     trackingEnabled: z.boolean(),
+    assetPolicy: z.enum(['any', 'service_only']),
   })
   .refine((v) => v.locales.includes(v.defaultLocale), {
     message: 'The default language must be one of the languages',
@@ -55,7 +56,12 @@ export async function updateGeneral(ws: string, input: z.input<typeof GeneralInp
     const { api } = await mail(ws);
     await api.workspace.update({
       name: parsed.data.name,
-      settings: { locales: parsed.data.locales, default_locale: parsed.data.defaultLocale, tracking_enabled: parsed.data.trackingEnabled },
+      settings: {
+        locales: parsed.data.locales,
+        default_locale: parsed.data.defaultLocale,
+        tracking_enabled: parsed.data.trackingEnabled,
+        asset_policy: parsed.data.assetPolicy,
+      },
     });
     revalidatePath(`/w/${ws}`, 'layout');
     return null;
