@@ -1,5 +1,16 @@
 # Roadmap
 
+## Now
+
+- [ ] Turn the editor into a multi-tenant mail service with ŌPUNTIA's admin as its
+      first client [plan](docs/plans/2026-09-18-mail-service.md) : draft, awaiting
+      Marlin's approval. Clients keep their people, the service keeps the mail:
+      workspaces and API keys via auth-brain, a Postgres-backed API, a send worker
+      with per-provider policies (iCloud+ SMTP first), suppression and preference
+      topics, webhooks, a hosted unsubscribe page, and the editor published as an
+      SDK. The Phase 0 to 7 "complete" marks below describe UI over mock adapters,
+      not a running service (2026-09-18)
+
 ## Recently shipped
 
 - Depth-2 nested columns (a column can split into 2-4 sub-columns) with a
