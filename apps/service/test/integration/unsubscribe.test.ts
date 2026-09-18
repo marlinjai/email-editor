@@ -240,7 +240,7 @@ describe('refused tokens', () => {
 
   it('refuses a malformed form', async () => {
     const s = await scenario();
-    for (const fields of [{}, { action: 'delete', scope: 'all' }, { action: 'unsubscribe', scope: 'topic' }, { action: 'unsubscribe', scope: 'topic', topic: 'x' }]) {
+    for (const fields of <Record<string, string>[]>[{}, { action: 'delete', scope: 'all' }, { action: 'unsubscribe', scope: 'topic' }, { action: 'unsubscribe', scope: 'topic', topic: 'x' }]) {
       expect((await post(s.token(), fields)).status, JSON.stringify(fields)).toBe(400);
     }
     // One-click with anything else in the body is not one-click.
@@ -439,7 +439,7 @@ describe('the four paths', () => {
     const all = await post(s.token(), { action: 'unsubscribe', scope: 'all' });
     expect(all.doc.querySelector('[role=status]')?.textContent).toContain('You will no longer receive any emails');
     expect(stateOf(all, 'Venue outreach')).toBe('Unsubscribed');
-    expect((await events(s.ws.id)).map((e) => e.data.topic)).toEqual(['programme-updates', null]);
+    expect((await events(s.ws.id)).map((e) => ('topic' in e.data ? e.data.topic : undefined))).toEqual(['programme-updates', null]);
 
     // Back into venue outreach alone: the block on everything becomes a block on
     // every other topic, so programme updates stay off.

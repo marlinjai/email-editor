@@ -164,6 +164,20 @@ Decisions baked into the foundation:
   `recipients.listStuckForWorker`, reconciled against
   `messages.latestForRecipient`.
 
+### The hosted unsubscribe page (F3)
+
+`GET /u/<token>` shows a person's topics and changes nothing; `POST /u/<token>`
+applies a choice, and a body of exactly `List-Unsubscribe=One-Click` is the
+one-click target of RFC 8058 (Request for Comments 8058). Every change writes the
+suppression, its audit row and a `contact.unsubscribed` or `contact.resubscribed`
+event in one transaction (`src/routes/unsubscribe.ts`, whose header comment holds
+the rules). The HTML comes from `src/pages/render.ts`, the copy in five languages
+from `src/pages/i18n.ts`. It is public, lives outside `/v1` and the contract's
+route table, and is mounted only when `createApp` receives `unsubscribeSigner`
+(`main.ts` always passes it). A test send's link carries
+`contact_id: TEST_UNSUBSCRIBE_CONTACT_ID` and opens a preview that never writes.
+Migration `0006_contact_resubscribed.sql` adds the resubscribe event type.
+
 ### The four teams
 
 | Team | Builds | Owns (new files) | Uses from the foundation |
