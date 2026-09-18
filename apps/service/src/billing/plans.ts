@@ -88,6 +88,17 @@ export type BillingConfig = {
   portalConfigurationId?: string;
 };
 
+/**
+ * The Stripe Price a paid plan is sold with on this instance, or null when it
+ * cannot be sold: no Stripe client (no key) or no Price id configured for it.
+ * Checkout fails closed on null, and the public landing page shows the plan as
+ * "coming soon" on the same answer, so the two can never disagree.
+ */
+export function checkoutPriceId(config: BillingConfig, stripe: unknown, plan: PaidPlanId): string | null {
+  if (!stripe) return null;
+  return config.prices[plan] ?? null;
+}
+
 /** The paid plan a Stripe Price id sells, or null for a Price this service does not know. */
 export function planForPrice(config: BillingConfig, priceId: string): PaidPlanId | null {
   for (const plan of PAID_PLANS) if (config.prices[plan] === priceId) return plan;

@@ -6,7 +6,7 @@ import type { Sql } from '../db.js';
 import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
 import type { BillingRow } from '../repo/billing.js';
-import { PAID_PLANS, PLANS, type BillingConfig } from '../billing/plans.js';
+import { checkoutPriceId, PAID_PLANS, PLANS, type BillingConfig } from '../billing/plans.js';
 import { StripeRequestError, type StripeApi } from '../billing/stripe.js';
 import { reconcileWorkspace } from '../billing/sync.js';
 import { computeUsage, periodOf } from '../billing/usage.js';
@@ -96,7 +96,7 @@ export function billingRoutes(sql: Sql, deps: BillingRouteDeps) {
     const access = c.get('access');
     const input = await body(c, 'billing.checkout');
     if (!stripe) notConfigured('no Stripe key');
-    const priceId = config.prices[input.plan];
+    const priceId = checkoutPriceId(config, stripe, input.plan);
     if (!priceId) notConfigured(`no Stripe Price for the ${input.plan} plan`);
 
     const row = (await pool.billing.get(access.workspaceId))!;
