@@ -6,7 +6,9 @@ import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
  *
  * - TEST_DATABASE_URL set (CI, with a Postgres service container): use it.
  * - Otherwise start postgres:17-alpine with Testcontainers. On this machine that
- *   needs DOCKER_HOST=unix://$HOME/.colima/default/docker.sock.
+ *   needs DOCKER_HOST=unix://$HOME/.colima/default/docker.sock and
+ *   TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock (the socket path
+ *   inside the Colima VM, which the Ryuk reaper container mounts).
  *
  * If neither works, the run FAILS, naming the fix. It never skips: a suite that
  * silently skips its tenancy tests is worse than one that does not exist.
@@ -24,7 +26,8 @@ export async function setup(): Promise<void> {
   } catch (err) {
     throw new Error(
       'Integration tests need Postgres: set TEST_DATABASE_URL, or make Docker reachable for Testcontainers ' +
-        '(on macOS with Colima: DOCKER_HOST=unix://$HOME/.colima/default/docker.sock). Cause: ' +
+        '(on macOS with Colima: DOCKER_HOST=unix://$HOME/.colima/default/docker.sock and ' +
+        'TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock). Cause: ' +
         (err instanceof Error ? err.message : String(err)),
     );
   }

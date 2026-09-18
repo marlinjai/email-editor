@@ -9,7 +9,9 @@
   },
   "scripts": {
     "build": "tsup",
-    "dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=${MAIL_INFISICAL_PROJECT_ID} --domain=https://infisical.lumitra.co --env=dev -- tsx watch src/main.ts",
+    "dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4 --domain=https://infisical.lumitra.co --env=dev -- sh -c \"tsx src/main.ts migrate && tsx watch src/main.ts serve\"",
+    "db:dev": "docker start lumitra-mail-dev-db 2>/dev/null || docker run -d --name lumitra-mail-dev-db -p 55432:5432 -e POSTGRES_USER=mail -e POSTGRES_PASSWORD=mail -e POSTGRES_DB=lumitra_mail postgres:17-alpine",
+    "migrate:dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4 --domain=https://infisical.lumitra.co --env=dev -- tsx src/main.ts migrate",
     "migrate": "node dist/main.js migrate",
     "start": "node dist/main.js serve",
     "lint": "tsc --noEmit",

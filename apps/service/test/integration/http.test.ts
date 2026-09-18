@@ -15,7 +15,8 @@ describe('health', () => {
   it('answers 200 when the database answers', async () => {
     const res = await h.call({ path: '/healthz' });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true, database: 'up' });
+    expect(res.body).toMatchObject({ ok: true, database: 'up' });
+    expect(typeof res.body.commit).toBe('string');
   });
 
   it('answers 503 when the database does not', async () => {

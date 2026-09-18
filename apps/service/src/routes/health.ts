@@ -5,6 +5,12 @@ import type { Sql } from '../db.js';
 export const HEALTH_DB_TIMEOUT_MS = 2000;
 
 /**
+ * The commit this image was built from (the GIT_SHA build argument), so a deploy
+ * check can prove which build is answering, not only that something is.
+ */
+const COMMIT = process.env.GIT_SHA ?? 'unknown';
+
+/**
  * Readiness, not just liveness: 200 only when the database answers, so the
  * deploy check (and Coolify's rolling update) can never go green over a service
  * that cannot reach its data.
@@ -21,11 +27,11 @@ export function healthRoutes(sql: Sql) {
           timer = setTimeout(() => reject(new Error('database did not answer in time')), HEALTH_DB_TIMEOUT_MS);
         }),
       ]);
-      return c.json({ ok: true, database: 'up' });
+      return c.json({ ok: true, database: 'up', commit: COMMIT });
     } catch (err) {
       console.error('[healthz] database check failed:', err instanceof Error ? err.message : err);
       return c.json(
-        { ok: false, database: 'down', error: { code: 'service_unavailable', message: 'The database is not reachable.' } },
+        { ok: false, database: 'down', commit: COMMIT, error: { code: 'service_unavailable', message: 'The database is not reachable.' } },
         503,
       );
     } finally {
