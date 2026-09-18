@@ -152,7 +152,12 @@ check the service runs before `send`.
 ## Webhooks
 
 Events: `message.sent`, `message.failed`, `contact.unsubscribed`,
-`contact.bounced`, `mailing.finished`. Every body is one envelope,
+`contact.resubscribed`, `contact.bounced`, `mailing.finished`.
+`contact.resubscribed` has the shape of `contact.unsubscribed` with
+`resubscribed_at` in place of `unsubscribed_at`: the person opted back in on the
+hosted page (topic null means the block on every topic was lifted). A mirror that
+applies unsubscribes must apply it too, or it keeps excluding someone who asked
+to receive mail again. Every body is one envelope,
 `{ id, type, created_at, workspace_id, data }`, parsed with `WebhookEvent` (a
 union discriminated on `type`). Deliveries may repeat: deduplicate on `id`.
 
