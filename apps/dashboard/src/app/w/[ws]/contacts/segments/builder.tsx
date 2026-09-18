@@ -68,7 +68,12 @@ function ConditionRow({
 
   let valueInput: React.ReactNode = null;
   if (takesValue(node.op)) {
-    const common = { 'aria-label': 'Value', value: node.value, disabled, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange({ ...node, value: e.target.value }) };
+    const common = {
+      'aria-label': 'Value',
+      'aria-invalid': problem ? true : undefined,
+      'aria-describedby': problem ? `${id}-problem` : undefined,
+      value: node.value,
+      disabled, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange({ ...node, value: e.target.value }) };
     if ((node.field === 'tag' || node.field === 'topic') && !list) {
       const options = node.field === 'tag' ? lookups.tags.map((t) => ({ slug: t.slug, name: t.name })) : lookups.topics.map((t) => ({ slug: t.slug, name: t.name }));
       valueInput = (

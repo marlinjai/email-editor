@@ -15,10 +15,14 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
     serverActions: {
-      // Image uploads (up to 10 MB, MAX_ASSET_BYTES) and template documents
-      // (up to 1 MB) pass through server actions.
-      bodySizeLimit: '12mb',
+      // CSV imports (up to 50 MB, MAX_IMPORT_BYTES), image uploads (up to
+      // 10 MB, MAX_ASSET_BYTES) and template documents (up to 1 MB) pass
+      // through server actions; the rest is multipart overhead.
+      bodySizeLimit: '52mb',
     },
+    // The proxy (src/proxy.ts) sits in front of every server action and reads
+    // at most this much of a body (10 MB by default), so it matches the above.
+    proxyClientMaxBodySize: '52mb',
   },
   async headers() {
     return [

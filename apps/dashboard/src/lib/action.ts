@@ -10,6 +10,7 @@ export class DashboardRefusal extends Error {
     readonly code: string,
     message: string,
     readonly fields?: Record<string, string>,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'DashboardRefusal';
@@ -27,7 +28,7 @@ export async function act<T>(label: string, fn: () => Promise<T>): Promise<Actio
     return { ok: true, data: await fn() };
   } catch (err) {
     unstable_rethrow(err);
-    if (err instanceof DashboardRefusal) return { ok: false, error: { code: err.code, message: err.message, fields: err.fields } };
+    if (err instanceof DashboardRefusal) return { ok: false, error: { code: err.code, message: err.message, fields: err.fields, details: err.details } };
     const error = describeError(err);
     const logged = error.code === 'internal_error' || error.code === 'network' || error.code === 'service_unavailable';
     if (logged) console.error(`[action ${label}] ${error.code}${error.requestId ? ` (request ${error.requestId})` : ''}:`, err);
