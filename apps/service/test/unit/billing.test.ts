@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Plan, Usage } from '@marlinjai/mail-contract';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from '../../src/config.js';
@@ -17,6 +18,8 @@ import {
 import { belongsTo, mirrorOf, UnknownPriceError } from '../../src/billing/sync.js';
 import { periodOf, usageWarningHeader } from '../../src/billing/usage.js';
 import type { BillingRow } from '../../src/repo/billing.js';
+import { STRIPE_WEBHOOK_EVENTS } from '../../src/routes/stripe-webhook.js';
+import { STRIPE_API_VERSION } from '../../src/billing/plans.js';
 
 const SECRET = 'whsec_unitsecretunitsecret';
 const WS = '0b8f6a3e-4c1d-4e2f-9a7b-1c2d3e4f5a6b';
@@ -235,5 +238,23 @@ describe('billing configuration', () => {
       expect(problems).toContain('STRIPE_PRICE_GROWTH_ID');
       expect(problems).not.toContain('publishablekeynotsecret');
     }
+  });
+});
+
+describe('the Stripe scripts', () => {
+  it('register exactly the events the webhook handles, on the pinned API version', () => {
+    const script = readFileSync(new URL('../../scripts/stripe-webhook-endpoint.mjs', import.meta.url), 'utf8');
+    const events = /const EVENTS = \[([^\]]*)\]/.exec(script)![1]!.match(/'([^']+)'/g)!.map((e) => e.slice(1, -1));
+    expect(events).toEqual([...STRIPE_WEBHOOK_EVENTS]);
+    for (const file of ['stripe-webhook-endpoint.mjs', 'stripe-catalogue.mjs']) {
+      const text = readFileSync(new URL(`../../scripts/${file}`, import.meta.url), 'utf8');
+      expect(text).toContain(`const API_VERSION = '${STRIPE_API_VERSION}'`);
+    }
+  });
+
+  it('the catalogue amounts are the plans\' displayed prices', () => {
+    const script = readFileSync(new URL('../../scripts/stripe-catalogue.mjs', import.meta.url), 'utf8');
+    expect(script).toContain(`lookupKey: 'mail-starter-monthly', product: 'mail-starter', amount: ${PLANS.starter.monthly_price_cents},`);
+    expect(script).toContain(`lookupKey: 'mail-growth-monthly', product: 'mail-growth', amount: ${PLANS.growth.monthly_price_cents},`);
   });
 });
