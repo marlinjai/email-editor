@@ -161,6 +161,14 @@ export function mailingPlatformRepo(db: Db) {
         ORDER BY (ab_test ->> 'decide_at')::timestamptz, id LIMIT ${limit}`;
     },
 
+    /** How long ago the message was handed over, on the database's clock (the clock that stamped it). */
+    async messageAgeMs(workspaceId: string, messageId: string): Promise<number | null> {
+      const rows = await db<{ ms: number }[]>`
+        SELECT (extract(epoch FROM clock_timestamp() - created_at) * 1000)::float8 AS ms
+        FROM messages WHERE workspace_id = ${workspaceId} AND id = ${messageId}`;
+      return rows[0]?.ms ?? null;
+    },
+
     async insertEvent(workspaceId: string, e: TrackingEventInput): Promise<void> {
       await db`
         INSERT INTO tracking_events (workspace_id, mailing_id, recipient_id, contact_id, variant, kind, link_idx, is_machine, is_apple_mpp)

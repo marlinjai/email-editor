@@ -122,7 +122,7 @@ export function classifyOpen(userAgent: string | undefined, ip: string | undefin
 }
 
 export function classifyClick(userAgent: string | undefined, msSinceSent: number | null): { isMachine: boolean } {
-  const tooSoon = msSinceSent !== null && msSinceSent >= 0 && msSinceSent < MACHINE_CLICK_WINDOW_MS;
+  const tooSoon = msSinceSent !== null && msSinceSent < MACHINE_CLICK_WINDOW_MS;
   return { isMachine: !userAgent || MACHINE_AGENTS.test(userAgent) || tooSoon };
 }
 

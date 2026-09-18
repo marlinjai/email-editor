@@ -240,3 +240,45 @@ describe('contract conformance, phase S2 webhooks', () => {
     await wh.drop();
   });
 });
+
+describe('contract conformance, phase S4: scheduling, A/B tests and tracking', () => {
+  it('every scheduling, A/B and tracking operation answers with its declared status and response schema', async () => {
+    const { seedContact, seedSending, createMailing, addRecipients } = await import('../support/sending.js');
+    const ops: OperationId[] = [
+      'mailings.schedule',
+      'mailings.unschedule',
+      'mailings.setAbTest',
+      'mailings.clearAbTest',
+      'mailings.pickAbWinner',
+      'mailings.analytics',
+      'tracking.get',
+      'tracking.update',
+    ];
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+    const S = await h.seedWorkspace('contract-s4-mailings');
+    const s = await seedSending(h, S.id);
+    const contact = await seedContact(h, S.id, s.topic.id, { email: 'conform@example.com' });
+    const mailing = await createMailing(h, S, { topic: s.topic.slug, provider_id: s.provider.id });
+    await addRecipients(h, S, mailing.id, [{ contact_id: contact.id }]);
+    const at = new Date(Date.now() + 3_600_000).toISOString();
+
+    await run('tracking.get', await h.call({ path: '/v1/workspace/tracking', key: S.key }));
+    await run('tracking.update', await h.call({ method: 'PUT', path: '/v1/workspace/tracking', key: S.key, body: { opens: false, clicks: false } }));
+    await run('mailings.schedule', await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/schedule`, key: S.key, body: { send_at: at } }));
+    await run('mailings.unschedule', await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/unschedule`, key: S.key, body: {} }));
+    const ab = { variants: [{ key: 'a', subject: 'A' }, { key: 'b', subject: 'B' }], test_fraction: 1, winner_metric: 'manual' };
+    await run('mailings.setAbTest', await h.call({ method: 'PUT', path: `/v1/mailings/${mailing.id}/ab-test`, key: S.key, body: ab }));
+    await run('mailings.clearAbTest', await h.call({ method: 'DELETE', path: `/v1/mailings/${mailing.id}/ab-test`, key: S.key }));
+    await h.call({ method: 'PUT', path: `/v1/mailings/${mailing.id}/ab-test`, key: S.key, body: ab });
+    expect((await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/send`, key: S.key, body: {} })).status).toBe(202);
+    await run('mailings.pickAbWinner', await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/ab-test/winner`, key: S.key, body: { variant: 'a' } }));
+    await run('mailings.analytics', await h.call({ path: `/v1/mailings/${mailing.id}/analytics`, key: S.key }));
+
+    expect([...covered].sort()).toEqual([...ops].sort());
+  });
+});

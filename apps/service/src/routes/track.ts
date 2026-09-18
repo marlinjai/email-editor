@@ -95,8 +95,8 @@ export function trackingRoutes(sql: Sql, deps: { tokens: TrackingTokens }) {
       c.req.method === 'GET' &&
       (await effectiveTracking(sql, claims.workspaceId)).clicks
     ) {
-      const sentAt = recipient.message_id ? (await pool.messages.get(claims.workspaceId, recipient.message_id))?.created_at : null;
-      const flags = classifyClick(c.req.header('user-agent'), sentAt ? Date.now() - new Date(sentAt).getTime() : null);
+      const age = recipient.message_id ? await pool.mailingPlatform.messageAgeMs(claims.workspaceId, recipient.message_id) : null;
+      const flags = classifyClick(c.req.header('user-agent'), age);
       await pool.mailingPlatform.insertEvent(claims.workspaceId, {
         mailingId: mailing.id,
         recipientId: recipient.id,
