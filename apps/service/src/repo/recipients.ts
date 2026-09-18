@@ -103,7 +103,8 @@ export function recipientsRepo(db: Db) {
         | { status: 'sent'; messageId: string }
         | { status: 'failed'; messageId: string | null; error: string }
         | { status: 'skipped'; reason: SkipReason; error?: string }
-        | { status: 'queued'; retryAt: Date; error: string },
+        /** Back to the queue, due `retryInMs` from now on the database's clock (the clock the claim compares with). */
+        | { status: 'queued'; retryInMs: number; error: string },
     ): Promise<RecipientRow | null> {
       const rows = await db<RecipientRow[]>`
         UPDATE mailing_recipients SET
@@ -111,7 +112,7 @@ export function recipientsRepo(db: Db) {
           skip_reason = ${to.status === 'skipped' ? to.reason : null},
           message_id = ${'messageId' in to ? to.messageId : db`message_id`},
           last_error = ${'error' in to ? (to.error ?? null) : db`last_error`},
-          next_attempt_at = ${to.status === 'queued' ? to.retryAt : db`next_attempt_at`},
+          next_attempt_at = ${to.status === 'queued' ? db`now() + make_interval(secs => ${to.retryInMs / 1000})` : db`next_attempt_at`},
           claimed_at = ${to.status === 'queued' ? null : db`claimed_at`},
           updated_at = now()
         WHERE workspace_id = ${workspaceId} AND id = ${recipientId} AND status = ANY(${from as RecipientStatus[]})

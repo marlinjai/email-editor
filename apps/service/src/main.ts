@@ -5,6 +5,8 @@ import { CompilePool } from './compile/pool.js';
 import { ConfigError, loadConfig, loadMigrateConfig } from './config.js';
 import { createSql } from './db.js';
 import { migrate, MigrationError } from './migrate.js';
+import { platformJobs } from './platform/jobs.js';
+import { PlatformWorker } from './platform/worker.js';
 import { repos } from './repo/index.js';
 import { createSealer } from './sealing.js';
 import { createUnsubscribeSigner } from './unsubscribe.js';
@@ -76,6 +78,18 @@ async function runServe(): Promise<void> {
     publicBaseUrl: config.publicBaseUrl,
   });
 
+  // S4: scheduled releases, A/B decisions, import batches, signup confirmations.
+  const platform = new PlatformWorker({
+    jobs: platformJobs({
+      sql,
+      compiler,
+      transportFor: transports.get,
+      unsubscribeSigner,
+      rootKeys: config.unsubscribeKeys,
+      publicBaseUrl: config.publicBaseUrl,
+    }),
+  });
+
   const webhookLoop = startWebhookDeliveryLoop(sql, createSealer(config.secretsKeys), { policy: webhookUrlPolicy });
 
   const purge = setInterval(() => {
@@ -92,6 +106,7 @@ async function runServe(): Promise<void> {
     console.log(`[serve] listening on http://0.0.0.0:${info.port}`);
   });
   worker.start();
+  platform.start();
 
   let stopping = false;
   const stop = (signal: string) => {
@@ -101,8 +116,7 @@ async function runServe(): Promise<void> {
     clearInterval(purge);
     // The worker finishes the send in flight (and records it) and starts no
     // other; only then do the connections go.
-    const workerStopped = worker
-      .stop()
+    const workerStopped = Promise.all([worker.stop(), platform.stop()])
       .then(() => transports.closeAll())
       .catch((err) => console.error('[worker] stopping failed:', err));
     server.close(() => {

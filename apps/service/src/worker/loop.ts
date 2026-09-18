@@ -333,7 +333,7 @@ export class SendWorker {
         const delay = this.retryDelaysMs[recipient.attempts - 1]!;
         await this.settle(tx, workspaceId, recipient.id, {
           status: 'queued',
-          retryAt: new Date(Date.now() + delay),
+          retryInMs: delay,
           error: outcome.error.message,
         });
       } else if (outcome.error instanceof TransientSendError || outcome.error instanceof PermanentSendError) {

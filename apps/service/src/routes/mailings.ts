@@ -54,6 +54,7 @@ export function toMailingSummary(row: MailingRow, counts: MailingCounts): Mailin
     counts,
     metadata: row.metadata,
     scheduled_at: row.scheduled_at,
+    ab_test: null,
     started_at: row.started_at,
     finished_at: row.finished_at,
     created_at: row.created_at,
