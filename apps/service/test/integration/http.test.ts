@@ -29,6 +29,21 @@ describe('health', () => {
   });
 });
 
+describe('the landing page', () => {
+  it('is served at the root without credentials, with its own CSP, and the API stays JSON', async () => {
+    const app = createApp({ sql: h.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, ...h.appDeps });
+    const res = await app.request('/', { headers: { 'Accept-Language': 'de' } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/^text\/html/);
+    expect(res.headers.get('content-language')).toBe('de');
+    expect(res.headers.get('content-security-policy')).toMatch(/^default-src 'none'; style-src 'sha256-/);
+    expect((await app.request('/robots.txt')).status).toBe(200);
+    const unknown = await app.request('/nope');
+    expect(unknown.status).toBe(404);
+    expect(((await unknown.json()) as { error: { code: string } }).error.code).toBe('not_found');
+  });
+});
+
 describe('the error envelope', () => {
   it('malformed JSON is invalid_request', async () => {
     const res = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, rawBody: '{"name":' });

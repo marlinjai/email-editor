@@ -49,9 +49,21 @@
       prod; rerun the setup command with `--live` and destinations in prod
       only; redeploy; then one real checkout, a plan switch in the portal and a
       cancellation, refunded [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Lumitra Mail privacy notice (needs Marlin's legal review): lumitra.co/datenschutz
+      covers the landing page but defers product-specific processing to a notice on
+      the product's own domain, and Mail has none. Write `mail.lumitra.co/privacy`
+      (what the service stores for workspaces and recipients, the processor role,
+      sub-processors Hetzner, the workspace's provider and Storage Brain, erasure),
+      publish the Art. 28 processing agreement template from "Legal shape", point the
+      landing footer's privacy link at it, and add mail.lumitra.co to the subdomain
+      list of lumitra.co/impressum [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
 
 ## Recently shipped
 
+- Lumitra Mail landing page live at `https://mail.lumitra.co/` in five
+  languages (#31, 2026-09-19); `email-editor.lumitra.co` answers 308 to it
+  through the redirect Worker, and email.lumitra.co links back (email-mcp #18)
+  [plan](docs/plans/2026-09-18-mail-service.md)
 - Depth-2 nested columns (a column can split into 2-4 sub-columns) with a
   full canvas UX: handle-on-hover, inspector panel, layers-panel nesting,
   Backspace-to-delete with auto-merge, container-block palette filter.

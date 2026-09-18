@@ -1,0 +1,13 @@
+{
+  // The Worker that serves email-editor.lumitra.co: a permanent redirect to
+  // https://mail.lumitra.co/. Same script name as the demo it replaces, so a
+  // deploy takes over the custom domain in place.
+  //   pnpm -F email-editor-nextjs-example deploy
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "email-editor",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-01",
+  "routes": [
+    { "pattern": "email-editor.lumitra.co", "custom_domain": true }
+  ]
+}
