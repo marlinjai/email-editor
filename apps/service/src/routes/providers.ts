@@ -92,12 +92,34 @@ export function toProvider(row: ProviderRow, publicBaseUrl: string): Provider {
  * secret is already stored (registered earlier, or pasted by hand), so calling
  * it again never registers a second endpoint.
  *
- * Never throws for a Resend-side failure: the reason is stored on the provider
+ * Never throws. A Resend-side failure is stored on the provider
  * (`events.error`) and the provider stays usable; the member can register the
  * endpoint by hand and paste the secret instead. The usual reason is a key that
- * may only send (`restricted_api_key`), which cannot manage webhooks.
+ * may only send (`restricted_api_key`), which cannot manage webhooks. A
+ * database failure is logged.
  */
 export async function registerResendEvents(
+  sql: Sql,
+  sealer: Sealer,
+  opts: Pick<ProviderRouteOptions, 'fetch' | 'publicBaseUrl' | 'verifyTimeoutMs' | 'log'>,
+  workspaceId: string,
+  row: ProviderRow,
+  apiKey: string,
+  actor: AuditActor,
+): Promise<ProviderRow> {
+  if (row.kind !== 'resend' || row.has_events_secret) return row;
+  // It runs after the provider's own change committed: a database failure here
+  // must not turn that change into an error the client retries (a retried
+  // create would make a second provider). Logged; the next verify tries again.
+  try {
+    return await attemptRegistration(sql, sealer, opts, workspaceId, row, apiKey, actor);
+  } catch (err) {
+    (opts.log ?? console).error(`[providers] registering the Resend events endpoint of provider ${row.id} failed:`, err);
+    return row;
+  }
+}
+
+async function attemptRegistration(
   sql: Sql,
   sealer: Sealer,
   opts: Pick<ProviderRouteOptions, 'fetch' | 'publicBaseUrl' | 'verifyTimeoutMs'>,
@@ -106,7 +128,6 @@ export async function registerResendEvents(
   apiKey: string,
   actor: AuditActor,
 ): Promise<ProviderRow> {
-  if (row.kind !== 'resend' || row.has_events_secret) return row;
   const url = resendEventsUrl(opts.publicBaseUrl, row.id);
   const fail = async (reason: string) => (await repos(sql).providers.setEventsError(workspaceId, row.id, reason)) ?? row;
   if (!url.startsWith('https://')) {
@@ -455,9 +476,14 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
     // manage webhooks also gets one registered when none is set up yet.
     if (result.kind === 'resend' && row.secret !== undefined) {
       if (result.events_source === 'automatic' && result.events_webhook_id) {
-        if ((await resendWebhookExists(opts, result.events_webhook_id, row.secret)) === false) {
-          await pool.providers.clearEvents(access.workspaceId, id);
-          result = (await pool.providers.get(access.workspaceId, id)) ?? result;
+        try {
+          if ((await resendWebhookExists(opts, result.events_webhook_id, row.secret)) === false) {
+            await pool.providers.clearEvents(access.workspaceId, id);
+            result = (await pool.providers.get(access.workspaceId, id)) ?? result;
+          }
+        } catch (err) {
+          // The update committed; the events endpoint is checked again on the next key change.
+          (opts.log ?? console).error(`[providers] re-checking the Resend events endpoint of provider ${id} failed:`, err);
         }
       }
       result = await registerResendEvents(sql, sealer, opts, access.workspaceId, result, row.secret, actorOf(access));
@@ -495,8 +521,13 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
     // The endpoint the service registered at Resend is removed with the
     // provider. Events already in flight still verify: the secret stays stored.
     if (deleted.kind === 'resend' && deleted.events_source === 'automatic' && deleted.events_webhook_id) {
-      const forSend = await pool.providers.getForSend(access.workspaceId, id);
-      if (forSend?.secret_sealed) await unregisterResendEvents(opts, deleted.events_webhook_id, sealer.open(forSend.secret_sealed));
+      // The delete committed: a failure here is logged, never answered as an error.
+      try {
+        const forSend = await pool.providers.getForSend(access.workspaceId, id);
+        if (forSend?.secret_sealed) await unregisterResendEvents(opts, deleted.events_webhook_id, sealer.open(forSend.secret_sealed));
+      } catch (err) {
+        (opts.log ?? console).error(`[providers] removing the Resend events endpoint of deleted provider ${id} failed:`, err);
+      }
     }
     return c.json({ ok: true as const });
   });
