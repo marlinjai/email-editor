@@ -247,8 +247,13 @@ export class SendWorker {
     if (!provider) throw new Error(`mailing ${mailingId} names provider ${mailing.provider_id}, which does not exist`);
     if (provider.min_interval_ms > 0) {
       const last = await r.providerSends.lastSentAt(workspaceId, provider.id);
-      const free = last ? new Date(last).getTime() + provider.min_interval_ms : 0;
-      if (free > Date.now()) throw new Wait(provider.id, new Date(free));
+      if (last) {
+        // Measured on the database's clock, which stamped the ledger, so workers
+        // on hosts whose clocks disagree still keep the interval.
+        const [{ now }] = (await tx`SELECT clock_timestamp() AS now`) as unknown as [{ now: string }];
+        const left = new Date(last).getTime() + provider.min_interval_ms - new Date(now).getTime();
+        if (left > 0) throw new Wait(provider.id, new Date(Date.now() + left));
+      }
     }
     const reservation = await this.budget.reserve(tx, workspaceId, provider.id, 1);
     if (!reservation.ok) {
