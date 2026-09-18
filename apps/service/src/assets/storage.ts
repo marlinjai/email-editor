@@ -1,4 +1,4 @@
-import { StorageBrain } from '@marlinjai/storage-brain-sdk';
+import { FileNotFoundError, StorageBrain } from '@marlinjai/storage-brain-sdk';
 import type { AssetContentType } from '@marlinjai/mail-contract';
 
 /**
@@ -48,10 +48,18 @@ const FETCH_TIMEOUT_MS = 15_000;
  * server-side: a signed URL expires, so it is never what a mail links to.
  */
 export class StorageBrainAssetStorage implements AssetStorage {
+  /** Uploads and deletes: retried, since the caller is waiting on a write anyway. */
   private readonly client: StorageBrain;
+  /**
+   * Reads for the public URL: one attempt. A mail client's image proxy gives up
+   * within seconds, and the SDK would otherwise also retry a missing file with
+   * backoff before reporting it.
+   */
+  private readonly reader: StorageBrain;
 
   constructor(options: { apiKey: string; baseUrl?: string }) {
     this.client = new StorageBrain({ apiKey: options.apiKey, baseUrl: options.baseUrl, timeout: FETCH_TIMEOUT_MS });
+    this.reader = new StorageBrain({ apiKey: options.apiKey, baseUrl: options.baseUrl, timeout: FETCH_TIMEOUT_MS, maxRetries: 1 });
   }
 
   async put(input: Parameters<AssetStorage['put']>[0]): Promise<{ fileId: string }> {
@@ -70,7 +78,7 @@ export class StorageBrainAssetStorage implements AssetStorage {
   async open(fileId: string): Promise<ReadableStream<Uint8Array> | null> {
     let url: string;
     try {
-      url = (await this.client.getSignedUrl(fileId, SIGNED_URL_TTL_SECONDS)).url;
+      url = (await this.reader.getSignedUrl(fileId, SIGNED_URL_TTL_SECONDS)).url;
     } catch (err) {
       if (statusOf(err) === 404) return null;
       throw new AssetStorageUnavailable(`Storage Brain did not sign a download URL: ${describe(err)}`, { cause: err });
@@ -98,9 +106,17 @@ export class StorageBrainAssetStorage implements AssetStorage {
   }
 }
 
-function statusOf(err: unknown): number | undefined {
-  const status = (err as { statusCode?: unknown } | null)?.statusCode;
-  return typeof status === 'number' ? status : undefined;
+/**
+ * The HTTP status behind an SDK error. The SDK (0.11) retries a 404 like a
+ * network failure and then throws a NetworkError whose `originalError` is the
+ * real FileNotFoundError, so the status is looked for along that chain.
+ */
+function statusOf(err: unknown, depth = 0): number | undefined {
+  if (err instanceof FileNotFoundError) return 404;
+  if (typeof err !== 'object' || err === null || depth > 3) return undefined;
+  const status = (err as { statusCode?: unknown }).statusCode;
+  if (typeof status === 'number') return status;
+  return statusOf((err as { originalError?: unknown }).originalError, depth + 1);
 }
 
 function describe(err: unknown): string {

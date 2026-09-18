@@ -9,9 +9,14 @@
 // errors } }` or `{ id, ok: false, error }`.
 
 import { parentPort } from 'node:worker_threads';
-import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
 
 if (!parentPort) throw new Error('compile-worker.js must run in a worker thread');
+// mjml's dependency tree still requires Node's deprecated `punycode`, which
+// would print the same warning once per worker (and again for every
+// replacement). It says nothing about this service, so it is silenced here,
+// in the worker only, before mjml loads.
+process.noDeprecation = true;
+const { createMJMLCompiler } = await import('@marlinjai/email-editor-core/server');
 const port = parentPort;
 const compiler = createMJMLCompiler();
 
