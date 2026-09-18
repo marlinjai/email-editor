@@ -5,6 +5,16 @@
   },
   "version": "0.1.0",
   "description": "Typed client for the Lumitra Mail v1 API: Node and edge runtimes, retries with idempotency, cursor pagination, webhook verification",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marlinjai/email-editor.git",
+    "directory": "packages/mail-sdk"
+  },
+  "homepage": "https://github.com/marlinjai/email-editor/tree/main/packages/mail-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/marlinjai/email-editor/issues"
+  },
   "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -17,7 +27,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
@@ -28,7 +40,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@marlinjai/mail-contract": "workspace:*"
+    "@marlinjai/mail-contract": "workspace:^"
   },
   "peerDependencies": {
     "zod": "^3.25.0"

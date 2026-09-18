@@ -271,7 +271,7 @@ Written once so the phases built in parallel cannot drift apart:
   tarballs in CI by `scripts/check-packed-manifests.mjs`); `onRequestImage` and
   `migrateTemplate` exist; the prebuilt stylesheet is scoped under `.ee-root`
   and verified in a Next 16, React 19, Tailwind CSS 4 host (`examples/nextjs`);
-  `publish-editor.yml` publishes on a tag `editor-v*`. The document's schema
+  `publish.yml` publishes on a tag `editor-v*` (and the mail contract and SDK on `mail-v*`). The document's schema
   field is `version` (today `"1.0"`); the service's `schema_version` column
   stores that value. Not yet published: waits on the npm steps in question 4
   below.
@@ -323,21 +323,23 @@ later decision can overturn:
    package still has to be registered as a trusted publisher on npmjs.com by
    Marlin before the first publish succeeds (a 404 on the upload means it is not
    registered yet). Until then hosts consume the packages from the workspace.
-   For the editor that is four registrations on npmjs.com, each with repository
-   `marlinjai/email-editor` and workflow file `publish-editor.yml`:
-   `@marlinjai/email-editor-core`, `@marlinjai/email-editor-blocks`,
-   `@marlinjai/email-editor-ui` and `@marlinjai/email-editor`. None of them
-   exists on npm yet (checked 2026-09-18), and npm only lets a trusted
-   publisher be attached to an existing package, so the very first publish is
-   manual and Marlin's: build, run
-   `node scripts/check-packed-manifests.mjs --out /tmp/editor-tarballs`, then
-   `npm publish <tarball> --access public` for core, blocks, ui and editor in
-   that order (publish the checked tarballs, never `npm publish` inside a
-   package directory, which would ship `workspace:` ranges). Then attach the
-   trusted publisher to each package and push the tag `editor-v0.1.0`: the
-   workflow skips versions already on the registry, so it verifies the setup
-   without republishing, and every later `editor-v*` tag publishes through
-   OpenID Connect with provenance.
+   That is six registrations on npmjs.com, each with repository
+   `marlinjai/email-editor` and workflow file `publish.yml`, in two release
+   sets (`scripts/release-sets.mjs`): the editor set
+   (`@marlinjai/email-editor-core`, `-blocks`, `-ui`, `@marlinjai/email-editor`,
+   tag `editor-v*`) and the mail set (`@marlinjai/mail-contract`,
+   `@marlinjai/mail-sdk`, tag `mail-v*`). None of them exists on npm yet
+   (checked 2026-09-18), and npm only lets a trusted publisher be attached to
+   an existing package, so the very first publish is manual and Marlin's:
+   build, run `node scripts/check-packed-manifests.mjs --set editor --out
+   /tmp/editor-tarballs` (and `--set mail --out /tmp/mail-tarballs`), then
+   `npm publish <tarball> --access public` for each tarball in the order
+   `node scripts/release-sets.mjs <set>` prints (publish the checked
+   tarballs, never `npm publish` inside a package directory, which would ship
+   `workspace:` ranges). Then attach the trusted publisher to each package and
+   push the tags `editor-v0.1.0` and `mail-v0.1.0`: the workflow skips versions
+   already on the registry, so it verifies the setup without republishing,
+   and every later tag publishes through OpenID Connect with provenance.
 5. **Contract details the plan left open** (fixed in `@marlinjai/mail-contract`,
    2026-09-18): a recipient whose outcome is unknown after a crash ends `skipped`
    with `skip_reason` `outcome_unknown` rather than `failed`, so `retry-failed`
