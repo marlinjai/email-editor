@@ -218,7 +218,7 @@ export function renderConfirmationMail(input: { locale: PageLocale; workspaceNam
     `<html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<title>${st(locale, 'mail_heading')}</title></head>` +
     '<body style="margin:0;padding:0;background:#f5f4f1;color:#1f1e1c;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4f1"><tr><td align="center" style="padding:32px 16px">' +
+    '<div role="main"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4f1"><tr><td align="center" style="padding:32px 16px">' +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #d6d3cc;border-radius:12px">' +
     '<tr><td style="padding:32px 28px">' +
     `<h1 style="margin:0 0 16px;font-size:24px;line-height:1.25">${st(locale, 'mail_heading')}</h1>` +
@@ -226,7 +226,7 @@ export function renderConfirmationMail(input: { locale: PageLocale; workspaceNam
     `<p style="margin:0 0 24px"><a href="${url}" style="display:inline-block;padding:12px 20px;background:#1f1e1c;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:600">${st(locale, 'mail_button')}</a></p>` +
     `<p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#57554f">${st(locale, 'mail_ignore')}</p>` +
     `<p style="margin:0;font-size:14px;line-height:1.5;color:#57554f;word-break:break-all">${st(locale, 'mail_link_fallback', { url: confirmUrl })}</p>` +
-    '</td></tr></table></td></tr></table></body></html>';
+    '</td></tr></table></td></tr></table></div></body></html>';
   const text = [raw('mail_heading'), '', raw('mail_text', ws), '', confirmUrl, '', raw('mail_ignore')].join('\n');
   return { subject: raw('mail_subject', ws), html, text };
 }
