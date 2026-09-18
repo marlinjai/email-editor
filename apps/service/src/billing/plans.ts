@@ -48,6 +48,9 @@ export const PLANS: Readonly<Record<PlanId, Plan>> = {
 export type PaidPlanId = 'starter' | 'growth';
 export const PAID_PLANS: readonly PaidPlanId[] = ['starter', 'growth'];
 
+/** The plans offered to the public, in order: `billing.plans` and the landing page list exactly these. */
+export const LISTED_PLANS: readonly Plan[] = [PLANS.free, ...PAID_PLANS.map((p) => PLANS[p])];
+
 /** The limit of a usage metric in a plan's limits (null is unlimited). */
 export function limitOf(limits: PlanLimits, metric: UsageMetric): number | null {
   switch (metric) {
