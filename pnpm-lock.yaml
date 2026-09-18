@@ -41,6 +41,9 @@ importers:
       '@marlinjai/brain-core':
         specifier: ^1.0.0
         version: 1.0.0(hono@4.13.8)(zod@3.25.76)
+      '@marlinjai/email-editor-core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@marlinjai/mail-contract':
         specifier: workspace:*
         version: link:../../packages/mail-contract

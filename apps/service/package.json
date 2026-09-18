@@ -25,6 +25,7 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@marlinjai/brain-core": "^1.0.0",
+    "@marlinjai/email-editor-core": "workspace:*",
     "@marlinjai/mail-contract": "workspace:*",
     "hono": "^4.13.8",
     "nodemailer": "^10.0.10",
