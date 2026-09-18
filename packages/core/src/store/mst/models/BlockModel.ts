@@ -74,7 +74,7 @@ export const SpacingModel = types.model('Spacing', {
  * All block types share a common base with type-specific properties.
  * Properties are defined directly (not frozen) for fine-grained MST reactivity.
  */
-export const BlockModel = types
+const BlockModelBase = types
   .model('Block', {
     id: types.identifier,
     type: types.enumeration('BlockType', Object.values(BlockType)),
@@ -430,6 +430,30 @@ export const BlockModel = types
       }
     },
   }));
+
+/**
+ * BlockModel: the block model with snapshot processing.
+ *
+ * The document schema (and the server compiler) stores a navbar's links under
+ * `links`, while the store keeps them in `navLinks` because `links` already
+ * holds the social block's links. Map between the two at the snapshot
+ * boundary, so the store reads a stored navbar and every snapshot it emits
+ * (onChange, undo history, persistence) is a schema-valid document.
+ *
+ * Both processors keep the base creation and snapshot types, so the result is
+ * typed as the base model; the explicit annotation also keeps the declaration
+ * emitter from inlining the whole model type.
+ */
+export const BlockModel: typeof BlockModelBase = BlockModelBase.preProcessSnapshot((snapshot) => {
+  if (!snapshot || snapshot.type !== 'navbar') return snapshot;
+  const { links, navLinks, ...rest } = snapshot as typeof snapshot & { navLinks?: unknown[] };
+  const stored = navLinks && navLinks.length > 0 ? navLinks : ((links as unknown[] | undefined) ?? []);
+  return { ...rest, links: [], navLinks: stored } as typeof snapshot;
+}).postProcessSnapshot((snapshot) => {
+  if (snapshot.type !== 'navbar') return snapshot;
+  const { navLinks, links: _socialLinks, ...rest } = snapshot;
+  return { ...rest, links: navLinks } as unknown as typeof snapshot;
+}) as unknown as typeof BlockModelBase;
 
 export type BlockInstance = Instance<typeof BlockModel>;
 export type BlockSnapshotIn = SnapshotIn<typeof BlockModel>;

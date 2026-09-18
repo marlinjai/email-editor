@@ -20,9 +20,8 @@ pnpm install
 # Build all packages
 pnpm run build
 
-# Start example app
-cd examples/nextjs
-pnpm run dev
+# Start the example app
+pnpm -F email-editor-nextjs-example dev
 ```
 
 Open http://localhost:3000 to see the editor in action.
@@ -31,11 +30,11 @@ Open http://localhost:3000 to see the editor in action.
 
 ### Editor Layer
 
-- **Core Engine** - Framework-agnostic email template management with MobX State Tree
+- **Core Engine** - Framework-agnostic email template management with MobX State Tree (MST)
 - **React UI** - 3-panel editor interface (sidebar, canvas, inspector)
 - **14 Block Types** - Text, Image, Button, Divider, Spacer, Social, Hero, Accordion, Raw HTML, Navbar, Carousel, Table, Branded Header, Branded Footer
 - **35 Prebuilt Templates** - Hero sections, feature grids, CTAs, footers, and more
-- **MJML Compilation** - Server-side rendering to email-safe HTML
+- **MJML (Mailjet Markup Language) Compilation** - Server-side rendering to email-safe HTML
 - **Undo/Redo** - Full history management via MST snapshots
 - **Drag & Drop** - Intuitive block placement with dnd-kit
 - **Device Preview** - Desktop and mobile views
@@ -55,8 +54,7 @@ Open http://localhost:3000 to see the editor in action.
 
 1. **Try the Example**
    ```bash
-   cd examples/nextjs
-   pnpm run dev
+   pnpm -F email-editor-nextjs-example dev
    ```
 
 2. **Read the Docs**
@@ -65,18 +63,28 @@ Open http://localhost:3000 to see the editor in action.
 
 3. **Integrate into Your App**
    ```bash
-   pnpm install @marlinjai/email-editor
+   pnpm add @marlinjai/email-editor @marlinjai/email-editor-core react react-dom
    ```
 
    ```tsx
-   import { EmailEditorReact } from '@marlinjai/email-editor/react';
+   'use client';
+
+   import { useState } from 'react';
+   import { EmailEditorReact, type TemplateSnapshotOut } from '@marlinjai/email-editor/react';
    import '@marlinjai/email-editor/styles.css';
 
-   function App() {
-     const [template, setTemplate] = useState(/* ... */);
-     return <EmailEditorReact value={template} onChange={setTemplate} />;
+   function App({ initial }: { initial?: TemplateSnapshotOut }) {
+     const [doc, setDoc] = useState(initial);
+     // The editor fills its container, so the container needs a height.
+     return (
+       <div style={{ height: '80vh' }}>
+         <EmailEditorReact initialTemplate={initial} onChange={setDoc} />
+       </div>
+     );
    }
    ```
+
+   The editor is uncontrolled: `initialTemplate` is read once on mount, and `onChange` receives the whole document, debounced by 300 ms. In Next.js, load it with `next/dynamic` and `ssr: false` from a `'use client'` file; see the [Integration](./integration) guide.
 
 ## Project Structure
 
@@ -124,7 +132,7 @@ All state uses MST for fine-grained reactivity, type-safe actions, and snapshot-
 
 ### 5. Customizable
 
-- Add custom blocks
+- Redefine standard blocks (label, icon, default props) with the `blocks` option
 - Theme colors and fonts
 - Extend with your own UI
 
@@ -132,41 +140,68 @@ All state uses MST for fine-grained reactivity, type-safe actions, and snapshot-
 
 ### Get Compiled HTML
 
+Compilation runs on your server, never in the browser (`editor.getHTML()` is a placeholder that returns an empty string). Validate the document with `migrateTemplate` first:
+
 ```typescript
-const editor = createEditor({ container });
-const html = editor.getHTML();
+// app/api/compile/route.ts
+import { migrateTemplate, isTemplateMigrationError } from '@marlinjai/email-editor-core';
+import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
+
+export async function POST(request: Request) {
+  try {
+    const doc = migrateTemplate(await request.json());
+    const { html, mjml, errors } = createMJMLCompiler().compile(doc);
+    return Response.json({ html, mjml, errors });
+  } catch (error) {
+    if (isTemplateMigrationError(error)) {
+      const status = error.code === 'NEWER_VERSION' ? 422 : 400;
+      return Response.json({ error: error.message, code: error.code, issues: error.issues }, { status });
+    }
+    throw error;
+  }
+}
 ```
 
 ### Save Template
 
-```typescript
+```tsx
+const [doc, setDoc] = useState<TemplateSnapshotOut>();
+
 <EmailEditorReact
-  value={template}
-  onChange={setTemplate}
+  initialTemplate={storedDoc}
+  onChange={setDoc}
   onSave={async () => {
     await fetch('/api/save', {
       method: 'POST',
-      body: JSON.stringify(template),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc),
     });
   }}
 />
 ```
 
+`onSave` receives no arguments: keep the latest document from `onChange` and send that.
+
 ### Customize Theme
 
-```typescript
-const theme = {
+```tsx
+import type { EditorTheme } from '@marlinjai/email-editor/react';
+
+const theme: EditorTheme = {
   colors: {
     primary: '#944923',
+    primaryHover: '#7a3c1d',
     surface: '#ffffff',
   },
   fonts: {
-    heading: 'Georgia, serif',
+    body: 'Georgia, serif',
   },
 };
 
-<EmailEditorReact theme={theme} ... />
+<EmailEditorReact theme={theme} />
 ```
+
+Each value sets an `--ee-*` design token on the editor's root element only. For finer control, override any `--ee-*` token on `.ee-root` in your own CSS, outside any `@layer`.
 
 ## Troubleshooting
 
@@ -177,7 +212,10 @@ Run `pnpm install` from the monorepo root.
 Run `pnpm run build` to compile all packages.
 
 **Styles not loading?**
-Import `@marlinjai/email-editor/styles.css` in your app.
+Import `@marlinjai/email-editor/styles.css` once in your app. It is scoped under `.ee-root`, so no Tailwind configuration change is needed.
+
+**Editor is blank or collapsed?**
+The editor fills its container: give the container a height.
 
 ## Support
 

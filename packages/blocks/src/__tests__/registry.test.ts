@@ -117,7 +117,7 @@ describe('createStandardBlockRegistry', () => {
 
     it('has default content', () => {
       const text = registry.get('text');
-      expect(text!.defaultProps.content).toBeTruthy();
+      expect((text!.defaultProps as { content?: string }).content).toBeTruthy();
     });
   });
 

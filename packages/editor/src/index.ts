@@ -3,6 +3,7 @@
 
 export { createEditor } from './createEditor';
 export type { EditorOptions, EditorInstance, EditorTheme } from './types';
+export type { OnRequestImage, ImageRequest, RequestedImage } from '@marlinjai/email-editor-ui';
 
 // Re-export core types for convenience
 export type {

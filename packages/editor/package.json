@@ -1,10 +1,35 @@
 {
   "name": "@marlinjai/email-editor",
+  "version": "0.1.0",
+  "description": "Embeddable visual email editor (React component and vanilla factory) that produces an MJML-compilable document",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marlinjai/email-editor.git",
+    "directory": "packages/editor"
+  },
+  "homepage": "https://github.com/marlinjai/email-editor/tree/main/packages/editor#readme",
+  "bugs": {
+    "url": "https://github.com/marlinjai/email-editor/issues"
+  },
+  "keywords": [
+    "email",
+    "mjml",
+    "email-editor",
+    "react",
+    "newsletter"
+  ],
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.0.1",
-  "description": "Email editor with MJML compilation",
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -30,28 +55,25 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@marlinjai/email-editor-core": "workspace:*",
-    "@marlinjai/email-editor-ui": "workspace:*",
-    "@marlinjai/email-editor-blocks": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.45",
-    "@types/react-dom": "^18.2.18",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.0",
-    "vitest": "^1.0.4"
+    "@marlinjai/email-editor-blocks": "workspace:^",
+    "@marlinjai/email-editor-core": "workspace:^",
+    "@marlinjai/email-editor-ui": "workspace:^"
   },
   "peerDependencies": {
     "react": "^18.2.0 || ^19.0.0",
     "react-dom": "^18.2.0 || ^19.0.0"
   },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    },
-    "react-dom": {
-      "optional": true
-    }
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^24",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.4"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   }
 }
-

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
-import type { EmailTemplate } from '@marlinjai/email-editor-core';
+import { migrateTemplate, isTemplateMigrationError, type EmailTemplate } from '@marlinjai/email-editor-core';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
@@ -13,14 +13,22 @@ import { join } from 'path';
  */
 export async function POST(request: NextRequest) {
   try {
-    const template: EmailTemplate = await request.json();
+    const rawTemplate: unknown = await request.json();
 
-    // Validate template
-    if (!template || template.version !== '1.0') {
-      return NextResponse.json(
-        { success: false, error: 'Invalid template format' },
-        { status: 400 }
-      );
+    // Validate the document and bring it to the schema version this build
+    // compiles. A newer document (from a newer editor) or an invalid one is
+    // the caller's error, with a code it can act on.
+    let template: EmailTemplate;
+    try {
+      template = migrateTemplate(rawTemplate);
+    } catch (error) {
+      if (isTemplateMigrationError(error)) {
+        return NextResponse.json(
+          { success: false, error: error.message, code: error.code, issues: error.issues },
+          { status: error.code === 'NEWER_VERSION' ? 422 : 400 }
+        );
+      }
+      throw error;
     }
 
     // Compile template
