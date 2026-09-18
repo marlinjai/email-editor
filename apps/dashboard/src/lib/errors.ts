@@ -66,7 +66,13 @@ function fieldErrors(details: Record<string, unknown> | undefined): Record<strin
 export function describeError(err: unknown): ActionError {
   if (err instanceof MailApiError) {
     const base = MESSAGES[err.code] ?? MESSAGES.internal_error;
-    const message = SERVICE_MESSAGE_WINS.has(err.code) && err.message ? `${base} ${err.message}` : base;
+    // `already_exists` names what exists ("the slug news"); the service says it best.
+    const message =
+      err.code === 'already_exists' && err.message
+        ? `${err.message} Choose another.`
+        : SERVICE_MESSAGE_WINS.has(err.code) && err.message
+          ? `${base} ${err.message}`
+          : base;
     return {
       code: err.code,
       message,

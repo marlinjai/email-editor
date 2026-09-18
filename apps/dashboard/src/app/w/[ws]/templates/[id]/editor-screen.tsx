@@ -44,6 +44,9 @@ function toEditorInput(template: Template): TemplateSnapshotIn {
 
 type Conflict = { currentVersion: number | null };
 
+/** The editor's store reports changes this long after the last edit (core RootStore's default `onChangeDebounce`). */
+const EDITOR_CHANGE_DEBOUNCE_MS = 300;
+
 export function EditorScreen({ ws, template: initial }: { ws: string; template: Template }) {
   const router = useRouter();
   const [template, setTemplate] = useState(initial);
@@ -66,16 +69,34 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
   // is the baseline, not a change.
   const latest = useRef<Record<string, unknown>>(toDocument(toEditorInput(initial) as unknown as Record<string, unknown>));
   const touched = useRef(false);
+  const lastInteraction = useRef(0);
 
   const onChange = useCallback((snapshot: TemplateSnapshotOut) => {
     latest.current = toDocument(snapshot);
     if (touched.current) setDirty(true);
   }, []);
 
+  const interacted = useCallback(() => {
+    touched.current = true;
+    lastInteraction.current = Date.now();
+  }, []);
+
+  /**
+   * The editor reports changes debounced (300 ms), so the document it last
+   * reported may be one edit behind. Before reading it, wait until that window
+   * has passed since the last interaction; otherwise a quick save would store
+   * the previous document and silently drop the edit just made.
+   */
+  const settled = useCallback(async () => {
+    const wait = lastInteraction.current + EDITOR_CHANGE_DEBOUNCE_MS + 100 - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    return latest.current;
+  }, []);
+
   const doSave = useCallback(
     (baseVersion: number) =>
       void save.run(
-        () => saveTemplate(ws, template.id, { baseVersion, name: name.trim() || template.name, document: latest.current as never }),
+        async () => saveTemplate(ws, template.id, { baseVersion, name: name.trim() || template.name, document: (await settled()) as never }),
         (outcome) => {
           if (outcome.kind === 'saved') {
             setTemplate(outcome.template);
@@ -88,10 +109,10 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
           }
         },
       ),
-    [save, ws, template.id, template.name, name, router],
+    [save, ws, template.id, template.name, name, router, settled],
   );
 
-  const refreshPreview = useCallback(() => void compile.run(() => compileDocument(ws, latest.current), setPreview), [compile, ws]);
+  const refreshPreview = useCallback(() => void compile.run(async () => compileDocument(ws, await settled()), setPreview), [compile, ws, settled]);
 
   // Cmd/Ctrl+S saves; the browser's own warning protects a tab closed with unsaved work.
   useEffect(() => {
@@ -118,7 +139,19 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
     return () => clearTimeout(t);
   }, [savedAt]);
 
-  const onRequestImage = useCallback<OnRequestImage>((request) => new Promise((resolve) => setImageRequest({ request, resolve })), []);
+  const onRequestImage = useCallback<OnRequestImage>(
+    (request) =>
+      new Promise((resolve) =>
+        setImageRequest({
+          request,
+          resolve: (image) => {
+            interacted();
+            resolve(image);
+          },
+        }),
+      ),
+    [interacted],
+  );
 
   const back = `/w/${ws}/templates`;
 
@@ -172,7 +205,7 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
         >
           Preview
         </Button>
-        <Button variant="primary" busy={save.pending} onClick={() => doSave(template.version)} title="Save (Cmd or Ctrl + S)">
+        <Button variant="primary" busy={save.pending} onClick={() => doSave(template.version)} title="Save (Cmd or Ctrl + S)" data-testid="save-template">
           Save
         </Button>
       </header>
@@ -184,8 +217,8 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
       <div className="flex min-h-0 flex-1">
         <div
           className="ee-host flex min-h-0 min-w-0 flex-1 flex-col"
-          onPointerDownCapture={() => (touched.current = true)}
-          onKeyDownCapture={() => (touched.current = true)}
+          onPointerDownCapture={interacted}
+          onKeyDownCapture={interacted}
         >
           <EmailEditorReact
             key={editorKey}
