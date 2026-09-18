@@ -63,7 +63,12 @@ function TopicForm({
             required
           />
         </Field>
-        <Field id={`${idp}-slug`} label="Slug" hint={topic ? 'Fixed once created: clients send it with every mailing.' : 'What clients send with a mailing.'} error={fields.slug}>
+        <Field
+          id={`${idp}-slug`}
+          label="Slug"
+          hint={topic ? 'Fixed once created: clients send it with every mailing.' : 'What clients send with a mailing.'}
+          error={fields.slug}
+        >
           <Input
             {...describedBy(`${idp}-slug`, fields.slug, true)}
             value={slug}
@@ -77,8 +82,18 @@ function TopicForm({
           />
         </Field>
       </div>
-      <Field id={`${idp}-desc`} label={`Description (${defaultLocale})`} hint="Shown on the unsubscribe page under the topic's name." error={fields.description}>
-        <Textarea {...describedBy(`${idp}-desc`, fields.description, true)} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+      <Field
+        id={`${idp}-desc`}
+        label={`Description (${defaultLocale})`}
+        hint="Shown on the unsubscribe page under the topic's name."
+        error={fields.description}
+      >
+        <Textarea
+          {...describedBy(`${idp}-desc`, fields.description, true)}
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
       </Field>
       {translations.length > 0 ? (
         <fieldset className="flex flex-col gap-3 rounded-xl border border-line p-4">
@@ -119,7 +134,19 @@ function TopicForm({
   );
 }
 
-export function TopicsView({ ws, topics, canAdmin, locales, defaultLocale }: { ws: string; topics: Topic[]; canAdmin: boolean; locales: string[]; defaultLocale: string }) {
+export function TopicsView({
+  ws,
+  topics,
+  canAdmin,
+  locales,
+  defaultLocale,
+}: {
+  ws: string;
+  topics: Topic[];
+  canAdmin: boolean;
+  locales: string[];
+  defaultLocale: string;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const done = () => {
@@ -130,7 +157,13 @@ export function TopicsView({ ws, topics, canAdmin, locales, defaultLocale }: { w
     <Section
       title="Topics"
       description="What people subscribe to. Every mailing goes out under one topic, and unsubscribing from one leaves the others untouched."
-      actions={canAdmin && editing !== 'new' ? <Button variant="primary" onClick={() => setEditing('new')}>New topic</Button> : null}
+      actions={
+        canAdmin && editing !== 'new' ? (
+          <Button variant="primary" onClick={() => setEditing('new')}>
+            New topic
+          </Button>
+        ) : null
+      }
     >
       {editing === 'new' ? (
         <Panel className="mb-4 p-5">
@@ -138,15 +171,32 @@ export function TopicsView({ ws, topics, canAdmin, locales, defaultLocale }: { w
         </Panel>
       ) : null}
       {topics.length === 0 && editing !== 'new' ? (
-        <EmptyState title="No topics yet" action={canAdmin ? <Button variant="primary" onClick={() => setEditing('new')}>New topic</Button> : null}>
-          Create one for each kind of mail you send, for example “Programme updates” and “Venue outreach”, so people can opt out of one without losing the other.
+        <EmptyState
+          title="No topics yet"
+          action={
+            canAdmin ? (
+              <Button variant="primary" onClick={() => setEditing('new')}>
+                New topic
+              </Button>
+            ) : null
+          }
+        >
+          Create one for each kind of mail you send, for example “Programme updates” and “Venue outreach”, so people can opt out of one
+          without losing the other.
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-3">
           {topics.map((t) => (
             <Panel key={t.id} className="p-5">
               {editing === t.id ? (
-                <TopicForm ws={ws} topic={t} locales={locales} defaultLocale={defaultLocale} onDone={done} onCancel={() => setEditing(null)} />
+                <TopicForm
+                  ws={ws}
+                  topic={t}
+                  locales={locales}
+                  defaultLocale={defaultLocale}
+                  onDone={done}
+                  onCancel={() => setEditing(null)}
+                />
               ) : (
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">

@@ -12,7 +12,17 @@ export function AcceptInvite({ token }: { token: string }) {
   return (
     <div className="flex flex-col gap-4">
       <FormError error={error} />
-      <Button variant="primary" busy={pending} className="self-start" onClick={() => void run(() => acceptInvite(token), (r) => router.push(`/w/${r.workspaceId}`))}>
+      <Button
+        variant="primary"
+        busy={pending}
+        className="self-start"
+        onClick={() =>
+          void run(
+            () => acceptInvite(token),
+            (r) => router.push(`/w/${r.workspaceId}`),
+          )
+        }
+      >
         Accept invitation
       </Button>
     </div>

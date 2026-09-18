@@ -41,11 +41,29 @@ export function WebhookForm({
         void run(() => saveWebhook(ws, endpoint?.id ?? null, { url, description, events, enabled }), onDone);
       }}
     >
-      <Field id={`${idp}-url`} label="Endpoint URL" hint="HTTPS, reachable from the internet. Requests are signed; verify them with the secret." error={fields.url}>
-        <Input {...describedBy(`${idp}-url`, fields.url, true)} type="url" value={url} onChange={(e) => setUrl(e.target.value)} required spellCheck={false} className="font-mono" />
+      <Field
+        id={`${idp}-url`}
+        label="Endpoint URL"
+        hint="HTTPS, reachable from the internet. Requests are signed; verify them with the secret."
+        error={fields.url}
+      >
+        <Input
+          {...describedBy(`${idp}-url`, fields.url, true)}
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          required
+          spellCheck={false}
+          className="font-mono"
+        />
       </Field>
       <Field id={`${idp}-desc`} label="Description (optional)" error={fields.description}>
-        <Input {...describedBy(`${idp}-desc`, fields.description)} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} />
+        <Input
+          {...describedBy(`${idp}-desc`, fields.description)}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          maxLength={500}
+        />
       </Field>
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-[12.5px] font-medium text-muted">Events</legend>

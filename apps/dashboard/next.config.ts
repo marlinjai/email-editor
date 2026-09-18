@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
   // pnpm workspace: trace dependencies from the repository root.
   outputFileTracingRoot: path.join(import.meta.dirname, '../..'),
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // Image uploads (up to 10 MB, MAX_ASSET_BYTES) and template documents
+      // (up to 1 MB) pass through server actions.
+      bodySizeLimit: '12mb',
+    },
+  },
   async headers() {
     return [
       {

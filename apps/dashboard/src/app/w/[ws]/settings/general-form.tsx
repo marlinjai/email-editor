@@ -16,7 +16,14 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
   const [localesText, setLocalesText] = useState(initial.locales.join(', '));
   const [defaultLocale, setDefaultLocale] = useState(initial.defaultLocale);
   const [tracking, setTracking] = useState(initial.trackingEnabled);
-  const locales = [...new Set(localesText.split(/[\s,]+/).map((l) => l.trim()).filter(Boolean))];
+  const locales = [
+    ...new Set(
+      localesText
+        .split(/[\s,]+/)
+        .map((l) => l.trim())
+        .filter(Boolean),
+    ),
+  ];
 
   return (
     <form
@@ -48,8 +55,17 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
             className="font-mono"
           />
         </Field>
-        <Field id="g-default" label="Default language" hint="Shown when a contact has no language of their own." error={fields.defaultLocale}>
-          <Select {...describedBy('g-default', fields.defaultLocale, true)} value={defaultLocale} onChange={(e) => setDefaultLocale(e.target.value)}>
+        <Field
+          id="g-default"
+          label="Default language"
+          hint="Shown when a contact has no language of their own."
+          error={fields.defaultLocale}
+        >
+          <Select
+            {...describedBy('g-default', fields.defaultLocale, true)}
+            value={defaultLocale}
+            onChange={(e) => setDefaultLocale(e.target.value)}
+          >
             {(locales.includes(defaultLocale) ? locales : [defaultLocale, ...locales]).map((l) => (
               <option key={l} value={l}>
                 {l}
@@ -71,7 +87,8 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
               Open and click tracking
             </label>
             <p id="g-tracking-hint" className="mt-0.5 text-[12.5px] text-muted">
-              Off by default. Turn it on only if your privacy policy says you track opens and clicks; the setting applies once campaign analytics ship.
+              Off by default. Turn it on only if your privacy policy says you track opens and clicks; the setting applies once campaign
+              analytics ship.
             </p>
           </div>
         </div>

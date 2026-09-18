@@ -81,14 +81,28 @@ function toDraft(p: Provider): Draft {
 }
 
 function toInput(d: Draft): ProviderFormInput {
-  const policy = { daily_recipient_budget: Number(d.budget), min_interval_ms: Number(d.interval), max_recipients_per_message: Number(d.perMessage) };
+  const policy = {
+    daily_recipient_budget: Number(d.budget),
+    min_interval_ms: Number(d.interval),
+    max_recipients_per_message: Number(d.perMessage),
+  };
   const common = { name: d.name, fromName: d.fromName, fromEmail: d.fromEmail, replyTo: d.replyTo, secret: d.secret, policy };
   return d.kind === 'smtp'
     ? { kind: 'smtp', ...common, host: d.host, port: Number(d.port), security: d.security, username: d.username }
     : { kind: 'resend', ...common };
 }
 
-function ProviderForm({ ws, provider, onDone, onCancel }: { ws: string; provider: Provider | null; onDone: () => void; onCancel: () => void }) {
+function ProviderForm({
+  ws,
+  provider,
+  onDone,
+  onCancel,
+}: {
+  ws: string;
+  provider: Provider | null;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
   const { run, pending, error, fields } = useAction();
   const [d, setD] = useState<Draft>(provider ? toDraft(provider) : EMPTY);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
@@ -117,43 +131,96 @@ function ProviderForm({ ws, provider, onDone, onCancel }: { ws: string; provider
           <Input {...describedBy(`${idp}-name`, f('name'))} value={d.name} onChange={(e) => set('name', e.target.value)} required />
         </Field>
         <Field id={`${idp}-kind`} label="Kind">
-          <Select id={`${idp}-kind`} value={d.kind} disabled={provider !== null} onChange={(e) => set('kind', e.target.value as Draft['kind'])}>
+          <Select
+            id={`${idp}-kind`}
+            value={d.kind}
+            disabled={provider !== null}
+            onChange={(e) => set('kind', e.target.value as Draft['kind'])}
+          >
             <option value="smtp">SMTP</option>
             <option value="resend">Resend</option>
           </Select>
         </Field>
         <Field id={`${idp}-fromname`} label="Sender name" error={f('fromName')}>
-          <Input {...describedBy(`${idp}-fromname`, f('fromName'))} value={d.fromName} onChange={(e) => set('fromName', e.target.value)} required />
+          <Input
+            {...describedBy(`${idp}-fromname`, f('fromName'))}
+            value={d.fromName}
+            onChange={(e) => set('fromName', e.target.value)}
+            required
+          />
         </Field>
         <Field id={`${idp}-fromemail`} label="Sender address" error={f('fromEmail')}>
-          <Input {...describedBy(`${idp}-fromemail`, f('fromEmail'))} type="email" value={d.fromEmail} onChange={(e) => set('fromEmail', e.target.value)} required />
+          <Input
+            {...describedBy(`${idp}-fromemail`, f('fromEmail'))}
+            type="email"
+            value={d.fromEmail}
+            onChange={(e) => set('fromEmail', e.target.value)}
+            required
+          />
         </Field>
         <Field id={`${idp}-replyto`} label="Reply-to (optional)" error={f('replyTo')}>
-          <Input {...describedBy(`${idp}-replyto`, f('replyTo'))} type="email" value={d.replyTo} onChange={(e) => set('replyTo', e.target.value)} />
+          <Input
+            {...describedBy(`${idp}-replyto`, f('replyTo'))}
+            type="email"
+            value={d.replyTo}
+            onChange={(e) => set('replyTo', e.target.value)}
+          />
         </Field>
         {d.kind === 'smtp' ? (
           <>
             <Field id={`${idp}-host`} label="SMTP host" error={f('host')}>
-              <Input {...describedBy(`${idp}-host`, f('host'))} value={d.host} onChange={(e) => set('host', e.target.value)} required spellCheck={false} />
+              <Input
+                {...describedBy(`${idp}-host`, f('host'))}
+                value={d.host}
+                onChange={(e) => set('host', e.target.value)}
+                required
+                spellCheck={false}
+              />
             </Field>
             <Field id={`${idp}-port`} label="Port" error={f('port')}>
-              <Input {...describedBy(`${idp}-port`, f('port'))} inputMode="numeric" value={d.port} onChange={(e) => set('port', e.target.value)} required />
+              <Input
+                {...describedBy(`${idp}-port`, f('port'))}
+                inputMode="numeric"
+                value={d.port}
+                onChange={(e) => set('port', e.target.value)}
+                required
+              />
             </Field>
-            <Field id={`${idp}-security`} label="Encryption" hint="Always encrypted: TLS from the start (465) or upgraded with STARTTLS (587).">
-              <Select {...describedBy(`${idp}-security`, undefined, true)} value={d.security} onChange={(e) => set('security', e.target.value as Draft['security'])}>
+            <Field
+              id={`${idp}-security`}
+              label="Encryption"
+              hint="Always encrypted: TLS from the start (465) or upgraded with STARTTLS (587)."
+            >
+              <Select
+                {...describedBy(`${idp}-security`, undefined, true)}
+                value={d.security}
+                onChange={(e) => set('security', e.target.value as Draft['security'])}
+              >
                 <option value="starttls">STARTTLS</option>
                 <option value="tls">TLS</option>
               </Select>
             </Field>
             <Field id={`${idp}-user`} label="User name" error={f('username')}>
-              <Input {...describedBy(`${idp}-user`, f('username'))} value={d.username} onChange={(e) => set('username', e.target.value)} required autoComplete="off" />
+              <Input
+                {...describedBy(`${idp}-user`, f('username'))}
+                value={d.username}
+                onChange={(e) => set('username', e.target.value)}
+                required
+                autoComplete="off"
+              />
             </Field>
           </>
         ) : null}
         <Field
           id={`${idp}-secret`}
           label={d.kind === 'smtp' ? 'Password' : 'API key'}
-          hint={provider ? (provider.has_secret ? 'Stored and never shown. Leave empty to keep it; type a new one to replace it.' : 'None stored yet.') : 'Stored encrypted and never shown again, not even to you.'}
+          hint={
+            provider
+              ? provider.has_secret
+                ? 'Stored and never shown. Leave empty to keep it; type a new one to replace it.'
+                : 'None stored yet.'
+              : 'Stored encrypted and never shown again, not even to you.'
+          }
           error={f('secret')}
         >
           <Input
@@ -169,13 +236,28 @@ function ProviderForm({ ws, provider, onDone, onCancel }: { ws: string; provider
       <fieldset className="grid gap-4 rounded-xl border border-line p-4 sm:grid-cols-3">
         <legend className="px-1 text-[12.5px] font-medium text-muted">Sending limits</legend>
         <Field id={`${idp}-budget`} label="Recipients per 24 hours" error={f('policy.daily_recipient_budget')}>
-          <Input {...describedBy(`${idp}-budget`, f('policy.daily_recipient_budget'))} inputMode="numeric" value={d.budget} onChange={(e) => set('budget', e.target.value)} />
+          <Input
+            {...describedBy(`${idp}-budget`, f('policy.daily_recipient_budget'))}
+            inputMode="numeric"
+            value={d.budget}
+            onChange={(e) => set('budget', e.target.value)}
+          />
         </Field>
         <Field id={`${idp}-interval`} label="Milliseconds between messages" error={f('policy.min_interval_ms')}>
-          <Input {...describedBy(`${idp}-interval`, f('policy.min_interval_ms'))} inputMode="numeric" value={d.interval} onChange={(e) => set('interval', e.target.value)} />
+          <Input
+            {...describedBy(`${idp}-interval`, f('policy.min_interval_ms'))}
+            inputMode="numeric"
+            value={d.interval}
+            onChange={(e) => set('interval', e.target.value)}
+          />
         </Field>
         <Field id={`${idp}-per`} label="Recipients per message" error={f('policy.max_recipients_per_message')}>
-          <Input {...describedBy(`${idp}-per`, f('policy.max_recipients_per_message'))} inputMode="numeric" value={d.perMessage} onChange={(e) => set('perMessage', e.target.value)} />
+          <Input
+            {...describedBy(`${idp}-per`, f('policy.max_recipients_per_message'))}
+            inputMode="numeric"
+            value={d.perMessage}
+            onChange={(e) => set('perMessage', e.target.value)}
+          />
         </Field>
       </fieldset>
       <FormError error={error} />
@@ -252,7 +334,11 @@ function ProviderCard({ ws, item, canAdmin }: { ws: string; item: Item; canAdmin
             {usage ? `${formatCount(used)} of ${formatCount(budget)} recipients` : 'Usage unavailable'}
           </span>
         </div>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]" role="img" aria-label={`${pct} percent of the daily budget used`}>
+        <div
+          className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"
+          role="img"
+          aria-label={`${pct} percent of the daily budget used`}
+        >
           <div className={`h-full rounded-full ${pct >= 100 ? 'bg-danger' : 'gold-surface border-0'}`} style={{ width: `${pct}%` }} />
         </div>
         {usage?.next_capacity_at ? (
@@ -299,7 +385,13 @@ export function ProvidersView({ ws, items, canAdmin }: { ws: string; items: Item
       <Section
         title="Sending providers"
         description="Where mail leaves from. The limits keep a mailing inside what the provider allows; the worker never sends faster or more."
-        actions={canAdmin && !adding ? <Button variant="primary" onClick={() => setAdding(true)}>Add provider</Button> : null}
+        actions={
+          canAdmin && !adding ? (
+            <Button variant="primary" onClick={() => setAdding(true)}>
+              Add provider
+            </Button>
+          ) : null
+        }
       >
         {adding ? (
           <Panel className="mb-4 p-5">
@@ -315,7 +407,16 @@ export function ProvidersView({ ws, items, canAdmin }: { ws: string; items: Item
           </Panel>
         ) : null}
         {items.length === 0 && !adding ? (
-          <EmptyState title="No provider yet" action={canAdmin ? <Button variant="primary" onClick={() => setAdding(true)}>Add provider</Button> : null}>
+          <EmptyState
+            title="No provider yet"
+            action={
+              canAdmin ? (
+                <Button variant="primary" onClick={() => setAdding(true)}>
+                  Add provider
+                </Button>
+              ) : null
+            }
+          >
             Connect the mailbox or service your mail is sent through: an iCloud+ custom domain, Resend, or any SMTP server.
           </EmptyState>
         ) : (

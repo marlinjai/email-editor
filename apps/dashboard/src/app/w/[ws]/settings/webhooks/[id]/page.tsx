@@ -19,9 +19,21 @@ export default async function EndpointPage({
   const status = WEBHOOK_DELIVERY_STATUSES.includes(sp.status as WebhookDeliveryStatus) ? (sp.status as WebhookDeliveryStatus) : undefined;
   const data = await act('webhooks.get', async () => {
     const { api } = await mail(ws);
-    const [endpoint, deliveries] = await Promise.all([api.webhooks.get(id), api.webhooks.deliveries(id, { limit: 50, status, cursor: sp.cursor })]);
+    const [endpoint, deliveries] = await Promise.all([
+      api.webhooks.get(id),
+      api.webhooks.deliveries(id, { limit: 50, status, cursor: sp.cursor }),
+    ]);
     return { endpoint, deliveries };
   });
-  if (!data.ok) return <ErrorPanel title="This endpoint could not be loaded" message={data.error.message} requestId={data.error.requestId} />;
-  return <EndpointView ws={ws} endpoint={data.data.endpoint} deliveries={data.data.deliveries.data} nextCursor={data.data.deliveries.next_cursor} status={status ?? null} />;
+  if (!data.ok)
+    return <ErrorPanel title="This endpoint could not be loaded" message={data.error.message} requestId={data.error.requestId} />;
+  return (
+    <EndpointView
+      ws={ws}
+      endpoint={data.data.endpoint}
+      deliveries={data.data.deliveries.data}
+      nextCursor={data.data.deliveries.next_cursor}
+      status={status ?? null}
+    />
+  );
 }

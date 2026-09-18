@@ -20,6 +20,7 @@ export default async function ProvidersPage({ params }: { params: Promise<{ ws: 
     const usage = await Promise.all(list.map((p) => api.providers.usage(p.id).catch(() => null)));
     return list.map((p, i) => ({ provider: p, usage: usage[i] ?? null }));
   });
-  if (!providers.ok) return <ErrorPanel title="Providers could not be loaded" message={providers.error.message} requestId={providers.error.requestId} />;
+  if (!providers.ok)
+    return <ErrorPanel title="Providers could not be loaded" message={providers.error.message} requestId={providers.error.requestId} />;
   return <ProvidersView ws={ws} items={providers.data} canAdmin={can(role, 'admin')} />;
 }

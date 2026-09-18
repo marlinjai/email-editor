@@ -29,7 +29,12 @@ const settingsPath = (ws: string, sub = '') => `/w/${ws}/settings${sub}`;
 
 // General
 
-const Locale = z.string().trim().min(2).max(35).regex(/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/, 'A language tag such as de, en or pt-BR');
+const Locale = z
+  .string()
+  .trim()
+  .min(2)
+  .max(35)
+  .regex(/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/, 'A language tag such as de, en or pt-BR');
 
 const GeneralInput = z
   .object({
@@ -38,7 +43,10 @@ const GeneralInput = z
     defaultLocale: Locale,
     trackingEnabled: z.boolean(),
   })
-  .refine((v) => v.locales.includes(v.defaultLocale), { message: 'The default language must be one of the languages', path: ['defaultLocale'] });
+  .refine((v) => v.locales.includes(v.defaultLocale), {
+    message: 'The default language must be one of the languages',
+    path: ['defaultLocale'],
+  });
 
 export async function updateGeneral(ws: string, input: z.input<typeof GeneralInput>): Promise<ActionResult> {
   const parsed = parseInput(GeneralInput, input);
@@ -84,7 +92,10 @@ const InviteInput = z.object({ email: Email, role: MemberRole });
  * may add members can create one; the service re-checks that when the link is
  * accepted.
  */
-export async function inviteMember(ws: string, input: z.input<typeof InviteInput>): Promise<ActionResult<{ url: string; expiresAt: string }>> {
+export async function inviteMember(
+  ws: string,
+  input: z.input<typeof InviteInput>,
+): Promise<ActionResult<{ url: string; expiresAt: string }>> {
   const parsed = parseInput(InviteInput, input);
   if (!parsed.ok) return parsed;
   return act('invites.create', async () => {
@@ -172,9 +183,22 @@ export async function saveProvider(ws: string, providerId: string | null, input:
   if (!parsed.ok) return parsed;
   const p = parsed.data;
   if (!providerId && p.secret.length === 0) {
-    return { ok: false, error: { code: 'validation_failed', message: 'Some fields need attention.', fields: { secret: p.kind === 'smtp' ? 'The SMTP password is required' : 'The Resend API key is required' } } };
+    return {
+      ok: false,
+      error: {
+        code: 'validation_failed',
+        message: 'Some fields need attention.',
+        fields: { secret: p.kind === 'smtp' ? 'The SMTP password is required' : 'The Resend API key is required' },
+      },
+    };
   }
-  const common = { name: p.name, from_name: p.fromName, from_email: p.fromEmail, reply_to: p.replyTo === '' ? null : p.replyTo, policy: p.policy };
+  const common = {
+    name: p.name,
+    from_name: p.fromName,
+    from_email: p.fromEmail,
+    reply_to: p.replyTo === '' ? null : p.replyTo,
+    policy: p.policy,
+  };
   return act(providerId ? 'providers.update' : 'providers.create', async () => {
     const { api } = await mail(ws);
     let id: string;
@@ -192,7 +216,11 @@ export async function saveProvider(ws: string, providerId: string | null, input:
     } else {
       const created =
         p.kind === 'smtp'
-          ? await api.providers.create({ kind: 'smtp', ...common, config: { host: p.host, port: p.port, security: p.security, username: p.username, password: p.secret } })
+          ? await api.providers.create({
+              kind: 'smtp',
+              ...common,
+              config: { host: p.host, port: p.port, security: p.security, username: p.username, password: p.secret },
+            })
           : await api.providers.create({ kind: 'resend', ...common, config: { api_key: p.secret } });
       id = created.id;
     }
@@ -220,7 +248,11 @@ export async function deleteProvider(ws: string, providerId: string): Promise<Ac
 
 // Topics
 
-const Translation = z.object({ locale: Locale, name: z.string().trim().min(1, 'The translated name').max(120), description: z.string().max(1000) });
+const Translation = z.object({
+  locale: Locale,
+  name: z.string().trim().min(1, 'The translated name').max(120),
+  description: z.string().max(1000),
+});
 
 const TopicInput = z.object({
   slug: Slug,
@@ -236,9 +268,18 @@ export async function saveTopic(ws: string, topicId: string | null, input: Topic
   const t = parsed.data;
   const locales = t.translations.map((x) => x.locale);
   if (new Set(locales).size !== locales.length) {
-    return { ok: false, error: { code: 'validation_failed', message: 'Each language can be translated once.', fields: { translations: 'A language appears twice' } } };
+    return {
+      ok: false,
+      error: {
+        code: 'validation_failed',
+        message: 'Each language can be translated once.',
+        fields: { translations: 'A language appears twice' },
+      },
+    };
   }
-  const translations = Object.fromEntries(t.translations.map((x) => [x.locale, { name: x.name, description: x.description.trim() === '' ? null : x.description }]));
+  const translations = Object.fromEntries(
+    t.translations.map((x) => [x.locale, { name: x.name, description: x.description.trim() === '' ? null : x.description }]),
+  );
   return act(topicId ? 'topics.update' : 'topics.create', async () => {
     const { api } = await mail(ws);
     const saved = topicId
@@ -260,7 +301,11 @@ const WebhookInput = z.object({
 export type WebhookFormInput = z.input<typeof WebhookInput>;
 
 /** Creating answers with the signing secret, shown once; an update never does. */
-export async function saveWebhook(ws: string, endpointId: string | null, input: WebhookFormInput): Promise<ActionResult<{ id: string; secret: string | null }>> {
+export async function saveWebhook(
+  ws: string,
+  endpointId: string | null,
+  input: WebhookFormInput,
+): Promise<ActionResult<{ id: string; secret: string | null }>> {
   const parsed = parseInput(WebhookInput, input);
   if (!parsed.ok) return parsed;
   const w = parsed.data;
@@ -268,10 +313,20 @@ export async function saveWebhook(ws: string, endpointId: string | null, input: 
     const { api } = await mail(ws);
     let result: { id: string; secret: string | null };
     if (endpointId) {
-      const updated = await api.webhooks.update(endpointId, { url: w.url, description: w.description.trim() === '' ? null : w.description, events: w.events, enabled: w.enabled });
+      const updated = await api.webhooks.update(endpointId, {
+        url: w.url,
+        description: w.description.trim() === '' ? null : w.description,
+        events: w.events,
+        enabled: w.enabled,
+      });
       result = { id: updated.id, secret: null };
     } else {
-      const created = await api.webhooks.create({ url: w.url, description: w.description || undefined, events: w.events, enabled: w.enabled });
+      const created = await api.webhooks.create({
+        url: w.url,
+        description: w.description || undefined,
+        events: w.events,
+        enabled: w.enabled,
+      });
       result = { id: created.endpoint.id, secret: created.secret };
     }
     revalidatePath(settingsPath(ws, '/webhooks'));

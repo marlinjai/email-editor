@@ -14,7 +14,10 @@ function inviteSecret(): string {
   return secret;
 }
 
-export function createInvite(input: { workspaceId: string; inviterSubject: string; email: string; role: MemberRole }): { url: string; expiresAt: string } {
+export function createInvite(input: { workspaceId: string; inviterSubject: string; email: string; role: MemberRole }): {
+  url: string;
+  expiresAt: string;
+} {
   const { token, payload } = signInvite(input, inviteSecret());
   return { url: `${auth.appUrl()}/invite/${token}`, expiresAt: new Date(payload.x).toISOString() };
 }

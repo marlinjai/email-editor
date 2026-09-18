@@ -38,7 +38,11 @@ function RoleSelect({ ws, member, myRole }: { ws: string; member: Member; myRole
           </option>
         ))}
       </Select>
-      {error ? <span role="alert" className="text-[12px] text-danger">{error.message}</span> : null}
+      {error ? (
+        <span role="alert" className="text-[12px] text-danger">
+          {error.message}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -56,14 +60,24 @@ function InviteForm({ ws, myRole }: { ws: string; myRole: MemberRole }) {
         onSubmit={(e) => {
           e.preventDefault();
           setCopied(false);
-          void run(() => inviteMember(ws, { email, role }), (r) => {
-            setLink({ ...r, email });
-            setEmail('');
-          });
+          void run(
+            () => inviteMember(ws, { email, role }),
+            (r) => {
+              setLink({ ...r, email });
+              setEmail('');
+            },
+          );
         }}
       >
         <Field id="inv-email" label="Email address" error={fields.email} className="min-w-[240px] flex-1">
-          <Input {...describedBy('inv-email', fields.email)} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="off" />
+          <Input
+            {...describedBy('inv-email', fields.email)}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="off"
+          />
         </Field>
         <Field id="inv-role" label="Role" error={fields.role} className="w-40">
           <Select {...describedBy('inv-role', fields.role)} value={role} onChange={(e) => setRole(e.target.value as MemberRole)}>
@@ -103,7 +117,9 @@ function InviteForm({ ws, myRole }: { ws: string; myRole: MemberRole }) {
               {copied ? 'Copied' : 'Copy link'}
             </Button>
           </div>
-          <p className="mt-2 text-[12px] text-muted">Their company needs Lumitra Mail enabled in their Lumitra account for the link to open.</p>
+          <p className="mt-2 text-[12px] text-muted">
+            Their company needs Lumitra Mail enabled in their Lumitra account for the link to open.
+          </p>
         </Notice>
       ) : null}
     </div>
@@ -138,7 +154,13 @@ export function MembersView({ ws, members, me, myRole }: { ws: string; members: 
                     {m.name ? <span className="block text-[12px] text-muted">{m.email}</span> : null}
                     {self ? <Badge tone="gold">You</Badge> : null}
                   </Td>
-                  <Td>{isAdmin && !self ? <RoleSelect ws={ws} member={m} myRole={myRole} /> : <span className="text-muted">{ROLE_LABELS[m.role]}</span>}</Td>
+                  <Td>
+                    {isAdmin && !self ? (
+                      <RoleSelect ws={ws} member={m} myRole={myRole} />
+                    ) : (
+                      <span className="text-muted">{ROLE_LABELS[m.role]}</span>
+                    )}
+                  </Td>
                   <Td>
                     <When at={m.created_at} />
                   </Td>
@@ -156,7 +178,10 @@ export function MembersView({ ws, members, me, myRole }: { ws: string; members: 
         </Table>
       </Section>
       {isAdmin ? (
-        <Section title="Invite someone" description="Creates a link for one address and role, valid for seven days. You send it; nothing is emailed automatically.">
+        <Section
+          title="Invite someone"
+          description="Creates a link for one address and role, valid for seven days. You send it; nothing is emailed automatically."
+        >
           <InviteForm ws={ws} myRole={myRole} />
         </Section>
       ) : null}

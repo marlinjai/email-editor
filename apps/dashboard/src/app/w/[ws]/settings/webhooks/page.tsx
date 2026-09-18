@@ -14,6 +14,7 @@ export default async function WebhooksPage({ params }: { params: Promise<{ ws: s
     for await (const e of api.paginate('webhooks.list', { query: { limit: 100 } })) all.push(e);
     return all;
   });
-  if (!endpoints.ok) return <ErrorPanel title="Webhooks could not be loaded" message={endpoints.error.message} requestId={endpoints.error.requestId} />;
+  if (!endpoints.ok)
+    return <ErrorPanel title="Webhooks could not be loaded" message={endpoints.error.message} requestId={endpoints.error.requestId} />;
   return <WebhooksView ws={ws} endpoints={endpoints.data} />;
 }

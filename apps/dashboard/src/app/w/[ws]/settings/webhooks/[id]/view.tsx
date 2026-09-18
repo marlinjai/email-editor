@@ -18,10 +18,23 @@ function Redeliver({ ws, endpointId, delivery }: { ws: string; endpointId: strin
   const { run, pending, error } = useAction();
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <Button variant="ghost" busy={pending} onClick={() => void run(() => redeliverWebhook(ws, endpointId, delivery.id), () => router.refresh())}>
+      <Button
+        variant="ghost"
+        busy={pending}
+        onClick={() =>
+          void run(
+            () => redeliverWebhook(ws, endpointId, delivery.id),
+            () => router.refresh(),
+          )
+        }
+      >
         Redeliver
       </Button>
-      {error ? <span role="alert" className="text-[12px] text-danger">{error.message}</span> : null}
+      {error ? (
+        <span role="alert" className="text-[12px] text-danger">
+          {error.message}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -93,7 +106,12 @@ export function EndpointView({
         actions={
           <nav aria-label="Filter deliveries" className="flex gap-1">
             {([null, 'pending', 'succeeded', 'failed'] as const).map((s) => (
-              <LinkButton key={s ?? 'all'} href={s ? `${base}?status=${s}` : base} variant={status === s ? 'secondary' : 'ghost'} aria-current={status === s ? 'page' : undefined}>
+              <LinkButton
+                key={s ?? 'all'}
+                href={s ? `${base}?status=${s}` : base}
+                variant={status === s ? 'secondary' : 'ghost'}
+                aria-current={status === s ? 'page' : undefined}
+              >
                 {s ? STATUS_LABEL[s] : 'All'}
               </LinkButton>
             ))}
@@ -136,20 +154,28 @@ export function EndpointView({
                     <Td className="tabular">{d.attempts}</Td>
                     <Td>
                       {d.last_status_code ? <Mono>HTTP {d.last_status_code}</Mono> : null}
-                      {d.last_error ? <span className="block max-w-[32ch] truncate text-[12px] text-danger" title={d.last_error}>{d.last_error}</span> : null}
+                      {d.last_error ? (
+                        <span className="block max-w-[32ch] truncate text-[12px] text-danger" title={d.last_error}>
+                          {d.last_error}
+                        </span>
+                      ) : null}
                       {!d.last_status_code && !d.last_error ? <span className="text-faint">none yet</span> : null}
                     </Td>
                     <Td>
                       <When at={d.created_at} />
                     </Td>
-                    <Td className="text-right">{d.status !== 'pending' ? <Redeliver ws={ws} endpointId={endpoint.id} delivery={d} /> : null}</Td>
+                    <Td className="text-right">
+                      {d.status !== 'pending' ? <Redeliver ws={ws} endpointId={endpoint.id} delivery={d} /> : null}
+                    </Td>
                   </tr>
                 ))}
               </tbody>
             </Table>
             {nextCursor ? (
               <div className="mt-3 flex justify-end">
-                <LinkButton href={`${base}?${new URLSearchParams({ ...(status ? { status } : {}), cursor: nextCursor })}`}>Older deliveries</LinkButton>
+                <LinkButton href={`${base}?${new URLSearchParams({ ...(status ? { status } : {}), cursor: nextCursor })}`}>
+                  Older deliveries
+                </LinkButton>
               </div>
             ) : null}
           </>

@@ -17,7 +17,8 @@ export default async function TopicsPage({ params }: { params: Promise<{ ws: str
     for await (const t of api.paginate('topics.list', { query: { limit: 100 } })) all.push(t);
     return all;
   });
-  if (!topics.ok) return <ErrorPanel title="Topics could not be loaded" message={topics.error.message} requestId={topics.error.requestId} />;
+  if (!topics.ok)
+    return <ErrorPanel title="Topics could not be loaded" message={topics.error.message} requestId={topics.error.requestId} />;
   const role = ctx.ok && ctx.data ? ctx.data.role : 'viewer';
   const locales = ctx.ok && ctx.data ? ctx.data.workspace.settings.locales : [];
   const defaultLocale = ctx.ok && ctx.data ? ctx.data.workspace.settings.default_locale : 'en';

@@ -27,20 +27,38 @@ export function ApiKeysView({ ws, keys }: { ws: string; keys: ApiKey[] }) {
 
   return (
     <>
-      <Section title="Create a key" description="For your own application's server. A key is shown once, then only its first characters; keep it out of browsers and repositories.">
+      <Section
+        title="Create a key"
+        description="For your own application's server. A key is shown once, then only its first characters; keep it out of browsers and repositories."
+      >
         <form
           className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            void run(() => createApiKey(ws, { name, scope }), (r) => {
-              setCreated({ key: r.key, name: r.api_key.name });
-              setName('');
-              router.refresh();
-            });
+            void run(
+              () => createApiKey(ws, { name, scope }),
+              (r) => {
+                setCreated({ key: r.key, name: r.api_key.name });
+                setName('');
+                router.refresh();
+              },
+            );
           }}
         >
-          <Field id="key-name" label="Name" hint="What uses it, e.g. Studio production" error={fields.name} className="min-w-[240px] flex-1">
-            <Input {...describedBy('key-name', fields.name, true)} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required />
+          <Field
+            id="key-name"
+            label="Name"
+            hint="What uses it, e.g. Studio production"
+            error={fields.name}
+            className="min-w-[240px] flex-1"
+          >
+            <Input
+              {...describedBy('key-name', fields.name, true)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={120}
+              required
+            />
           </Field>
           <Field id="key-scope" label="Scope" error={fields.scope} className="w-[320px]">
             <Select {...describedBy('key-scope', fields.scope)} value={scope} onChange={(e) => setScope(e.target.value as ApiKeyScope)}>
@@ -61,7 +79,9 @@ export function ApiKeysView({ ws, keys }: { ws: string; keys: ApiKey[] }) {
       </Section>
       <Section title="Active keys">
         {active.length === 0 ? (
-          <EmptyState title="No active keys">Create one above when an application needs to call the mail API for this workspace.</EmptyState>
+          <EmptyState title="No active keys">
+            Create one above when an application needs to call the mail API for this workspace.
+          </EmptyState>
         ) : (
           <Table label="Active API keys">
             <thead>
@@ -129,7 +149,12 @@ export function ApiKeysView({ ws, keys }: { ws: string; keys: ApiKey[] }) {
           </Table>
         </Section>
       ) : null}
-      <SecretOnceDialog open={created !== null} onClose={() => setCreated(null)} title={`API key "${created?.name ?? ''}"`} secret={created?.key ?? ''} />
+      <SecretOnceDialog
+        open={created !== null}
+        onClose={() => setCreated(null)}
+        title={`API key "${created?.name ?? ''}"`}
+        secret={created?.key ?? ''}
+      />
       <ConfirmDialog
         open={revoking !== null}
         onClose={() => setRevoking(null)}

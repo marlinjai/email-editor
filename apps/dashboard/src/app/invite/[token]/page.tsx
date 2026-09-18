@@ -21,7 +21,11 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         <div className="mt-8">
           <ErrorPanel
             title={check.reason === 'expired' ? 'This invitation has expired' : 'This invitation link is not valid'}
-            message={check.reason === 'expired' ? 'Invitations are valid for seven days. Ask the person who invited you for a new one.' : 'Check that the whole link was copied, or ask for a new one.'}
+            message={
+              check.reason === 'expired'
+                ? 'Invitations are valid for seven days. Ask the person who invited you for a new one.'
+                : 'Check that the whole link was copied, or ask for a new one.'
+            }
             action={<LinkButton href="/">Go to my workspaces</LinkButton>}
           />
         </div>

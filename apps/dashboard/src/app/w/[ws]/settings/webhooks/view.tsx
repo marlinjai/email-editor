@@ -16,7 +16,13 @@ export function WebhooksView({ ws, endpoints }: { ws: string; endpoints: Webhook
     <Section
       title="Webhooks"
       description="Events sent to your own application as they happen: sends, failures, unsubscribes, bounces and finished mailings. Each is retried with backoff until your endpoint answers 2xx."
-      actions={!adding ? <Button variant="primary" onClick={() => setAdding(true)}>Add endpoint</Button> : null}
+      actions={
+        !adding ? (
+          <Button variant="primary" onClick={() => setAdding(true)}>
+            Add endpoint
+          </Button>
+        ) : null
+      }
     >
       {adding ? (
         <Panel className="mb-4 p-5">
@@ -33,13 +39,24 @@ export function WebhooksView({ ws, endpoints }: { ws: string; endpoints: Webhook
         </Panel>
       ) : null}
       {endpoints.length === 0 && !adding ? (
-        <EmptyState title="No endpoints yet" action={<Button variant="primary" onClick={() => setAdding(true)}>Add endpoint</Button>}>
+        <EmptyState
+          title="No endpoints yet"
+          action={
+            <Button variant="primary" onClick={() => setAdding(true)}>
+              Add endpoint
+            </Button>
+          }
+        >
           Add one to mirror sent mail and unsubscribes into your own records.
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
           {endpoints.map((e) => (
-            <Link key={e.id} href={`/w/${ws}/settings/webhooks/${e.id}`} className="block rounded-xl border border-line bg-panel px-5 py-4 transition-colors hover:border-line-strong">
+            <Link
+              key={e.id}
+              href={`/w/${ws}/settings/webhooks/${e.id}`}
+              className="block rounded-xl border border-line bg-panel px-5 py-4 transition-colors hover:border-line-strong"
+            >
               <div className="flex flex-wrap items-center gap-3">
                 <Mono className="min-w-0 flex-1 truncate text-[13px] text-ink">{e.url}</Mono>
                 <Badge tone={e.enabled ? 'ok' : 'neutral'}>{e.enabled ? 'Enabled' : 'Disabled'}</Badge>
@@ -52,7 +69,8 @@ export function WebhooksView({ ws, endpoints }: { ws: string; endpoints: Webhook
       )}
       <SecretOnceDialog open={secret !== null} onClose={() => setSecret(null)} title="Signing secret" secret={secret ?? ''}>
         <p className="text-[12.5px] text-muted">
-          Verify each request&apos;s <span className="font-mono">x-mail-signature</span> with it (the SDK&apos;s <span className="font-mono">verifyWebhook</span> does this).
+          Verify each request&apos;s <span className="font-mono">x-mail-signature</span> with it (the SDK&apos;s{' '}
+          <span className="font-mono">verifyWebhook</span> does this).
         </p>
       </SecretOnceDialog>
     </Section>
