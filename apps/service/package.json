@@ -1,0 +1,36 @@
+{
+  "name": "@email-editor/service",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Lumitra Mail: the multi-tenant mail service (API, and from S2 the send worker and hosted pages)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=${MAIL_INFISICAL_PROJECT_ID} --domain=https://infisical.lumitra.co --env=dev -- tsx watch src/main.ts",
+    "migrate": "node dist/main.js migrate",
+    "start": "node dist/main.js serve",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run -c vitest.unit.config.ts",
+    "test:integration": "vitest run test/integration",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@marlinjai/brain-core": "^1.0.0",
+    "hono": "^4.13.8",
+    "postgres": "^3.4.9",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.1.0",
+    "@types/node": "22",
+    "tsup": "^8.0.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.4"
+  }
+}
