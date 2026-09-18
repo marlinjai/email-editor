@@ -50,6 +50,18 @@ const SERVICE_MESSAGE_WINS: ReadonlySet<ErrorCode> = new Set([
   'provider_error',
 ]);
 
+/**
+ * Checkout and the portal answer `service_unavailable` with this reason until
+ * Stripe is configured for the instance: not a passing outage, so it is not
+ * worded as one.
+ */
+export function isBillingNotConfigured(code: string, details: Record<string, unknown> | undefined): boolean {
+  return code === 'service_unavailable' && details?.reason === 'billing_not_configured';
+}
+
+export const BILLING_NOT_CONFIGURED =
+  'Billing is not available yet: paid plans cannot be bought here until payments are set up. Nothing was charged, and the workspace keeps its current plan.';
+
 type Issue = { path?: Array<string | number>; message?: string };
 
 function fieldErrors(details: Record<string, unknown> | undefined): Record<string, string> | undefined {
@@ -63,20 +75,21 @@ function fieldErrors(details: Record<string, unknown> | undefined): Record<strin
   return out;
 }
 
+function messageFor(err: MailApiError): string {
+  const base = MESSAGES[err.code] ?? MESSAGES.internal_error;
+  // `already_exists` names what exists ("the slug news"); the service says it best.
+  if (err.code === 'already_exists' && err.message) return `${err.message} Choose another.`;
+  // The service names the plan, the limit and what to do; the screen adds the way to Billing.
+  if (err.code === 'plan_limit_reached' && err.message) return err.message;
+  if (isBillingNotConfigured(err.code, err.details)) return BILLING_NOT_CONFIGURED;
+  if (SERVICE_MESSAGE_WINS.has(err.code) && err.message) return `${base} ${err.message}`;
+  return base;
+}
+
 /** Turns anything a mail service call can throw into what the screen shows. */
 export function describeError(err: unknown): ActionError {
   if (err instanceof MailApiError) {
-    const base = MESSAGES[err.code] ?? MESSAGES.internal_error;
-    // `already_exists` names what exists ("the slug news"); the service says it best.
-    const message =
-      err.code === 'already_exists' && err.message
-        ? `${err.message} Choose another.`
-        : err.code === 'plan_limit_reached' && err.message
-          ? // The service names the plan, the limit and what to do; the screen adds the way to Billing.
-            err.message
-        : SERVICE_MESSAGE_WINS.has(err.code) && err.message
-          ? `${base} ${err.message}`
-          : base;
+    const message = messageFor(err);
     return {
       code: err.code,
       message,

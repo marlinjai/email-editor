@@ -12,6 +12,8 @@ import {
   type MailingTestResult,
   type MessageSummary,
   type RecipientBatchResult,
+  type ResponseMeta,
+  type UsageWarningHeaderEntry,
 } from '@marlinjai/mail-sdk';
 import { act, parseInput } from '@/lib/action';
 import { mail } from '@/lib/mail';
@@ -131,17 +133,44 @@ export async function addRecipients(
 
 const TestInput = z.object({ to: Email, firstName: z.string().max(200) });
 
-export async function sendTest(ws: string, id: string, input: z.input<typeof TestInput>): Promise<ActionResult<MailingTestResult>> {
+/** Collects the `x-mail-usage-warning` header of the one call it is passed to. */
+function usageWarningsOf() {
+  let warnings: UsageWarningHeaderEntry[] = [];
+  return { onResponse: (meta: ResponseMeta) => void (warnings = meta.usageWarnings), get: () => warnings };
+}
+
+export async function sendTest(
+  ws: string,
+  id: string,
+  input: z.input<typeof TestInput>,
+): Promise<ActionResult<MailingTestResult & { usageWarnings: UsageWarningHeaderEntry[] }>> {
   const parsed = parseInput(TestInput, input);
   if (!parsed.ok) return parsed;
   return act('mailings.test', async () => {
     const { api } = await mail(ws);
-    const result = await api.mailings.test(id, {
-      to: parsed.data.to,
-      ...(parsed.data.firstName.trim() ? { merge: { first_name: parsed.data.firstName.trim() } } : {}),
-    });
+    const usage = usageWarningsOf();
+    const result = await api.mailings.test(
+      id,
+      {
+        to: parsed.data.to,
+        ...(parsed.data.firstName.trim() ? { merge: { first_name: parsed.data.firstName.trim() } } : {}),
+      },
+      { onResponse: usage.onResponse },
+    );
     revalidatePath(`${mailingsPath(ws)}/${id}`);
-    return result;
+    return { ...result, usageWarnings: usage.get() };
+  });
+}
+
+/** Starts sending; the plan's usage warning from the response comes back with the mailing. */
+export async function sendMailing(ws: string, id: string): Promise<ActionResult<{ mailing: Mailing; usageWarnings: UsageWarningHeaderEntry[] }>> {
+  return act('mailings.send', async () => {
+    const { api } = await mail(ws);
+    const usage = usageWarningsOf();
+    const mailing = await api.mailings.send(id, { onResponse: usage.onResponse });
+    revalidatePath(`${mailingsPath(ws)}/${id}`);
+    revalidatePath(mailingsPath(ws));
+    return { mailing, usageWarnings: usage.get() };
   });
 }
 
@@ -156,10 +185,10 @@ export async function latestTest(ws: string, id: string): Promise<ActionResult<M
   });
 }
 
-type Control = 'send' | 'pause' | 'resume' | 'cancel';
+type Control = 'pause' | 'resume' | 'cancel';
 
 export async function controlMailing(ws: string, id: string, control: Control): Promise<ActionResult<Mailing>> {
-  if (!['send', 'pause', 'resume', 'cancel'].includes(control)) {
+  if (!['pause', 'resume', 'cancel'].includes(control)) {
     return { ok: false, error: { code: 'invalid_request', message: 'Unknown action.' } };
   }
   return act(`mailings.${control}`, async () => {

@@ -4,6 +4,7 @@ import { describeError } from '@/lib/errors';
 import { formatBytes, percent, slugify } from '@/lib/format';
 import { mailingControls, mailingProgress } from '@/lib/mailing-status';
 import { can } from '@/lib/roles';
+import { formatPrice, usageLevel, usageSentence, usageWarningSummary } from '@/lib/usage';
 import { assertTestAuthNotInProduction, decodeTestIdentity, encodeTestIdentity, testAuthEnabled, TestAuthInProductionError } from '@/lib/test-auth';
 
 const api = (code: ConstructorParameters<typeof MailApiError>[0]['code'], extra: Partial<ConstructorParameters<typeof MailApiError>[0]> = {}) =>
@@ -63,6 +64,40 @@ describe('mailing controls follow the contract table', () => {
   it('computes progress without dividing by zero', () => {
     expect(mailingProgress({ total: 0, queued: 0, sending: 0, sent: 0, failed: 0, skipped: 0 })).toEqual({ settled: 0, total: 0, percent: 0 });
     expect(mailingProgress({ total: 4, queued: 1, sending: 0, sent: 2, failed: 1, skipped: 0 }).percent).toBe(75);
+  });
+});
+
+describe('plan usage in words', () => {
+  it('places a count against its limit at the contract threshold', () => {
+    expect(usageLevel(10, null)).toBe('ok');
+    expect(usageLevel(799, 1000)).toBe('ok');
+    expect(usageLevel(800, 1000)).toBe('approaching');
+    expect(usageLevel(1000, 1000)).toBe('reached');
+    expect(usageLevel(1200, 1000)).toBe('reached');
+  });
+  it('names the metric, and the period only for messages', () => {
+    expect(usageSentence({ metric: 'messages', used: 8200, limit: 10000 })).toBe('8,200 of 10,000 messages this period');
+    expect(usageSentence({ metric: 'webhook_endpoints', used: 1, limit: 1 })).toBe('1 of 1 webhook endpoints');
+  });
+  it('summarises warnings by their worst level', () => {
+    expect(usageWarningSummary([])).toBeNull();
+    expect(usageWarningSummary([{ metric: 'messages', used: 850, limit: 1000 }])?.level).toBe('approaching');
+    const both = usageWarningSummary([
+      { metric: 'messages', used: 850, limit: 1000 },
+      { metric: 'contacts', used: 500, limit: 500 },
+    ]);
+    expect(both?.level).toBe('reached');
+    expect(both?.text).toContain('500 of 500 contacts');
+  });
+  it('does not interrupt for counts only an admin changes', () => {
+    expect(usageWarningSummary([{ metric: 'providers', used: 1, limit: 1 }, { metric: 'members', used: 2, limit: 2 }])).toBeNull();
+    expect(usageWarningSummary([{ metric: 'providers', used: 1, limit: 1 }, { metric: 'contacts', used: 420, limit: 500 }])?.text).not.toContain('providers');
+  });
+  it('prices a plan, or says it is not sold', () => {
+    expect(formatPrice({ monthly_price_cents: 0, currency: 'EUR' })).toBe('Free');
+    expect(formatPrice({ monthly_price_cents: 900, currency: 'EUR' })).toBe('€9 a month');
+    expect(formatPrice({ monthly_price_cents: 2950, currency: 'EUR' })).toBe('€29.50 a month');
+    expect(formatPrice({ monthly_price_cents: null, currency: 'EUR' })).toBeNull();
   });
 });
 

@@ -15,6 +15,7 @@ export default async function SettingsLayout({ children, params }: { children: R
     { href: `${base}/providers`, label: 'Providers' },
     { href: `${base}/topics`, label: 'Topics' },
     ...(can(role, 'admin') ? [{ href: `${base}/webhooks`, label: 'Webhooks' }] : []),
+    { href: `${base}/billing`, label: 'Billing' },
   ];
   return (
     <>

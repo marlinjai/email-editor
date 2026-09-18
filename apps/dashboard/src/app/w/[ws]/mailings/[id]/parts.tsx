@@ -2,14 +2,32 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { Mailing, MailingCounts, MessageSummary, RecipientBatchResult } from '@marlinjai/mail-contract';
+import type { Mailing, MailingCounts, MessageSummary, RecipientBatchResult, UsageWarningHeaderEntry } from '@marlinjai/mail-contract';
+import Link from 'next/link';
 import { ConfirmDialog, Dialog } from '@/components/dialog';
 import { FormError } from '@/components/form-error';
 import { Button, describedBy, Field, Input, Notice, Spinner, Textarea, When } from '@/components/ui';
 import { useAction } from '@/components/use-action';
 import { formatCount, percent } from '@/lib/format';
 import { parseRecipients, PROBLEM_LABELS, type ParseResult } from '@/lib/recipients';
-import { addRecipients, controlMailing, duplicateMailing, preflight, retryFailed, sendTest } from '../actions';
+import { billingPath, usageWarningSummary } from '@/lib/usage';
+import { addRecipients, controlMailing, duplicateMailing, preflight, retryFailed, sendMailing, sendTest } from '../actions';
+
+/** The plan's usage warning the service sent with a send or a test (its `x-mail-usage-warning` header). */
+export function UsageWarningNotice({ ws, warnings }: { ws: string; warnings: UsageWarningHeaderEntry[] }) {
+  const summary = usageWarningSummary(warnings);
+  if (!summary) return null;
+  return (
+    <Notice tone={summary.level === 'reached' ? 'danger' : 'warn'}>
+      <span data-testid="usage-warning">
+        {summary.text}{' '}
+        <Link href={billingPath(ws)} className="font-medium text-ink underline decoration-line-strong underline-offset-2">
+          Plans and usage
+        </Link>
+      </span>
+    </Notice>
+  );
+}
 
 /** The live sending rail: sent in brushed gold, failed and skipped beside it, queued as the empty track. */
 export function ProgressRail({ counts, live }: { counts: MailingCounts; live: boolean }) {
@@ -57,7 +75,19 @@ export function ProgressRail({ counts, live }: { counts: MailingCounts; live: bo
 type Preflight = { recipients: number; remainingBudget: number | null; compileErrors: number; hasUnsubscribe: boolean };
 
 /** Send, with what the service would refuse checked first and the daily budget spelled out. */
-export function SendDialog({ ws, mailing, open, onClose, onSent }: { ws: string; mailing: Mailing; open: boolean; onClose: () => void; onSent: (m: Mailing) => void }) {
+export function SendDialog({
+  ws,
+  mailing,
+  open,
+  onClose,
+  onSent,
+}: {
+  ws: string;
+  mailing: Mailing;
+  open: boolean;
+  onClose: () => void;
+  onSent: (sent: { mailing: Mailing; usageWarnings: UsageWarningHeaderEntry[] }) => void;
+}) {
   const check = useAction();
   const send = useAction();
   const [pf, setPf] = useState<Preflight | null>(null);
@@ -78,7 +108,7 @@ export function SendDialog({ ws, mailing, open, onClose, onSent }: { ws: string;
           <Button variant="ghost" onClick={onClose} disabled={send.pending} autoFocus>
             Cancel
           </Button>
-          <Button variant="primary" busy={send.pending} disabled={!pf || blocking !== null} onClick={() => void send.run(() => controlMailing(ws, mailing.id, 'send'), onSent)}>
+          <Button variant="primary" busy={send.pending} disabled={!pf || blocking !== null} onClick={() => void send.run(() => sendMailing(ws, mailing.id), onSent)}>
             Send to {pf ? formatCount(pf.recipients) : '…'} recipients
           </Button>
         </>
@@ -132,6 +162,7 @@ export function Controls({
   const [cancelling, setCancelling] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [includeUnknown, setIncludeUnknown] = useState(false);
+  const [usageWarnings, setUsageWarnings] = useState<UsageWarningHeaderEntry[]>([]);
   const retry = useAction();
   const unknownId = useId();
 
@@ -166,14 +197,16 @@ export function Controls({
         ) : null}
       </div>
       {act.error ? <FormError error={act.error} /> : null}
+      <UsageWarningNotice ws={ws} warnings={usageWarnings} />
       <SendDialog
         ws={ws}
         mailing={mailing}
         open={sending}
         onClose={() => setSending(false)}
-        onSent={(m) => {
+        onSent={(sent) => {
           setSending(false);
-          onChange(m);
+          setUsageWarnings(sent.usageWarnings);
+          onChange(sent.mailing);
         }}
       />
       <ConfirmDialog
@@ -240,6 +273,7 @@ export function TestSend({ ws, mailing, lastTest, defaultTo, canWrite }: { ws: s
   const { run, pending, error, fields } = useAction();
   const [to, setTo] = useState(defaultTo);
   const [firstName, setFirstName] = useState('');
+  const [usageWarnings, setUsageWarnings] = useState<UsageWarningHeaderEntry[]>([]);
   const stale = lastTest !== null && new Date(lastTest.created_at).getTime() < new Date(mailing.updated_at).getTime();
   return (
     <div className="flex flex-col gap-4">
@@ -259,7 +293,13 @@ export function TestSend({ ws, mailing, lastTest, defaultTo, canWrite }: { ws: s
           className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            void run(() => sendTest(ws, mailing.id, { to, firstName }), () => router.refresh());
+            void run(
+              () => sendTest(ws, mailing.id, { to, firstName }),
+              (r) => {
+                setUsageWarnings(r.usageWarnings);
+                router.refresh();
+              },
+            );
           }}
         >
           <Field id="t-to" label="Send a test to" error={fields.to} className="min-w-[240px] flex-1">
@@ -274,6 +314,7 @@ export function TestSend({ ws, mailing, lastTest, defaultTo, canWrite }: { ws: s
         </form>
       ) : null}
       <FormError error={error && !error.fields ? error : null} />
+      <UsageWarningNotice ws={ws} warnings={usageWarnings} />
     </div>
   );
 }
