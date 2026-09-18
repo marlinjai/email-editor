@@ -19,6 +19,7 @@ import { tagsRepo } from './tags.js';
 import { contactPropertiesRepo } from './contact-properties.js';
 import { mailingPlatformRepo, workspaceTrackingRepo } from './mailing-platform.js';
 import { segmentsRepo } from './segments.js';
+import { importsRepo } from './imports.js';
 
 /**
  * Every query the service runs against workspace-owned data lives behind these
@@ -64,6 +65,7 @@ export function repos(db: Db) {
     mailingPlatform: mailingPlatformRepo(db),
     workspaceTracking: workspaceTrackingRepo(db),
     segments: segmentsRepo(db),
+    imports: importsRepo(db),
   };
 }
 export type Repos = ReturnType<typeof repos>;

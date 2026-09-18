@@ -1,4 +1,4 @@
-import { MAX_ASSET_BYTES, REQUEST_ID_HEADER, routes } from '@marlinjai/mail-contract';
+import { MAX_ASSET_BYTES, MAX_IMPORT_BYTES, REQUEST_ID_HEADER, routes } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AssetStorage } from './assets/storage.js';
@@ -36,12 +36,15 @@ import { topicRoutes } from './routes/topics.js';
 import { tagRoutes } from './routes/tags.js';
 import { contactPropertyRoutes } from './routes/contact-properties.js';
 import { segmentRoutes } from './routes/segments.js';
+import { importRoutes } from './routes/imports.js';
 import { createSmtpTransport, type SmtpSettings } from './transport/smtp.js';
 import type { Transport } from './transport/types.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 /** An image upload: the file itself plus room for the multipart framing around it. */
 export const MAX_UPLOAD_BODY_BYTES = MAX_ASSET_BYTES + 64 * 1024;
+/** A CSV import: the file plus room for the multipart framing. */
+export const MAX_IMPORT_BODY_BYTES = MAX_IMPORT_BYTES + 64 * 1024;
 
 export type AppOptions = {
   sql: Sql;
@@ -127,9 +130,15 @@ export function createApp({
     });
   const jsonLimit = limit(MAX_BODY_BYTES);
   const uploadLimit = limit(MAX_UPLOAD_BODY_BYTES);
+  const importLimit = limit(MAX_IMPORT_BODY_BYTES);
   const upload = routes['assets.upload'];
+  const csvImport = routes['imports.create'];
   app.use('/v1/*', (c, next) =>
-    c.req.method === upload.method && c.req.path === upload.path ? uploadLimit(c, next) : jsonLimit(c, next),
+    c.req.method === upload.method && c.req.path === upload.path
+      ? uploadLimit(c, next)
+      : c.req.method === csvImport.method && c.req.path === csvImport.path
+        ? importLimit(c, next)
+        : jsonLimit(c, next),
   );
   app.use(
     '/v1/*',
@@ -153,6 +162,7 @@ export function createApp({
   app.route('/', topicRoutes(sql, deps));
   app.route('/', contactRoutes(sql, deps));
   app.route('/', suppressionRoutes(sql, deps));
+  app.route('/', importRoutes(sql, deps));
 
   app.route(
     '/',

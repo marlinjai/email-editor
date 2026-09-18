@@ -1,4 +1,5 @@
 import type { Compiler } from '../compile/pool.js';
+import { createImportJob } from '../imports/job.js';
 import type { Sql } from '../db.js';
 import type { UnsubscribeSigner } from '../unsubscribe.js';
 import type { TransportFor } from '../worker/transports.js';
@@ -25,5 +26,6 @@ export function platformJobs(deps: PlatformDeps): PlatformJob[] {
   return [
     createScheduleJob({ sql: deps.sql, compile, log: deps.log }),
     createAbDecisionJob({ sql: deps.sql, log: deps.log }),
+    createImportJob({ sql: deps.sql, log: deps.log }),
   ];
 }
