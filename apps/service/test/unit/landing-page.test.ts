@@ -55,19 +55,33 @@ describe('translations', () => {
     expect(joined('es')).not.toMatch(/\b(tú|te has)\b/i);
   });
 
-  it('claims only what the service does today', () => {
-    // Bounce handling and open/click webhooks are not built yet; the images are
-    // on Cloudflare R2, so nothing may say the whole service is hosted in the EU.
-    const en = Object.values(LANDING_MESSAGES.en).join(' ');
-    expect(en).not.toMatch(/bounce|complaint/i);
-    expect(LANDING_MESSAGES.en.f_webhooks_text).not.toMatch(/open|click/i);
-    expect(en).not.toMatch(/hosted in the EU/i);
-    expect(LANDING_MESSAGES.en.privacy_eu).toMatch(/Hetzner/);
-    expect(LANDING_MESSAGES.en.privacy_eu).toMatch(/Cloudflare R2/);
-    for (const locale of PAGE_LOCALES) {
-      expect(LANDING_MESSAGES[locale].privacy_eu, locale).toMatch(/Cloudflare R2/);
-      expect(Object.values(LANDING_MESSAGES[locale]).join(' '), locale).not.toMatch(/\b(EU|UE)\b/);
-    }
+  // Bounce handling and open/click webhooks are not built yet, and the images
+  // are on Cloudflare R2, so no locale may claim either or say the whole
+  // service is hosted in the EU. Each language's own words are checked.
+  const BOUNCE_WORDS: Record<PageLocale, RegExp> = {
+    en: /bounce|complaint/i,
+    de: /bounce|rückläufer|beschwerde|zurückkommt/i,
+    it: /bounce|rimbalz|reclam|segnalazion/i,
+    fr: /bounce|rebond|plainte/i,
+    es: /bounce|rebot|queja/i,
+  };
+  const OPEN_CLICK_WORDS: Record<PageLocale, RegExp> = {
+    en: /\bopen|\bclick/i,
+    de: /öffnung|klick/i,
+    it: /apertur|\bclic/i,
+    fr: /ouverture|\bclic/i,
+    es: /apertur|\bclic/i,
+  };
+
+  it.each(PAGE_LOCALES)('%s claims only what the service does today', (locale) => {
+    const messages = LANDING_MESSAGES[locale];
+    const all = Object.values(messages).join(' ');
+    expect(all).not.toMatch(BOUNCE_WORDS[locale]);
+    expect(messages.f_webhooks_text).not.toMatch(OPEN_CLICK_WORDS[locale]);
+    expect(messages.app_text).not.toMatch(OPEN_CLICK_WORDS[locale]);
+    expect(all).not.toMatch(/\b(EU|UE)\b|hosted in the EU/);
+    expect(messages.privacy_eu).toMatch(/Hetzner/);
+    expect(messages.privacy_eu).toMatch(/Cloudflare R2/);
   });
 
   it.each(PAGE_LOCALES)('%s renders with no unfilled placeholder and no stray key name', (locale) => {
