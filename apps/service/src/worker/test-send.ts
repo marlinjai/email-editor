@@ -11,15 +11,9 @@ import { composeMessage } from './compose.js';
 import { DEFAULT_PUBLIC_BASE_URL, unsubscribeUrl } from './merge.js';
 import { recordFailed, recordSent } from './settle.js';
 import type { TransportFor } from './transports.js';
-
-/**
- * The contact id a test send's unsubscribe token carries. The hosted page
- * (src/routes/unsubscribe.ts, from the unsubscribe team's branch, which exports
- * the same constant) recognises it, shows a preview and never writes anything, so
- * a test recipient clicking the link unsubscribes nobody. Defined here until that
- * branch is on main; then this imports it.
- */
-export const TEST_UNSUBSCRIBE_CONTACT_ID = 'test';
+// The contact id a test send's token carries: the hosted page recognises it,
+// shows a preview and never writes, so a test recipient unsubscribes nobody.
+import { TEST_UNSUBSCRIBE_CONTACT_ID } from '../routes/unsubscribe.js';
 
 /** Marks a test on the wire; also makes every test send distinct for a provider that deduplicates. */
 export const TEST_SEND_HEADER = 'X-Lumitra-Test';

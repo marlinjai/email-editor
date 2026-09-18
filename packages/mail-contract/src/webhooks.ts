@@ -10,6 +10,7 @@ export const WEBHOOK_EVENT_TYPES = [
   'message.sent',
   'message.failed',
   'contact.unsubscribed',
+  'contact.resubscribed',
   'contact.bounced',
   'mailing.finished',
 ] as const;
@@ -61,6 +62,18 @@ export const ContactUnsubscribedData = z.object({
 });
 export type ContactUnsubscribedData = z.infer<typeof ContactUnsubscribedData>;
 
+/**
+ * The person opted back in (only possible through the signed hosted page, or by a
+ * client or member lifting their own `unsubscribed` block). The same shape as
+ * `contact.unsubscribed`, so a mirror can apply both with one code path: `topic`
+ * null means the block on every topic was lifted. Blocks for a bounce, a
+ * complaint or a manual block are never lifted this way.
+ */
+export const ContactResubscribedData = ContactUnsubscribedData.omit({ unsubscribed_at: true }).extend({
+  resubscribed_at: Timestamp,
+});
+export type ContactResubscribedData = z.infer<typeof ContactResubscribedData>;
+
 export const ContactBouncedData = z.object({
   contact_id: Id.nullable(),
   external_id: z.string().nullable(),
@@ -97,6 +110,7 @@ export const WebhookEvent = z.discriminatedUnion('type', [
   envelope('message.sent', MessageSentData),
   envelope('message.failed', MessageFailedData),
   envelope('contact.unsubscribed', ContactUnsubscribedData),
+  envelope('contact.resubscribed', ContactResubscribedData),
   envelope('contact.bounced', ContactBouncedData),
   envelope('mailing.finished', MailingFinishedData),
 ]);

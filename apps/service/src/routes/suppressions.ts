@@ -106,6 +106,13 @@ export function suppressionRoutes(sql: Sql, deps: MountDeps) {
     return c.json(toSuppression(suppression), 201);
   });
 
+  /**
+   * Lifts a block. Lifting an `unsubscribed` block is an opt-in again, so it
+   * reports `contact.resubscribed` in the same transaction, the mirror of
+   * `contact.unsubscribed` on create; lifting a bounce, complaint or manual block
+   * reports nothing. The contact's topic subscriptions are left as they are: the
+   * client re-sends them with its next upsert, which the block no longer filters.
+   */
   mount(app, 'suppressions.delete', deps, async (c) => {
     const access = c.get('access');
     const id = rowId(params(c, 'suppressions.delete').id, 'suppression');
@@ -122,6 +129,21 @@ export function suppressionRoutes(sql: Sql, deps: MountDeps) {
         targetId: id,
         details: { reason: existing.reason, topic: existing.topic },
       });
+      if (existing.reason === 'unsubscribed') {
+        const contact = await r.contacts.byEmail(access.workspaceId, existing.email);
+        await emitEvent(tx, access.workspaceId, {
+          type: 'contact.resubscribed',
+          data: {
+            contact_id: contact?.id ?? null,
+            external_id: contact?.external_id ?? null,
+            email: existing.email,
+            topic: existing.topic,
+            mailing_id: null,
+            source: access.via === 'member' ? 'dashboard' : 'api',
+            resubscribed_at: new Date().toISOString(),
+          },
+        });
+      }
     });
     return c.json({ ok: true as const });
   });

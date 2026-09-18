@@ -38,6 +38,15 @@ const samples = {
     source: 'one_click',
     unsubscribed_at: TS,
   },
+  'contact.resubscribed': {
+    contact_id: 'ctc_1',
+    external_id: 'person_1',
+    email: 'a@b.de',
+    topic: 'programme-updates',
+    mailing_id: null,
+    source: 'hosted_page',
+    resubscribed_at: TS,
+  },
   'contact.bounced': {
     contact_id: null,
     external_id: null,
@@ -76,6 +85,15 @@ describe('webhook events', () => {
   it('mailing.finished only reports a final status', () => {
     const data = { ...samples['mailing.finished'], status: 'sending' };
     expect(WebhookEvent.safeParse({ ...env, type: 'mailing.finished', data }).success).toBe(false);
+  });
+
+  it('contact.resubscribed mirrors contact.unsubscribed, with its own timestamp', () => {
+    const { resubscribed_at: _at, ...rest } = samples['contact.resubscribed'];
+    const wrongStamp = { ...rest, unsubscribed_at: TS };
+    expect(WebhookEvent.safeParse({ ...env, type: 'contact.resubscribed', data: wrongStamp }).success).toBe(false);
+    expect(WebhookEvent.safeParse({ ...env, type: 'contact.resubscribed', data: { ...rest, resubscribed_at: TS, topic: null } }).success).toBe(true);
+    const unsubscribedKeys = Object.keys(samples['contact.unsubscribed']).filter((k) => k !== 'unsubscribed_at').sort();
+    expect(Object.keys(rest).sort()).toEqual(unsubscribedKeys);
   });
 
   it('narrows by type', () => {

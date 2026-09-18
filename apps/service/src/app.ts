@@ -17,6 +17,7 @@ import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { templateRoutes } from './routes/templates.js';
 import { webhookRoutes } from './routes/webhooks.js';
+import { unsubscribeRoutes } from './routes/unsubscribe.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 import { mailingRoutes } from './routes/mailings.js';
 import { messageRoutes } from './routes/messages.js';
@@ -59,7 +60,11 @@ export type AppOptions = {
   providerVerifyTimeoutMs?: number;
   /** F1: the HTTP client `providers.verify` checks a Resend key with. */
   providerFetch?: typeof fetch;
-  /** F2: signs the hosted unsubscribe links (MAIL_UNSUBSCRIBE_KEY), built once in main.ts. */
+  /**
+   * Signs and verifies the hosted unsubscribe links (MAIL_UNSUBSCRIBE_KEY), built
+   * once in main.ts. F2 signs `{{unsubscribe_url}}` with it; F3's public page
+   * `/u/<token>` verifies with it and is served only when it is given.
+   */
   unsubscribeSigner?: UnsubscribeSigner;
   /** F2: the provider transports for test sends; main.ts shares the worker's. Tests pass a MemoryTransport. */
   transportFor?: TransportFor;
@@ -94,6 +99,9 @@ export function createApp({
 
   app.route('/', healthRoutes(sql));
   app.route('/', publicAssetRoutes({ pool, storage: assetStorage, log }));
+  // Public and outside /v1: a browser page (HTML, its own body limit, no API
+  // credentials), so none of the API middleware below applies to it.
+  if (unsubscribeSigner) app.route('/', unsubscribeRoutes(sql, { signer: unsubscribeSigner, log }));
 
   const limit = (maxSize: number) =>
     bodyLimit({
