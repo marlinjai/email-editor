@@ -29,8 +29,13 @@ import { assertCanSend, assertCanTest, assertWithinLimit, computeUsage, usageWar
 export type CompiledDocument = { mjml: string; html: string; warnings: CompileMessage[]; errors: CompileMessage[] };
 
 export type MailingRouteDeps = MountDeps & {
-  /** Compiles a validated document to MJML and HTML (S1's CompilePool in production). */
-  compile: (document: TemplateDocument) => Promise<CompiledDocument>;
+  /**
+   * Compiles a validated document to MJML and HTML under the workspace's
+   * asset policy (src/compile/workspace-compile.ts over S1's CompilePool).
+   */
+  compile: (workspaceId: string, document: TemplateDocument) => Promise<CompiledDocument>;
+  /** The asset policy's errors for HTML compiled earlier (a stored snapshot); empty under `any`. */
+  assetErrors: (workspaceId: string, html: string) => Promise<CompileMessage[]>;
   /** Sends one test message outside the queue (src/worker/test-send.ts). */
   sendTest: (input: {
     workspaceId: string;
@@ -306,11 +311,16 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     const stored = await pool.mailings.compiled(workspaceId, id);
     let html = stored?.html ?? null;
     if (html === null) {
-      const compiled = await deps.compile(validateDocument(mailing.document) as unknown as TemplateDocument);
+      const compiled = await deps.compile(workspaceId, validateDocument(mailing.document) as unknown as TemplateDocument);
       if (compiled.errors.length > 0) {
         throw new ApiError('compile_failed', 'The document does not compile.', { errors: compiled.errors });
       }
       html = compiled.html;
+    } else {
+      // A snapshot compiled before the workspace turned on service_only is
+      // held to the policy as it is now.
+      const errors = await deps.assetErrors(workspaceId, html);
+      if (errors.length > 0) throw new ApiError('compile_failed', 'The document does not compile.', { errors });
     }
     const merge = { ...(input.merge ?? {}) };
     // S5: a test is one more recipient on the plan's period.
@@ -329,7 +339,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     if (!canTransition(current.status, 'send')) invalidState(current, 'send');
     // Compile outside the transaction (it is CPU work); the snapshot is taken
     // under the lock below and refused if the document changed meanwhile.
-    const compiled = await deps.compile(validateDocument(current.document) as unknown as TemplateDocument);
+    const compiled = await deps.compile(access.workspaceId, validateDocument(current.document) as unknown as TemplateDocument);
     if (compiled.errors.length > 0) {
       throw new ApiError('compile_failed', 'The document does not compile.', { errors: compiled.errors });
     }

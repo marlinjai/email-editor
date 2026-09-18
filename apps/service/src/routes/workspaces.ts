@@ -86,7 +86,14 @@ export function workspaceRoutes(sql: Sql, deps: MountDeps) {
         actor: actorOf(access),
         targetType: 'workspace',
         targetId: access.workspaceId,
-        details: { fields: Object.keys(input) },
+        details: {
+          fields: Object.keys(input),
+          ...(input.settings ? { settings: Object.keys(input.settings) } : {}),
+          // Who loosened or tightened where a workspace's mails may load from, and when.
+          ...(settings && settings.asset_policy !== current.settings.asset_policy
+            ? { asset_policy: { from: current.settings.asset_policy, to: settings.asset_policy } }
+            : {}),
+        },
       });
       return next!;
     });

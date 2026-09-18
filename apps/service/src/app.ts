@@ -4,6 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type { AssetStorage } from './assets/storage.js';
 import { authenticate } from './auth.js';
 import type { Compiler } from './compile/pool.js';
+import { workspaceCompile } from './compile/workspace-compile.js';
 import type { TemplateDocument } from '@marlinjai/mail-contract';
 import type { AppEnv } from './context.js';
 import type { Sql } from './db.js';
@@ -143,7 +144,8 @@ export function createApp({
   app.route('/', memberRoutes(sql, deps));
   app.route('/', apiKeyRoutes(sql, deps));
   app.route('/', auditRoutes(deps));
-  app.route('/', templateRoutes(sql, { ...deps, compiler }));
+  const compileForWorkspace = workspaceCompile(pool, compiler, publicBaseUrl);
+  app.route('/', templateRoutes(sql, { ...deps, compiler: compileForWorkspace }));
   app.route('/', assetRoutes(sql, { ...deps, storage: assetStorage, publicBaseUrl, log }));
   app.route('/', webhookRoutes(sql, deps, webhookUrlPolicy));
   app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch }));
@@ -155,7 +157,8 @@ export function createApp({
     '/',
     mailingRoutes(sql, {
       ...deps,
-      compile: (document) => compiler.compile(document),
+      compile: (workspaceId, document) => compileForWorkspace.compile(workspaceId, document),
+      assetErrors: (workspaceId, html) => compileForWorkspace.check(workspaceId, html),
       loadTemplateDocument: async (workspaceId, templateId) =>
         ((await pool.templates.get(workspaceId, templateId))?.document as TemplateDocument | undefined) ?? null,
       sendTest: unsubscribeSigner

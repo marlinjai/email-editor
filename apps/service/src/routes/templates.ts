@@ -1,7 +1,7 @@
 import { DEFAULT_PAGE_LIMIT } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { ApiError } from '../api-error.js';
-import type { Compiler } from '../compile/pool.js';
+import type { WorkspaceCompile } from '../compile/workspace-compile.js';
 import { actorLabel, actorOf, type AppEnv } from '../context.js';
 import type { Sql } from '../db.js';
 import { schemaVersionOf, validateDocument } from '../documents.js';
@@ -22,7 +22,7 @@ function documentFirst(raw: unknown): void {
 
 const notFound = () => new ApiError('not_found', 'No such template in this workspace.');
 
-export function templateRoutes(sql: Sql, deps: MountDeps & { compiler: Compiler }) {
+export function templateRoutes(sql: Sql, deps: MountDeps & { compiler: WorkspaceCompile }) {
   const app = new Hono<AppEnv>();
   const { pool, compiler } = deps;
 
@@ -197,14 +197,15 @@ export function templateRoutes(sql: Sql, deps: MountDeps & { compiler: Compiler 
     }
     // Stored documents passed validation when saved; a later build may still
     // need to migrate an older schema version before compiling it.
-    return c.json(await compiler.compile(validateDocument(stored)));
+    return c.json(await compiler.compile(workspaceId, validateDocument(stored)));
   });
 
   mount(app, 'compile', deps, async (c) => {
+    const { workspaceId } = c.get('access');
     const raw = await rawJson(c);
     documentFirst(raw);
     const input = checkBody('compile', raw);
-    return c.json(await compiler.compile(validateDocument(input.document)));
+    return c.json(await compiler.compile(workspaceId, validateDocument(input.document)));
   });
 
   return app;
