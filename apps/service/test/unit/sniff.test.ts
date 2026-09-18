@@ -41,7 +41,7 @@ describe('sniffImage', () => {
 describe('cleanFilename', () => {
   it('keeps the last path segment and puts the sniffed extension on it', () => {
     expect(cleanFilename('C:\\Users\\me\\hero.JPG', 'image/png')).toBe('hero.png');
-    expect(cleanFilename('../../etc/passwd', 'image/gif')).toBe('passwd.gif');
+    expect(cleanFilename('../../etc/hosts', 'image/gif')).toBe('hosts.gif');
   });
 
   it('strips control characters and falls back to "image"', () => {

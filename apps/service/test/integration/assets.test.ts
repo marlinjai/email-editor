@@ -166,7 +166,7 @@ describe('assets: the public URL', () => {
     const unknown = await h.app.request('/a/00000000-0000-4000-8000-000000000000');
     expect(unknown.status).toBe(404);
     expect(unknown.headers.get('cache-control')).toBe('public, max-age=60');
-    expect((await h.app.request('/a/../../etc/passwd')).status).toBe(404);
+    expect((await h.app.request('/a/../../etc/hosts')).status).toBe(404);
     expect((await h.app.request('/a/nope')).status).toBe(404);
   });
 
