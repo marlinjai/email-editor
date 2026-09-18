@@ -71,7 +71,7 @@ describe('translations', () => {
   it('uses no en dash or em dash anywhere', () => {
     for (const locale of PAGE_LOCALES) {
       for (const [key, value] of Object.entries(MESSAGES[locale])) {
-        expect(/[–—]/.test(value), `${locale}.${key}`).toBe(false);
+        expect(/[\u2013\u2014]/.test(value), `${locale}.${key}`).toBe(false);
       }
     }
   });
