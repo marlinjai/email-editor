@@ -1,8 +1,19 @@
 name: Deploy Docs
 
+# Builds the Clearify docs site and uploads docs-dist to the Cloudflare Pages
+# project email-editor-docs (docs.email-editor.lumitra.co). The Cloudflare
+# token comes from Infisical: project "infrastructure", prod, path
+# /ci-cd/docs-deploy, read by the docs-deploy-ci machine identity, whose
+# universal-auth pair is the INFISICAL_CLIENT_ID / INFISICAL_CLIENT_SECRET
+# repo secrets. Both the identity and the secrets are Terraform-managed in
+# marlinjai/infra (deployments/infisical-config/docs-deploy-ci.tf and
+# deployments/email-editor-docs/github.tf); that identity can read nothing
+# else.
+
 on:
   push:
     branches: [main]
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -10,17 +21,20 @@ jobs:
     permissions:
       contents: read
       deployments: write
+    env:
+      # Not a secret; lets wrangler skip the account lookup.
+      CLOUDFLARE_ACCOUNT_ID: afe1136796a1aaacf06fd5e0d1ffa0a7
     steps:
       - uses: actions/checkout@v4
       - name: Load Cloudflare credentials from Infisical
-        uses: Infisical/secrets-action@v1
+        uses: Infisical/secrets-action@v1.0.18
         with:
           domain: https://infisical.lumitra.co
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          project-slug: infra
+          project-slug: infrastructure
           env-slug: prod
-          secret-path: /providers
+          secret-path: /ci-cd/docs-deploy
           export-type: env
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -29,4 +43,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec clearify build
-      - run: npx wrangler pages deploy docs-dist --project-name=email-editor-docs
+      # --branch=main publishes to production explicitly: wrangler otherwise
+      # infers the branch from git, and a detached checkout silently deploys a
+      # preview instead.
+      - run: npx wrangler pages deploy docs-dist --project-name=email-editor-docs --branch=main
