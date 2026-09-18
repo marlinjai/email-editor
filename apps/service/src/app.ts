@@ -12,6 +12,7 @@ import { createSealer, type SecretsKeys } from './sealing.js';
 import { apiKeyRoutes } from './routes/api-keys.js';
 import { assetRoutes, publicAssetRoutes } from './routes/assets.js';
 import { auditRoutes } from './routes/audit.js';
+import { erasureRoutes } from './routes/erasure.js';
 import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { templateRoutes } from './routes/templates.js';
@@ -53,6 +54,11 @@ export type AppOptions = {
   providerVerifyTimeoutMs?: number;
   /** F1: the HTTP client `providers.verify` checks a Resend key with. */
   providerFetch?: typeof fetch;
+  /**
+   * S3: the HMAC secret auth-brain signs its erasure webhook with
+   * (MAIL_ERASURE_WEBHOOK_SECRET). Without it `/internal/erasure` answers 503.
+   */
+  erasureWebhookSecret?: string;
 };
 
 export function createApp({
@@ -67,6 +73,7 @@ export function createApp({
   smtpTransport = createSmtpTransport,
   providerVerifyTimeoutMs = 10_000,
   providerFetch = fetch,
+  erasureWebhookSecret,
 }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
@@ -82,6 +89,7 @@ export function createApp({
 
   app.route('/', healthRoutes(sql));
   app.route('/', publicAssetRoutes({ pool, storage: assetStorage, log }));
+  app.route('/', erasureRoutes(sql, { secret: erasureWebhookSecret, storage: assetStorage, log: { error: log.error, log: console.log } }));
 
   const limit = (maxSize: number) =>
     bodyLimit({

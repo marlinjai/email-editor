@@ -114,6 +114,29 @@ Brain unreachable is 503 with `Retry-After`, never cached. With an
 `Idempotency-Key`, a retried upload replays the first answer; the fingerprint is
 the parsed parts (a new multipart boundary on the retry still matches).
 
+## Company erasure (S3)
+
+Every workspace the dashboard creates carries the signed-in person's auth-brain
+company (`company_id`, migration `0008_workspace_company`; `null` for a
+workspace created without one). auth-brain erases a company under the General
+Data Protection Regulation (GDPR, Art. 17) and fans the event out to every app
+subscribed to `tenant.erased`; this service's endpoint is
+`POST https://mail.lumitra.co/internal/erasure` (`src/routes/erasure.ts`).
+
+- **Signature.** `x-lumitra-erasure-signature: sha256=<hex>`, HMAC-SHA256 over
+  the exact raw body with `MAIL_ERASURE_WEBHOOK_SECRET`, the same value held in
+  auth-brain's Infisical project (both minted in one `copy_secret op=generate`).
+  Missing or wrong is 401; the secret unset is 503, so auth-brain retries.
+- **What goes.** Every workspace with that `company_id`: its uploaded images in
+  Storage Brain first, then every row (members, keys, audit log, templates,
+  providers, topics, contacts, suppressions, mailings, recipients, the archive,
+  webhooks), in one transaction that locks the workspace rows. A Storage Brain
+  failure answers 503 and erases nothing, so the redelivery starts over.
+- **Idempotent.** Handled event ids are kept in `erasure_events` (ids and counts
+  only); a redelivery answers 200 with `replayed: true`. A company this service
+  never served, and any other event kind, acks 200 as a no-op, because auth-brain
+  does not complete an erasure until every subscribed app has answered 2xx.
+
 ## Layout
 
 - `src/main.ts`: the two commands, `migrate` and `serve`.
@@ -168,7 +191,7 @@ reports the pushed commit.
 | --- | --- |
 | GitHub secrets | `COOLIFY_WEBHOOK`, `COOLIFY_TOKEN` (Terraform: `infra/deployments/lumitra-mail/github.tf`) |
 | Coolify app env | only `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID`, `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`, `INFISICAL_PROJECT_ID`, `INFISICAL_ENV` |
-| Infisical `prod` | `DATABASE_URL`, `DASHBOARD_SERVICE_TOKEN`, `MAIL_SECRETS_KEY`, `MAIL_UNSUBSCRIBE_KEY`, `PUBLIC_BASE_URL` (`https://mail.lumitra.co`), `STORAGE_BRAIN_API_KEY` |
+| Infisical `prod` | `DATABASE_URL`, `DASHBOARD_SERVICE_TOKEN`, `MAIL_SECRETS_KEY`, `MAIL_UNSUBSCRIBE_KEY`, `MAIL_ERASURE_WEBHOOK_SECRET`, `PUBLIC_BASE_URL` (`https://mail.lumitra.co`), `STORAGE_BRAIN_API_KEY` |
 | Optional, with defaults | `STORAGE_BRAIN_URL` (the SDK's production URL), `COMPILE_WORKERS` (2), `COMPILE_TIMEOUT_MS` (10000), `COMPILE_MAX_QUEUE` (32) |
 
 `entrypoint.sh` refuses to start without the Coolify variables, trades the

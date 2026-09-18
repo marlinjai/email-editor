@@ -3,6 +3,7 @@ import { apiKeysRepo } from './api-keys.js';
 import { assetsRepo } from './assets.js';
 import { auditRepo } from './audit.js';
 import { contactsRepo } from './contacts.js';
+import { erasureRepo } from './erasure.js';
 import { idempotencyRepo } from './idempotency.js';
 import { mailingsRepo } from './mailings.js';
 import { membersRepo } from './members.js';
@@ -29,7 +30,8 @@ import { workspacesRepo } from './workspaces.js';
  * `/a/:id`, which returns the bytes' location and never the owning
  * workspace), and the worker's scans across workspaces, all suffixed
  * `ForWorker` (`mailings.listSendingForWorker`, `recipients.listStuckForWorker`,
- * `webhookDeliveries.claimDueForWorker`).
+ * `webhookDeliveries.claimDueForWorker`), and `erasure`, which finds and
+ * removes every workspace of an auth-brain company that was erased.
  *
  * Built over a `Db`, which is either the pool or a transaction, so a route can
  * write a change and its audit row atomically: `sql.begin((tx) => repos(tx)...)`.
@@ -54,6 +56,7 @@ export function repos(db: Db) {
     webhookEndpoints: webhookEndpointsRepo(db),
     webhookEvents: webhookEventsRepo(db),
     webhookDeliveries: webhookDeliveriesRepo(db),
+    erasure: erasureRepo(db),
   };
 }
 export type Repos = ReturnType<typeof repos>;

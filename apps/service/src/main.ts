@@ -58,6 +58,7 @@ async function runServe(): Promise<void> {
     compiler,
     assetStorage: new StorageBrainAssetStorage(config.storageBrain),
     publicBaseUrl: config.publicBaseUrl,
+    erasureWebhookSecret: config.erasureWebhookSecret,
   });
 
   const webhookLoop = startWebhookDeliveryLoop(sql, createSealer(config.secretsKeys), { policy: webhookUrlPolicy });

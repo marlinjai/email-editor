@@ -8,6 +8,7 @@ const valid = {
   PUBLIC_BASE_URL: 'https://mail.lumitra.co',
   STORAGE_BRAIN_API_KEY: `sk_test_${'x'.repeat(32)}`,
   MAIL_UNSUBSCRIBE_KEY: 'ef'.repeat(32),
+  MAIL_ERASURE_WEBHOOK_SECRET: '12'.repeat(32),
 };
 
 describe('config', () => {
@@ -18,6 +19,7 @@ describe('config', () => {
     expect(config.compile).toEqual({ workers: 2, timeoutMs: 10_000, maxQueue: 32 });
     expect(config.storageBrain.baseUrl).toBeUndefined();
     expect(config.unsubscribeKeys.get(1)).toHaveLength(32);
+    expect(config.erasureWebhookSecret).toBe('12'.repeat(32));
   });
 
   it('names every missing variable at once', () => {
@@ -34,6 +36,7 @@ describe('config', () => {
           'PUBLIC_BASE_URL is not set',
           'STORAGE_BRAIN_API_KEY is not set',
           'MAIL_UNSUBSCRIBE_KEY is not set',
+          'MAIL_ERASURE_WEBHOOK_SECRET is not set',
         ]),
       );
     }
