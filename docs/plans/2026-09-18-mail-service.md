@@ -422,6 +422,26 @@ Defaults taken in S1 (each can be overturned later):
 6. **One Storage Brain tenant per environment**, not a key shared with another
    app: quota, listing and erasure stay the mail service's own.
 7. **The contract gained one audit action**, `asset.uploaded`.
+### S2, F2: mailings and the send worker (built 2026-09-18, branch `feat/s2-mailings-worker`)
+
+Mailings with the contract's state machine, the recipient batch, test sends, the
+messages archive, the send worker and the Resend transport. Decisions taken on the
+stated defaults, open to change:
+
+- **A crash mid-send ends `skipped` with `outcome_unknown`,** as the contract and
+  the schema say (the worker paragraph above says "marked `failed`"; the contract
+  wins). "Re-sent once" holds for every failure before the provider took the
+  message: a transient refusal, or a crash before the claim committed.
+- **An address the recipient batch creates is subscribed to the mailing's topic**
+  (the client adding it to a topic mailing is the consent). An existing contact's
+  subscriptions are never changed, and suppressions always win at claim time.
+- **The mailto of `List-Unsubscribe` goes to the provider's reply address** (else
+  its from address): a person reads it. The service has no inbound mail.
+- **`mailings.duplicate`** (`POST /v1/mailings/:id/duplicate`) was added to the
+  contract and the SDK: any mailing, in any state, copied into a new draft
+  without recipients.
+- **Compiling** goes through S1's compile pool and document validation, the same
+  path as the compile API.
 
 ## Legal shape
 

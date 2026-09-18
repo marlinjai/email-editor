@@ -245,6 +245,42 @@ Decisions baked into the foundation:
   `recipients.listStuckForWorker`, reconciled against
   `messages.latestForRecipient`.
 
+### The hosted unsubscribe page (F3)
+
+`GET /u/<token>` shows a person's topics and changes nothing; `POST /u/<token>`
+applies a choice, and a body of exactly `List-Unsubscribe=One-Click` is the
+one-click target of RFC 8058 (Request for Comments 8058). Every change writes the
+suppression, its audit row and a `contact.unsubscribed` or `contact.resubscribed`
+event in one transaction (`src/routes/unsubscribe.ts`, whose header comment holds
+the rules). The HTML comes from `src/pages/render.ts`, the copy in five languages
+from `src/pages/i18n.ts`. It is public, lives outside `/v1` and the contract's
+route table, and is mounted only when `createApp` receives `unsubscribeSigner`
+(`main.ts` always passes it). A test send's link carries
+`contact_id: TEST_UNSUBSCRIBE_CONTACT_ID` and opens a preview that never writes.
+Migration `0006_contact_resubscribed.sql` adds the resubscribe event type.
+
+### Mailings and the send worker (F2)
+
+- `src/routes/mailings.ts`: the state machine of `MAILING_TRANSITIONS`, every
+  action under the mailing's row lock. Content and recipients change only in
+  `draft` or `scheduled`; `send` compiles the stored document (the snapshot),
+  refuses a broadcast without `{{unsubscribe_url}}` and hands it to the worker.
+- `src/worker/loop.ts` (`SendWorker`): one loop per process, started by `serve`,
+  stopped on SIGTERM after the send in flight is recorded. Per cycle, one
+  transaction claims the next recipient, checks suppression, erasure and topic
+  subscription, waits out `min_interval_ms` and reserves the daily budget under
+  the provider's lock (a "not yet" rolls back: the recipient stays queued, no
+  attempt counts). The send happens after that commits; the archived message, the
+  recipient's final status and the webhook event then commit together.
+  Transient failures retry three times (30 s, 2 min, 10 min); a row left
+  `sending` for 15 minutes is reconciled from the archive.
+- `src/worker/merge.ts`, `compose.ts`: merge fields (every value HTML-escaped),
+  the preheader, and `List-Unsubscribe` with `List-Unsubscribe-Post` (RFC 8058).
+- `src/worker/test-send.ts`: one test message, counted against the budget,
+  archived with `is_test`; its unsubscribe token names contact `test`.
+- `src/transport/resend.ts`: Resend over HTTP, with an idempotency key derived
+  from the message, so a retry after a timeout is never delivered twice.
+
 ### The four teams
 
 | Team | Builds | Owns (new files) | Uses from the foundation |

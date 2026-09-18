@@ -4,6 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type { AssetStorage } from './assets/storage.js';
 import { authenticate } from './auth.js';
 import type { Compiler } from './compile/pool.js';
+import type { TemplateDocument } from '@marlinjai/mail-contract';
 import type { AppEnv } from './context.js';
 import type { Sql } from './db.js';
 import { ApiError } from './api-error.js';
@@ -17,7 +18,13 @@ import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { templateRoutes } from './routes/templates.js';
 import { webhookRoutes } from './routes/webhooks.js';
+import { unsubscribeRoutes } from './routes/unsubscribe.js';
 import { workspaceRoutes } from './routes/workspaces.js';
+import { mailingRoutes } from './routes/mailings.js';
+import { messageRoutes } from './routes/messages.js';
+import type { UnsubscribeSigner } from './unsubscribe.js';
+import { createTestSender } from './worker/test-send.js';
+import { createTransportCache, type TransportFor } from './worker/transports.js';
 import type { SsrfPolicy } from './webhooks/ssrf.js';
 import { providerRoutes } from './routes/providers.js';
 import { contactRoutes } from './routes/contacts.js';
@@ -55,6 +62,14 @@ export type AppOptions = {
   /** F1: the HTTP client `providers.verify` checks a Resend key with. */
   providerFetch?: typeof fetch;
   /**
+   * Signs and verifies the hosted unsubscribe links (MAIL_UNSUBSCRIBE_KEY), built
+   * once in main.ts. F2 signs `{{unsubscribe_url}}` with it; F3's public page
+   * `/u/<token>` verifies with it and is served only when it is given.
+   */
+  unsubscribeSigner?: UnsubscribeSigner;
+  /** F2: the provider transports for test sends; main.ts shares the worker's. Tests pass a MemoryTransport. */
+  transportFor?: TransportFor;
+  /**
    * S3: the HMAC secret auth-brain signs its erasure webhook with
    * (MAIL_ERASURE_WEBHOOK_SECRET). Without it `/internal/erasure` answers 503.
    */
@@ -73,6 +88,8 @@ export function createApp({
   smtpTransport = createSmtpTransport,
   providerVerifyTimeoutMs = 10_000,
   providerFetch = fetch,
+  unsubscribeSigner,
+  transportFor,
   erasureWebhookSecret,
 }: AppOptions) {
   const app = new Hono<AppEnv>();
@@ -89,6 +106,9 @@ export function createApp({
 
   app.route('/', healthRoutes(sql));
   app.route('/', publicAssetRoutes({ pool, storage: assetStorage, log }));
+  // Public and outside /v1: a browser page (HTML, its own body limit, no API
+  // credentials), so none of the API middleware below applies to it.
+  if (unsubscribeSigner) app.route('/', unsubscribeRoutes(sql, { signer: unsubscribeSigner, log }));
   app.route('/', erasureRoutes(sql, { secret: erasureWebhookSecret, storage: assetStorage, log: { error: log.error, log: console.log } }));
 
   const limit = (maxSize: number) =>
@@ -126,6 +146,27 @@ export function createApp({
   app.route('/', topicRoutes(sql, deps));
   app.route('/', contactRoutes(sql, deps));
   app.route('/', suppressionRoutes(sql, deps));
+
+  app.route(
+    '/',
+    mailingRoutes(sql, {
+      ...deps,
+      compile: (document) => compiler.compile(document),
+      loadTemplateDocument: async (workspaceId, templateId) =>
+        ((await pool.templates.get(workspaceId, templateId))?.document as TemplateDocument | undefined) ?? null,
+      sendTest: unsubscribeSigner
+        ? createTestSender({
+            sql,
+            transportFor: transportFor ?? createTransportCache(sealer, log).get,
+            signer: unsubscribeSigner,
+            publicBaseUrl,
+          })
+        : async () => {
+            throw new ApiError('service_unavailable', 'Sending is not configured on this instance (no unsubscribe key).');
+          },
+    }),
+  );
+  app.route('/', messageRoutes(deps));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 

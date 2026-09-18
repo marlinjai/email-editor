@@ -175,6 +175,9 @@ export async function POST(req: Request) {
     case 'contact.unsubscribed':
       // mirror the unsubscribe into your own system of record
       break;
+    case 'contact.resubscribed':
+      // the person opted back in on the hosted page: lift your mirror of the unsubscribe
+      break;
     // ...
   }
   return new Response(null, { status: 204 });
