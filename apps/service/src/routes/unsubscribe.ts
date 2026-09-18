@@ -234,13 +234,15 @@ export function unsubscribeRoutes(sql: Sql, deps: UnsubscribeRouteDeps) {
       // Cross-site request forgery (CSRF) is not the threat here: the token in
       // the path is the whole credential, so a forged request needs the token and
       // anyone holding it can post it directly. The Origin check is defence in
-      // depth against another website submitting a token it saw (a leaked link):
-      // a browser always names the posting site. It must tolerate an absent
-      // Origin, because the mail client's one-click POST (RFC 8058) is a
-      // server-side request that sends none, and the literal "null", which a
-      // browser sends for this page's own form under `Referrer-Policy:
-      // no-referrer` (Fetch standard, "serializing a request origin"). Refusing
-      // those would block the unsubscribe the law requires us to honour.
+      // depth only: it stops a naive cross-site form post that names its own
+      // origin. It must tolerate an absent Origin, because the mail client's
+      // one-click POST (RFC 8058) is a server-side request that sends none, and
+      // the literal "null", which a browser sends for this page's own form under
+      // `Referrer-Policy: no-referrer` (Fetch standard, "serializing a request
+      // origin") and privacy tooling sends too. A deliberate attacker page can
+      // also arrive as "null", so this is not a real barrier; it does not need to
+      // be, since the token is the credential. Refusing absent or "null" origins
+      // would block the unsubscribe the law requires us to honour.
       if (isForeignOrigin(c)) return message(c, 403, 'cross_site', null);
 
       const token = c.req.param('token') ?? '';
@@ -274,8 +276,13 @@ export function unsubscribeRoutes(sql: Sql, deps: UnsubscribeRouteDeps) {
         const state = await loadState(sql, resolved.workspace.id, null);
         return preferences(c, resolved, state, token, { kind: 'test' }, explicit);
       }
-      await change(resolved, { action: choice.action, topic, source: 'hosted_page' });
+      const changed = await change(resolved, { action: choice.action, topic, source: 'hosted_page' });
       const state = await loadState(sql, resolved.workspace.id, resolved.contact.email);
+      // A repeated unsubscribe still confirms (the person is unsubscribed). A
+      // resubscribe that lifted nothing (a bounce or manual block landed after
+      // the page was opened, or nothing was blocked) must not claim success:
+      // the plain page shows the true state instead.
+      if (!changed && choice.action === 'resubscribe') return preferences(c, resolved, state, token, undefined, explicit);
       const outcome: Outcome = {
         kind: choice.action === 'unsubscribe' ? 'unsubscribed' : 'resubscribed',
         topic: topic ? { id: topic.id, name: topic.name, description: topic.description, state: 'subscribed' } : null,

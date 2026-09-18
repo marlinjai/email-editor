@@ -467,9 +467,15 @@ describe('what the page may not lift', () => {
     expect(stateOf(page, 'Programme updates')).toBe('Paused by the sender');
     expect(page.doc.querySelectorAll('section li button')).toHaveLength(0);
     const before = await counts(s.ws.id);
-    await post(s.token(), { action: 'resubscribe', scope: 'all' });
-    await post(s.token(), { action: 'resubscribe', scope: 'topic', topic: s.news.id });
+    const all = await post(s.token(), { action: 'resubscribe', scope: 'all' });
+    const one = await post(s.token(), { action: 'resubscribe', scope: 'topic', topic: s.news.id });
     expect(await counts(s.ws.id)).toEqual(before);
+    // No false "subscribed again": the plain page shows the true state.
+    for (const page of [all, one]) {
+      expect(page.doc.querySelector('h1')?.textContent).toBe('Email preferences');
+      expect(page.doc.querySelector('[role=status]')).toBeNull();
+      expect(stateOf(page, 'Programme updates')).toBe('Paused by the sender');
+    }
   });
 });
 
