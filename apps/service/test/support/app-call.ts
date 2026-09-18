@@ -1,16 +1,16 @@
 import { createApp, type AppOptions } from '../../src/app.js';
-import type { Sql } from '../../src/db.js';
-import { DASHBOARD_TOKEN, SECRETS_KEYS, type Call, type Result } from './harness.js';
+import { DASHBOARD_TOKEN, SECRETS_KEYS, type Call, type Harness, type Result } from './harness.js';
 
 /**
  * A second app over the harness database with options of its own (a verify
  * timeout, a fake fetch), driven the way the harness drives its app. Also how a
  * test simulates a restart: a new app over the same database.
  */
-export function appOver(sql: Sql, options: Partial<AppOptions> = {}) {
+export function appOver(h: Harness, options: Partial<AppOptions> = {}) {
   const logged: unknown[] = [];
   const app = createApp({
-    sql,
+    sql: h.sql,
+    ...h.appDeps,
     dashboardServiceToken: DASHBOARD_TOKEN,
     secretsKeys: SECRETS_KEYS,
     log: { error: (...a: unknown[]) => logged.push(a) },

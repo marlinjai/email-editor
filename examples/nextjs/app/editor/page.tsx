@@ -81,9 +81,15 @@ export default function EditorPage() {
         a.download = `${template.metadata?.title || 'email'}.html`;
         a.click();
         URL.revokeObjectURL(url);
+      } else {
+        const reason = result.error ?? (Array.isArray(result.errors) ? result.errors[0] : undefined) ?? 'unknown error';
+        setSaveStatus(`Export failed: ${reason}`);
+        setTimeout(() => setSaveStatus(''), 6000);
       }
     } catch (err) {
       console.error('Export failed:', err);
+      setSaveStatus('Export failed: the compile route did not answer');
+      setTimeout(() => setSaveStatus(''), 6000);
     }
   }, []);
 

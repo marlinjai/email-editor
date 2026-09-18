@@ -94,7 +94,7 @@ async function createSmtp(port: number, overrides: Record<string, unknown> = {})
   return res.body;
 }
 
-const verifyApp = () => appOver(h.sql, { providerVerifyTimeoutMs: 3000 });
+const verifyApp = () => appOver(h, { providerVerifyTimeoutMs: 3000 });
 
 describe('providers: create, read, update, delete', () => {
   it('stores the secret sealed and returns has_secret instead of it', async () => {
@@ -261,7 +261,7 @@ describe('providers.verify against a real SMTP server', () => {
     const port = (silent.address() as AddressInfo).port;
     try {
       const p = await createSmtp(port);
-      const res = await appOver(h.sql, { providerVerifyTimeoutMs: 300 }).call({ method: 'POST', path: `/v1/providers/${p.id}/verify`, key: A.key });
+      const res = await appOver(h, { providerVerifyTimeoutMs: 300 }).call({ method: 'POST', path: `/v1/providers/${p.id}/verify`, key: A.key });
       expect(res.body.ok).toBe(false);
       expect(res.body.error).toMatch(/^host_unreachable: .*within/);
     } finally {
@@ -291,7 +291,7 @@ describe('providers.verify against a real SMTP server', () => {
         sentAuth = String((init.headers as Record<string, string>).authorization);
         return answer();
       }) as unknown as typeof fetch;
-      const res = await appOver(h.sql, { providerFetch: fake }).call({ method: 'POST', path: `/v1/providers/${created.body.id}/verify`, key: A.key });
+      const res = await appOver(h, { providerFetch: fake }).call({ method: 'POST', path: `/v1/providers/${created.body.id}/verify`, key: A.key });
       expect(sentAuth).toBe(`Bearer ${RESEND_KEY}`);
       if (expected === null) expect(res.body).toEqual({ ok: true, error: null });
       else expect(res.body.error).toMatch(expected);

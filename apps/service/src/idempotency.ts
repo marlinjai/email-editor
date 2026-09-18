@@ -30,6 +30,36 @@ function fingerprint(method: string, path: string, body: string): string {
 }
 
 /**
+ * What identifies the request's content. A JSON body is its text. A multipart
+ * upload is its parsed parts (field names, file names, types and a digest of
+ * the bytes), because the boundary a client picks differs on every retry, so
+ * the raw bytes of two identical uploads never match. Parsing here also leaves
+ * the parsed form cached for the handler; reading multipart as text would
+ * leave a decoded copy that no longer parses as a form.
+ */
+async function requestContent(c: Context<AppEnv>): Promise<string> {
+  if (!/^multipart\/form-data/i.test(c.req.header('content-type') ?? '')) return c.req.text();
+  let form: Record<string, unknown>;
+  try {
+    form = await c.req.parseBody({ all: true });
+  } catch {
+    throw new ApiError('invalid_request', 'The multipart body could not be read.');
+  }
+  const parts: string[] = [];
+  for (const name of Object.keys(form).sort()) {
+    for (const value of [form[name]].flat()) {
+      if (value instanceof File) {
+        const digest = createHash('sha256').update(Buffer.from(await value.arrayBuffer())).digest('hex');
+        parts.push(`${name}=file:${JSON.stringify(value.name)}:${value.type}:${digest}`);
+      } else {
+        parts.push(`${name}=${JSON.stringify(value)}`);
+      }
+    }
+  }
+  return parts.join('\n');
+}
+
+/**
  * Makes a mutating route safe to retry. With an `Idempotency-Key` header:
  *
  * - the first request claims the key and runs; its response (any status below
@@ -63,8 +93,7 @@ export function idempotent(
     }
 
     const { workspaceId, scope } = scopeOf(c);
-    const body = await c.req.text();
-    const hash = fingerprint(c.req.method, c.req.path, body);
+    const hash = fingerprint(c.req.method, c.req.path, await requestContent(c));
     const repo = ledger();
 
     const claim = await repo.claim(workspaceId, scope, key, hash);

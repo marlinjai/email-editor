@@ -303,7 +303,7 @@ describe('contacts: the lifecycle on four paths', () => {
 
     // 3. Resume from persistence: a new process over the same database sees the
     // same contact and upserts onto it.
-    const restarted = appOver(h.sql);
+    const restarted = appOver(h);
     const got = await restarted.call({ path: `/v1/contacts/${id}`, key: A.key });
     expect(got.body).toMatchObject({ id, external_id: ext, email: secondEmail, topics: [t.slug] });
     const resumed = await restarted.call({ method: 'POST', path: '/v1/contacts', key: A.key, body: { external_id: ext, last_name: 'Hopper' } });

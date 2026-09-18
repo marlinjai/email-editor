@@ -1,152 +1,76 @@
 // examples/nextjs/app/api/compile/route.ts
-// Server-side MJML compilation API route with API key validation
+// Server-side MJML compilation for the demo editor
 
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
-import {
-  validateApiKey,
-  incrementUsage,
-  shouldAddWatermark,
-  injectWatermark,
-} from '@marlinjai/email-editor-core/server';
 import { migrateTemplate, isTemplateMigrationError, type EmailTemplate } from '@marlinjai/email-editor-core';
 
 /**
  * POST /api/compile
- * Compile EmailTemplate to MJML and HTML
- * 
- * Headers:
- * - X-Api-Key: Your API key (optional, free tier if not provided)
- * 
- * Body:
- * - template: EmailTemplate JSON
- * - preview?: boolean (skip watermark for preview mode)
+ * Compile an EmailTemplate to MJML and HTML.
+ *
+ * Body: the EmailTemplate JSON, or `{ template: EmailTemplate }`.
+ *
+ * This route is the demo's own compiler, with no keys and no metering. A real
+ * host that sends mail uses the mail service's compile API instead
+ * (`POST /v1/compile` through `@marlinjai/mail-sdk`), which authenticates the
+ * workspace and runs the compiler off the request thread.
  */
 export async function POST(request: NextRequest) {
+  let body: unknown;
   try {
-    // Get API key from header or body
-    const apiKey = request.headers.get('X-Api-Key') || undefined;
-    const body = await request.json();
-    const rawTemplate: unknown = body.template || body;
-    const isPreview = body.preview === true;
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ success: false, error: 'The request body is not valid JSON.' }, { status: 400 });
+  }
 
-    // Validate API key and check rate limits
-    const validation = await validateApiKey(apiKey);
-    if (!validation.isValid) {
+  const rawTemplate: unknown =
+    typeof body === 'object' && body !== null && 'template' in body ? (body as { template: unknown }).template : body;
+
+  // Validate the document and bring it to the schema version this build
+  // compiles. A newer document (from a newer editor) or an invalid one is
+  // the caller's error, with a code it can act on.
+  let template: EmailTemplate;
+  try {
+    template = migrateTemplate(rawTemplate);
+  } catch (error) {
+    if (isTemplateMigrationError(error)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: validation.error || 'Invalid API key',
-        },
-        { status: 401 }
+        { success: false, error: error.message, code: error.code, issues: error.issues },
+        { status: error.code === 'NEWER_VERSION' ? 422 : 400 }
       );
     }
-
-    // Validate the document and bring it to the schema version this build
-    // compiles. A newer document (from a newer editor) or an invalid one is
-    // the caller's error, with a code it can act on.
-    let template: EmailTemplate;
-    try {
-      template = migrateTemplate(rawTemplate);
-    } catch (error) {
-      if (isTemplateMigrationError(error)) {
-        return NextResponse.json(
-          { success: false, error: error.message, code: error.code, issues: error.issues },
-          { status: error.code === 'NEWER_VERSION' ? 422 : 400 }
-        );
-      }
-      throw error;
-    }
-
-    // Compile template
-    const compiler = createMJMLCompiler();
-    const result = compiler.compile(template);
-
-    if (result.errors && result.errors.length > 0) {
-      return NextResponse.json({
-        success: false,
-        errors: result.errors,
-      });
-    }
-
-    // Track usage (only for non-preview compiles)
-    if (!isPreview && apiKey) {
-      incrementUsage(apiKey);
-    }
-
-    // Add watermark for free tier (unless preview mode)
-    let html = result.html;
-    const addWatermark = !isPreview && shouldAddWatermark(validation.tier);
-    if (addWatermark) {
-      html = injectWatermark(html);
-    }
-
-    // Return compiled output
-    return NextResponse.json({
-      success: true,
-      mjml: result.mjml,
-      html,
-      watermark: addWatermark,
-      tier: validation.tier,
-      usageRemaining: validation.rateLimitRemaining,
-    });
-  } catch (error) {
     console.error('Compilation error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Unexpected error while reading the template.' }, { status: 500 });
   }
+
+  const result = createMJMLCompiler().compile(template);
+  if (result.errors && result.errors.length > 0) {
+    return NextResponse.json({ success: false, mjml: result.mjml, errors: result.errors });
+  }
+  return NextResponse.json({ success: true, mjml: result.mjml, html: result.html });
 }
 
 /**
  * GET /api/compile
- * Returns API documentation
+ * Describes the route.
  */
 export async function GET() {
   return NextResponse.json({
-    name: 'Email Editor Compile API',
-    version: '1.0',
+    name: 'Email Editor demo compile route',
     endpoints: {
       'POST /api/compile': {
-        description: 'Compile EmailTemplate to HTML',
-        headers: {
-          'X-Api-Key': 'Your API key (optional, free tier if not provided)',
-        },
-        body: {
-          template: 'EmailTemplate JSON object',
-          preview: 'boolean (optional, skip watermark for preview mode)',
-        },
+        description: 'Compile an EmailTemplate to MJML and HTML',
+        body: 'EmailTemplate JSON, or { template: EmailTemplate }',
         response: {
           success: 'boolean',
-          html: 'Compiled HTML string',
+          html: 'Compiled HTML string (when success)',
           mjml: 'Generated MJML string',
-          watermark: 'boolean (true if watermark was added)',
-          tier: 'free | pro | scale',
-          usageRemaining: 'number (compiles remaining this month)',
+          errors: 'MJML errors (when not success)',
+          code: 'migrateTemplate error code, when the document was rejected',
         },
-      },
-    },
-    tiers: {
-      free: {
-        compiles: '100/month',
-        watermark: true,
-        price: 'Free',
-      },
-      pro: {
-        compiles: '5,000/month',
-        watermark: false,
-        price: '$29/month',
-      },
-      scale: {
-        compiles: '50,000/month',
-        watermark: false,
-        price: '$99/month',
       },
     },
   });

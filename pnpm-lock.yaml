@@ -41,9 +41,15 @@ importers:
       '@marlinjai/brain-core':
         specifier: ^1.0.0
         version: 1.0.0(hono@4.13.8)(zod@3.25.76)
+      '@marlinjai/email-editor-core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@marlinjai/mail-contract':
         specifier: workspace:*
         version: link:../../packages/mail-contract
+      '@marlinjai/storage-brain-sdk':
+        specifier: ^0.11.1
+        version: 0.11.1(hono@4.13.8)(zod@3.25.76)
       hono:
         specifier: ^4.13.8
         version: 4.13.8
@@ -2354,6 +2360,9 @@ packages:
 
   '@marlinjai/data-table-core@0.3.0':
     resolution: {integrity: sha512-BMa7qGoDf0AukqorHPVEOc1i2KAa63PcNuklSA+LP9jXabLbY/dIlHLuuNIChhRgq7sA6RIrbYyQktHj9O3ZGQ==}
+
+  '@marlinjai/storage-brain-sdk@0.11.1':
+    resolution: {integrity: sha512-X3T2pU8mmGRtldL0z3dN+skuxH5SZn6xAIFmKWsP6iHhZsQ4pEcu7Z3oxwZVaSh+j8Gbvx5ehgg5Y2e7gKWveg==}
 
   '@marlinjai/storage-brain-sdk@0.9.0':
     resolution: {integrity: sha512-DxQqPv8zOVBwTFJEDN7P+qpSjdT7M0ZZj2L3Cde/8CaLUlwWAEkvILxwCxX+WUcCKyITXk/xnWjvGFiC+iDpOg==}
@@ -8984,6 +8993,13 @@ snapshots:
       - yaml
 
   '@marlinjai/data-table-core@0.3.0': {}
+
+  '@marlinjai/storage-brain-sdk@0.11.1(hono@4.13.8)(zod@3.25.76)':
+    dependencies:
+      '@marlinjai/brain-core': 1.0.0(hono@4.13.8)(zod@3.25.76)
+    transitivePeerDependencies:
+      - hono
+      - zod
 
   '@marlinjai/storage-brain-sdk@0.9.0(hono@4.13.8)(zod@3.25.76)':
     dependencies:

@@ -5,7 +5,9 @@ import { defineConfig } from 'tsup';
 // so the running service carries exactly the contract it was built against.
 // Migrations ship next to dist/ as plain files.
 export default defineConfig({
-  entry: ['src/main.ts'],
+  // The compile worker is its own entry: it runs in a worker thread, loaded by
+  // path from next to main.js.
+  entry: { main: 'src/main.ts', 'compile-worker': 'src/compile-worker.js' },
   format: ['esm'],
   platform: 'node',
   target: 'node22',

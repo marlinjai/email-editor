@@ -1,6 +1,8 @@
-import { foundationRoutes, matchRoute, routes, type OperationId } from '@marlinjai/mail-contract';
+import { foundationRoutes, matchRoute, routes, templateRoutes, type OperationId } from '@marlinjai/mail-contract';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { brokenSpacerDocument, helloDocument } from '../support/documents.js';
 import { startHarness, type Harness } from '../support/harness.js';
+import { pngBytes } from '../support/images.js';
 
 /**
  * The service answers every S0 operation of `@marlinjai/mail-contract` with a
@@ -72,6 +74,44 @@ describe('contract conformance, phase S0', () => {
   });
 });
 
+describe('contract conformance, phase S1', () => {
+  it('every S1 operation answers with its declared status and response schema', async () => {
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+
+    const created = await run('templates.create', await h.call({ method: 'POST', path: '/v1/templates', key: W.key, body: { name: 'Conform', description: 'd', document: helloDocument() } }));
+    const id = created.body.id;
+    await run('templates.list', await h.call({ path: '/v1/templates', key: W.key }));
+    await run('templates.get', await h.call({ path: `/v1/templates/${id}`, key: W.key }));
+    await run('templates.update', await h.call({ method: 'PUT', path: `/v1/templates/${id}`, key: W.key, body: { base_version: 1, document: helloDocument('v2'), description: null } }));
+    await run('templates.versions', await h.call({ path: `/v1/templates/${id}/versions`, key: W.key }));
+    await run('templates.version', await h.call({ path: `/v1/templates/${id}/versions/1`, key: W.key }));
+    await run('templates.compile', await h.call({ method: 'POST', path: `/v1/templates/${id}/compile`, key: W.key, body: { version: 1 } }));
+    const withErrors = await run('compile', await h.call({ method: 'POST', path: '/v1/compile', key: W.key, body: { document: brokenSpacerDocument() } }));
+    expect(withErrors.body.errors.length).toBeGreaterThan(0);
+    const upload = new FormData();
+    upload.append('file', new Blob([pngBytes(2, 2)], { type: 'image/png' }), 'c.png');
+    const asset = await run('assets.upload', await h.call({ method: 'POST', path: '/v1/assets', key: W.key, form: upload }));
+    await run('assets.get', await h.call({ path: `/v1/assets/${asset.body.id}`, key: W.key }));
+    await run('templates.delete', await h.call({ method: 'DELETE', path: `/v1/templates/${id}`, key: W.key }));
+
+    expect([...covered].sort()).toEqual(Object.keys(templateRoutes).sort());
+  });
+
+  it('every S1 route of the table is mounted at its method and path', async () => {
+    for (const [id, def] of Object.entries(templateRoutes)) {
+      const path = def.path.replace(':id', '00000000-0000-4000-8000-000000000000').replace(':version', '1');
+      expect(matchRoute(def.method, path)?.id).toBe(id);
+      const res = await h.call({ method: def.method, path, key: W.key, body: def.method === 'GET' ? undefined : {} });
+      expect(String(res.body.error?.message ?? ''), `${id}`).not.toMatch(/^No route for/);
+    }
+  });
+});
+
 // Team F1 of S2: providers, topics, contacts and suppressions. Its own block, so
 // the four S2 teams each append theirs without touching another's.
 describe('contract conformance, S2 providers, topics, contacts and suppressions', () => {
@@ -104,7 +144,7 @@ describe('contract conformance, S2 providers, topics, contacts and suppressions'
     await run('providers.update', await h.call({ method: 'PATCH', path: `/v1/providers/${provider.body.id}`, key, body: { kind: 'resend', name: 'Renamed' } }));
     await run('providers.usage', await h.call({ path: `/v1/providers/${provider.body.id}/usage`, key }));
     const { appOver } = await import('../support/app-call.js');
-    const offline = appOver(h.sql, { providerFetch: (async () => { throw new TypeError('offline'); }) as unknown as typeof fetch });
+    const offline = appOver(h, { providerFetch: (async () => { throw new TypeError('offline'); }) as unknown as typeof fetch });
     await run('providers.verify', await offline.call({ method: 'POST', path: `/v1/providers/${provider.body.id}/verify`, key }));
     await run('providers.delete', await h.call({ method: 'DELETE', path: `/v1/providers/${provider.body.id}`, key }));
 
