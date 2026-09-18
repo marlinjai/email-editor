@@ -147,8 +147,10 @@ serves uploads and imports. Every compile goes through
 Google Fonts imports are left out (the font falls back to its stack), and
 `src/compile/asset-policy.ts` walks the compiled HTML and reports every other
 address as a compile error, so `compile` (the editor's preview),
-`templates.compile`, `mailings.test` and `mailings.send` (`compile_failed`)
-refuse the same documents. It reads `src`, `srcset`, `poster`, `background`
+`templates.compile`, `mailings.test`, `mailings.send` and `mailings.schedule`
+(`compile_failed`), a scheduled release (back to draft with
+`mailing.schedule_failed`), A/B variants and a signup form's confirmation
+template refuse the same documents. It reads `src`, `srcset`, `poster`, `background`
 and `data` on any element (Outlook's `<v:fill src>` included, inside
 conditional comments), `href` on `<link>`, `<base>` and SVG images, and every
 `url()`, `@import` and `image-set()` in a `style` attribute or a `<style>`
