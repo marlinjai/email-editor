@@ -36,15 +36,22 @@ export type OnRequestImage = (request: ImageRequest) => Promise<RequestedImage |
 
 export interface EditorHostHooks {
   onRequestImage?: OnRequestImage;
+  /**
+   * The editor's root element. Dialogs portal into it rather than into
+   * `document.body`, so they stay inside the scoped stylesheet and inherit
+   * the theme tokens set on the root.
+   */
+  portalContainer?: HTMLElement | null;
 }
 
 const EditorHostContext = createContext<EditorHostHooks>({});
 
 export function EditorHostProvider({
   onRequestImage,
+  portalContainer,
   children,
 }: EditorHostHooks & { children: React.ReactNode }) {
-  const value = useMemo(() => ({ onRequestImage }), [onRequestImage]);
+  const value = useMemo(() => ({ onRequestImage, portalContainer }), [onRequestImage, portalContainer]);
   return <EditorHostContext.Provider value={value}>{children}</EditorHostContext.Provider>;
 }
 

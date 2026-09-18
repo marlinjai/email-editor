@@ -42,8 +42,8 @@
     "./styles.css": "./dist/styles.css"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean && BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify",
-    "build:css": "BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify",
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean && BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss --postcss ./postcss.config.js -i ./src/styles.css -o ./dist/styles.css --minify",
+    "build:css": "BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss --postcss ./postcss.config.js -i ./src/styles.css -o ./dist/styles.css --minify",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "tsc --noEmit",
     "test": "vitest run",

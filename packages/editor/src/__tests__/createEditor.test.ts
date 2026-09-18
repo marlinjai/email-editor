@@ -33,6 +33,17 @@ describe('createEditor', () => {
     act(() => editor.destroy());
   });
 
+  it('applies the theme as design tokens on the editor root, not on the document', () => {
+    const container = document.createElement('div');
+    let editor!: ReturnType<typeof createEditor>;
+    act(() => {
+      editor = createEditor({ container, theme: { colors: { primary: '#0f766e' } } });
+    });
+    expect(rendered.at(-1)!.style).toMatchObject({ '--ee-accent': '#0f766e' });
+    expect(document.documentElement.getAttribute('style')).toBeNull();
+    act(() => editor.destroy());
+  });
+
   it('renders without onRequestImage (the URL-field fallback)', () => {
     const container = document.createElement('div');
     let editor!: ReturnType<typeof createEditor>;

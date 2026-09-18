@@ -1,11 +1,12 @@
 // packages/editor/src/react.tsx
 // React wrapper component
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import type { TemplateSnapshotIn, TemplateSnapshotOut, BlockDefinition } from '@marlinjai/email-editor-core';
 import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
 import { EmailEditor, type OnRequestImage } from '@marlinjai/email-editor-ui';
 import type { EditorTheme } from './types';
+import { themeToStyle } from './theme';
 
 interface EmailEditorReactProps {
   /** Initial template data (uncontrolled) */
@@ -54,24 +55,9 @@ export function EmailEditorReact({
   // Create pre-built template registry
   const [prebuiltRegistry] = useState(() => createStandardPrebuiltRegistry());
 
-  // Apply theme if provided
-  useEffect(() => {
-    if (theme?.colors) {
-      const root = document.documentElement;
-      if (theme.colors.primary) {
-        root.style.setProperty('--color-brand-primary', theme.colors.primary);
-      }
-      if (theme.colors.surface) {
-        root.style.setProperty('--color-brand-surface', theme.colors.surface);
-      }
-      if (theme.colors.text) {
-        root.style.setProperty('--color-brand-text', theme.colors.text);
-      }
-      if (theme.colors.border) {
-        root.style.setProperty('--color-brand-border', theme.colors.border);
-      }
-    }
-  }, [theme]);
+  // The theme becomes design tokens on the editor's own root element, so it
+  // never touches the host page.
+  const style = useMemo(() => themeToStyle(theme), [theme]);
 
   return (
     <EmailEditor
@@ -83,6 +69,7 @@ export function EmailEditorReact({
       onExport={onExport}
       onNavigateBack={onNavigateBack}
       onRequestImage={onRequestImage}
+      style={style}
     />
   );
 }

@@ -66,6 +66,14 @@ export interface EmailEditorProps {
    * URL field. Resolve with `null` to cancel; a rejection is shown inline.
    */
   onRequestImage?: OnRequestImage;
+  /** Extra class names for the editor's root element (which carries `ee-root`) */
+  className?: string;
+  /**
+   * Inline styles for the editor's root element. Use it to set design tokens,
+   * e.g. `{ '--ee-accent': '#0f766e' }`. The editor fills its container's
+   * height, so give the container one.
+   */
+  style?: React.CSSProperties;
 }
 
 /**
@@ -83,7 +91,10 @@ export const EmailEditor = observer(function EmailEditor({
   onExport,
   onNavigateBack,
   onRequestImage,
+  className,
+  style,
 }: EmailEditorProps) {
+  const [rootElement, setRootElement] = useState<HTMLDivElement | null>(null);
   const [store] = useState(() =>
     createRootStore({
       template: initialTemplate,
@@ -93,14 +104,20 @@ export const EmailEditor = observer(function EmailEditor({
 
   return (
     <StoreProvider value={store}>
-      <EditorHostProvider onRequestImage={onRequestImage}>
-        <EmailEditorContent
-          blockRegistry={blockRegistry}
-          prebuiltRegistry={prebuiltRegistry}
-          onSave={onSave}
-          onExport={onExport}
-          onNavigateBack={onNavigateBack}
-        />
+      <EditorHostProvider onRequestImage={onRequestImage} portalContainer={rootElement}>
+        <div
+          ref={setRootElement}
+          className={clsx('ee-root', className)}
+          style={{ height: '100%', minHeight: 0, ...style }}
+        >
+          <EmailEditorContent
+            blockRegistry={blockRegistry}
+            prebuiltRegistry={prebuiltRegistry}
+            onSave={onSave}
+            onExport={onExport}
+            onNavigateBack={onNavigateBack}
+          />
+        </div>
       </EditorHostProvider>
     </StoreProvider>
   );
@@ -211,7 +228,7 @@ const EmailEditorContent = observer(function EmailEditorContent({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="email-editor h-screen flex flex-col bg-canvas-1">
+      <div className="email-editor h-full flex flex-col bg-canvas-1">
         <EditorToolbar
           onSave={onSave}
           onExport={onExport ? handleExport : undefined}

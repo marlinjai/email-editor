@@ -5,17 +5,26 @@ import type { EmailTemplate, BlockDefinition } from '@marlinjai/email-editor-cor
 import type { OnRequestImage } from '@marlinjai/email-editor-ui';
 
 /**
- * Editor theme configuration
+ * Editor theme: brand colors and the UI font of the editor chrome. Each value
+ * sets one design token on the editor's root element; anything left out keeps
+ * the default. Every token (`--ee-*`) can also be overridden in the host's CSS
+ * on `.ee-root`, outside any cascade layer.
  */
 export interface EditorTheme {
   colors?: {
+    /** Accent: primary buttons, selection, focus rings (`--ee-accent`) */
     primary?: string;
+    /** Accent on hover (`--ee-accent-hover`) */
+    primaryHover?: string;
+    /** Light panel surfaces (`--ee-canvas-2`) */
     surface?: string;
+    /** Text on light surfaces (`--ee-text-dark`) */
     text?: string;
+    /** Borders on light surfaces (`--ee-border-light`) */
     border?: string;
   };
   fonts?: {
-    heading?: string;
+    /** Font stack of the editor chrome (`--ee-font-sans`) */
     body?: string;
   };
 }

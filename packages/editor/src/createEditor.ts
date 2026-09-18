@@ -7,6 +7,7 @@ import type { EmailTemplate, TemplateSnapshotIn, TemplateSnapshotOut } from '@ma
 import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
 import { EmailEditor } from '@marlinjai/email-editor-ui';
 import type { EditorOptions, EditorInstance } from './types';
+import { themeToStyle } from './theme';
 
 /**
  * Convert EmailTemplate to TemplateSnapshotIn
@@ -94,6 +95,7 @@ export function createEditor(options: EditorOptions): EditorInstance {
         prebuiltRegistry,
         onSave: handleSave,
         onRequestImage,
+        style: themeToStyle(theme),
       })
     );
   };
