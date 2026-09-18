@@ -241,6 +241,53 @@ describe('contract conformance, phase S2 webhooks', () => {
   });
 });
 
+describe('contract conformance, phase S4: tags, properties, segments', () => {
+  it('every tags, contactProperties and segments operation, and mailings.addSegment, conforms', async () => {
+    const { seedSending, createMailing } = await import('../support/sending.js');
+    const w = await h.seedWorkspace('conform-s4-segments');
+    const covered = new Set<OperationId>();
+    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+      conforms(id, res);
+      covered.add(id);
+      return res as { status: number; body: any };
+    };
+    const { provider } = await seedSending(h, w.id, { topic: 'news' });
+    const person = await h.call({ method: 'POST', path: '/v1/contacts', key: w.key, body: { email: 'seg@conform.io', topics: ['news'] } });
+    const contactId = person.body.contact.id as string;
+
+    const tag = await run('tags.create', await h.call({ method: 'POST', path: '/v1/tags', key: w.key, body: { slug: 'vip', name: 'VIP' } }));
+    await run('tags.list', await h.call({ path: '/v1/tags', key: w.key }));
+    await run('tags.assign', await h.call({ method: 'POST', path: `/v1/tags/${tag.body.id}/contacts`, key: w.key, body: { contact_ids: [contactId] } }));
+
+    const property = { key: 'plan', label: 'Plan', type: 'string' };
+    await run('contactProperties.create', await h.call({ method: 'POST', path: '/v1/contact-properties', key: w.key, body: property }));
+    await run('contactProperties.list', await h.call({ path: '/v1/contact-properties', key: w.key }));
+
+    const filter = { field: 'tag', op: 'eq', value: 'vip' };
+    await run('segments.preview', await h.call({ method: 'POST', path: '/v1/segments/preview', key: w.key, body: { filter } }));
+    const seg = await run('segments.create', await h.call({ method: 'POST', path: '/v1/segments', key: w.key, body: { name: 'VIPs', filter } }));
+    await run('segments.list', await h.call({ path: '/v1/segments', key: w.key }));
+    await run('segments.get', await h.call({ path: `/v1/segments/${seg.body.id}`, key: w.key }));
+    await run('segments.update', await h.call({ method: 'PUT', path: `/v1/segments/${seg.body.id}`, key: w.key, body: { name: 'VIP', filter } }));
+    const mailing = await createMailing(h, w, { topic: 'news', provider_id: provider.id });
+    const added = await run(
+      'mailings.addSegment',
+      await h.call({ method: 'POST', path: `/v1/mailings/${mailing.id}/recipients/segment`, key: w.key, body: { segment_id: seg.body.id } }),
+    );
+    expect(added.body.added).toBe(1);
+
+    await run('segments.delete', await h.call({ method: 'DELETE', path: `/v1/segments/${seg.body.id}`, key: w.key }));
+    await run('contactProperties.delete', await h.call({ method: 'DELETE', path: '/v1/contact-properties/plan', key: w.key }));
+    await run('tags.unassign', await h.call({ method: 'DELETE', path: `/v1/tags/${tag.body.id}/contacts`, key: w.key, body: { contact_ids: [contactId] } }));
+    await run('tags.delete', await h.call({ method: 'DELETE', path: `/v1/tags/${tag.body.id}`, key: w.key }));
+
+    const mine = (Object.keys(routes) as OperationId[]).filter(
+      (id) => id.startsWith('tags.') || id.startsWith('contactProperties.') || id.startsWith('segments.') || id === 'mailings.addSegment',
+    );
+    expect([...covered].sort()).toEqual(mine.sort());
+  });
+});
+
 describe('contract conformance, phase S4: scheduling, A/B tests and tracking', () => {
   it('every scheduling, A/B and tracking operation answers with its declared status and response schema', async () => {
     const { seedContact, seedSending, createMailing, addRecipients } = await import('../support/sending.js');

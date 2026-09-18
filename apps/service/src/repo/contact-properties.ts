@@ -5,6 +5,17 @@ export type ContactPropertyRow = ContactPropertyDefinition & { created_at: strin
 
 export function contactPropertiesRepo(db: Db) {
   return {
+    /**
+     * Serialises property writes against new definitions, per workspace, for
+     * the rest of the transaction: a write that checks values takes it `shared`,
+     * defining a key takes it `exclusive`.
+     */
+    async lockDefinitions(workspaceId: string, mode: 'shared' | 'exclusive'): Promise<void> {
+      const key = `contact_properties:${workspaceId}`;
+      if (mode === 'shared') await db`SELECT pg_advisory_xact_lock_shared(hashtext(${key}))`;
+      else await db`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+    },
+
     async list(workspaceId: string): Promise<ContactPropertyRow[]> {
       return db<ContactPropertyRow[]>`
         SELECT key, label, type, created_at FROM contact_properties WHERE workspace_id = ${workspaceId} ORDER BY key`;

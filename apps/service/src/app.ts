@@ -33,6 +33,9 @@ import { providerRoutes } from './routes/providers.js';
 import { contactRoutes } from './routes/contacts.js';
 import { suppressionRoutes } from './routes/suppressions.js';
 import { topicRoutes } from './routes/topics.js';
+import { tagRoutes } from './routes/tags.js';
+import { contactPropertyRoutes } from './routes/contact-properties.js';
+import { segmentRoutes } from './routes/segments.js';
 import { createSmtpTransport, type SmtpSettings } from './transport/smtp.js';
 import type { Transport } from './transport/types.js';
 
@@ -172,6 +175,9 @@ export function createApp({
   );
   app.route('/', messageRoutes(deps));
   app.route('/', mailingPlatformRoutes(sql, { ...deps, compile: (document) => compiler.compile(document) }));
+  app.route('/', tagRoutes(sql, deps));
+  app.route('/', contactPropertyRoutes(sql, deps));
+  app.route('/', segmentRoutes(sql, deps));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 
