@@ -6,6 +6,7 @@ import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
 import { body, pageArgs, query, toPage } from '../validate.js';
 import { DEFAULT_WORKSPACE_SETTINGS, mergeSettings } from '../workspace-settings.js';
+import { assertFeature } from '../billing/usage.js';
 
 function subjectOf(c: { get(key: 'caller'): AppEnv['Variables']['caller'] }): string {
   const caller = c.get('caller');
@@ -77,6 +78,8 @@ export function workspaceRoutes(sql: Sql, deps: MountDeps) {
       const current = await r.workspaces.get(access.workspaceId);
       if (!current) throw new ApiError('not_found', 'The workspace no longer exists.');
       const settings = input.settings ? mergeSettings(current.settings, input.settings) : undefined;
+      // S5: turning tracking on needs a plan with it; turning it off never does.
+      if (settings?.tracking_enabled && !current.settings.tracking_enabled) await assertFeature(tx, access.workspaceId, 'tracking');
       const next = await r.workspaces.update(access.workspaceId, { name: input.name, settings });
       await r.audit.record(access.workspaceId, {
         action: 'workspace.updated',

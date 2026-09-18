@@ -6,6 +6,7 @@ import type { Sql } from '../db.js';
 import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
 import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
+import { assertWithinLimit } from '../billing/usage.js';
 
 const LAST_OWNER = "This is the workspace's last owner. Make someone else an owner first.";
 
@@ -56,6 +57,7 @@ export function memberRoutes(sql: Sql, deps: MountDeps) {
       if (!created) {
         throw new ApiError('already_exists', 'This person (by auth-brain subject or email) is already a member.');
       }
+      await assertWithinLimit(tx, access.workspaceId, 'members');
       await r.audit.record(access.workspaceId, {
         action: 'member.added',
         actor: actorOf(access),

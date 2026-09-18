@@ -1,7 +1,8 @@
 # Continuous integration for every pull request and every push to main.
 #
 # - service: typecheck, unit tests, integration tests against a real Postgres 17
-#   service container, and the build of apps/service (the mail service).
+#   service container (and stripe-mock for the Stripe client), and the build of
+#   apps/service (the mail service).
 # - service-image: builds the service's container image for linux/arm64 (the
 #   shared Coolify server's architecture) without pushing it, so a broken
 #   Dockerfile fails the pull request instead of the deploy.
@@ -35,6 +36,12 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # Stripe's own mock, validating requests against Stripe's OpenAPI
+      # description (test/integration/stripe-mock.test.ts).
+      stripe-mock:
+        image: stripe/stripe-mock:latest
+        ports:
+          - 12111:12111
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -56,6 +63,7 @@ jobs:
       - name: Integration tests (Postgres 17)
         env:
           TEST_DATABASE_URL: postgres://mail:mail@localhost:5432/mail
+          STRIPE_MOCK_URL: http://localhost:12111
         run: pnpm --filter @email-editor/service test:integration
       - name: Build
         run: pnpm --filter @email-editor/service build

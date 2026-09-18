@@ -240,3 +240,17 @@ describe('contract conformance, phase S2 webhooks', () => {
     await wh.drop();
   });
 });
+
+// S5: billing. Status and schema of every billing operation are asserted in
+// test/integration/billing.test.ts (it needs a Stripe stand-in); here, that
+// every billing route of the table is mounted at its method and path.
+describe('contract conformance, S5 billing routes are mounted', () => {
+  it('every billing route of the table answers from its handler, not the catch-all', async () => {
+    const { billingRoutes } = await import('@marlinjai/mail-contract');
+    for (const [id, def] of Object.entries(billingRoutes)) {
+      expect(matchRoute(def.method, def.path)?.id).toBe(id);
+      const res = await h.call({ method: def.method, path: def.path, key: W.key, body: def.method === 'GET' ? undefined : {} });
+      expect(String(res.body.error?.message ?? ''), `${id}`).not.toMatch(/^No route for/);
+    }
+  });
+});

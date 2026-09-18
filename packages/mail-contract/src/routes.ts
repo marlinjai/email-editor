@@ -87,7 +87,7 @@ import {
   TagCreate,
   TrackingSettings,
 } from './platform';
-import { CheckoutRequest, CheckoutSession, Plan, Subscription, Usage } from './billing';
+import { CheckoutRequest, CheckoutSession, Plan, PortalRequest, PortalSession, Subscription, Usage } from './billing';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -916,7 +916,7 @@ export const platformRoutes = {
   },
 } as const satisfies Record<string, RouteDef>;
 
-// S5: billing (typed, not served before S5)
+// S5: billing
 
 export const billingRoutes = {
   'billing.plans': {
@@ -941,6 +941,15 @@ export const billingRoutes = {
     path: '/v1/billing/checkout',
     body: CheckoutRequest,
     response: CheckoutSession,
+    status: 200,
+    access: 'admin',
+    phase: 'S5',
+  },
+  'billing.portal': {
+    method: 'POST',
+    path: '/v1/billing/portal',
+    body: PortalRequest,
+    response: PortalSession,
     status: 200,
     access: 'admin',
     phase: 'S5',

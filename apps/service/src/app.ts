@@ -29,6 +29,10 @@ import { providerRoutes } from './routes/providers.js';
 import { contactRoutes } from './routes/contacts.js';
 import { suppressionRoutes } from './routes/suppressions.js';
 import { topicRoutes } from './routes/topics.js';
+import { billingRoutes } from './routes/billing.js';
+import { stripeWebhookRoutes } from './routes/stripe-webhook.js';
+import type { BillingConfig } from './billing/plans.js';
+import type { StripeApi } from './billing/stripe.js';
 import { createSmtpTransport, type SmtpSettings } from './transport/smtp.js';
 import type { Transport } from './transport/types.js';
 
@@ -68,6 +72,10 @@ export type AppOptions = {
   unsubscribeSigner?: UnsubscribeSigner;
   /** F2: the provider transports for test sends; main.ts shares the worker's. Tests pass a MemoryTransport. */
   transportFor?: TransportFor;
+  /** S5: plans' Stripe Price ids and the webhook secret; absent means billing without Stripe (checkout fails closed). */
+  billing?: BillingConfig;
+  /** S5: the Stripe client (null without a key). Tests pass a fake. */
+  stripe?: StripeApi | null;
 };
 
 export function createApp({
@@ -84,6 +92,8 @@ export function createApp({
   providerFetch = fetch,
   unsubscribeSigner,
   transportFor,
+  billing = { prices: {} },
+  stripe = null,
 }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
@@ -102,6 +112,8 @@ export function createApp({
   // Public and outside /v1: a browser page (HTML, its own body limit, no API
   // credentials), so none of the API middleware below applies to it.
   if (unsubscribeSigner) app.route('/', unsubscribeRoutes(sql, { signer: unsubscribeSigner, log }));
+  // Public and outside /v1 too: Stripe signs its requests, it holds no API key.
+  app.route('/', stripeWebhookRoutes(sql, { config: billing, stripe, log: { error: log.error, log: console.log } }));
 
   const limit = (maxSize: number) =>
     bodyLimit({
@@ -159,6 +171,7 @@ export function createApp({
     }),
   );
   app.route('/', messageRoutes(deps));
+  app.route('/', billingRoutes(sql, { ...deps, config: billing, stripe, log }));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 

@@ -7,6 +7,7 @@ import { repos } from '../repo/index.js';
 import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
 import { generateWebhookSecret, WEBHOOK_SECRET_ROTATION_WINDOW_MS } from '../webhooks/secret.js';
 import { assertWebhookUrlAllowed, SsrfBlockedError, type SsrfPolicy } from '../webhooks/ssrf.js';
+import { assertWithinLimit } from '../billing/usage.js';
 
 /**
  * `webhook_endpoints`, their deliveries and manual redelivery. The signing
@@ -52,6 +53,7 @@ export function webhookRoutes(sql: Sql, deps: MountDeps, urlPolicy: SsrfPolicy =
         enabled: input.enabled ?? true,
         secretSealed: sealer.seal(secret),
       });
+      await assertWithinLimit(tx, access.workspaceId, 'webhook_endpoints');
       await r.audit.record(access.workspaceId, {
         action: 'webhook.created',
         actor: actorOf(access),
