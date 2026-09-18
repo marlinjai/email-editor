@@ -18,6 +18,13 @@
       `marlinjai/email-editor`, workflow `publish.yml`) and push the two tags
       it prints; needs Marlin's npm account, details in the
       [plan](docs/plans/2026-09-18-mail-service.md) under question 4 (2026-09-18)
+- [ ] Mail service: switch ŌPUNTIA's workspace (`9402caff-1afc-4875-b849-63a9dda9b35e`)
+      to `asset_policy: service_only` once the asset policy is deployed: first
+      compile its templates under the new policy and import every remote image
+      with `assets.import`, then `PATCH /v1/workspace` with
+      `{ "settings": { "asset_policy": "service_only" } }` through the secrets
+      proxy (apps/service/README.md, "Asset policy")
+      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 - [ ] Mail service: add a `topics.delete` route to the contract and the service
       (refused with `conflict` while a mailing uses the topic, which the schema
       already enforces) once a client needs to remove a topic; S2 ships without

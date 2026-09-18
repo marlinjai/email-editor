@@ -36,7 +36,7 @@ access levels map to roles (`owner`, `admin`, `editor`, `viewer`) and key scopes
 | Access | Member needs | Key needs | S0 operations |
 | --- | --- | --- | --- |
 | `read` | viewer | any scope | `workspace.get`, `members.list`, `templates.list`, `templates.get`, `templates.versions`, `templates.version`, `templates.compile`, `compile`, `assets.get` |
-| `write` | editor | send or full | `templates.create`, `templates.update`, `templates.delete`, `assets.upload` |
+| `write` | editor | send or full | `templates.create`, `templates.update`, `templates.delete`, `assets.upload`, `assets.import` |
 | `admin` | admin | full | `workspace.update`, `members.add`, `members.update`, `members.remove`, `apiKeys.create` (the key is in this response only), `apiKeys.list`, `apiKeys.revoke`, `audit.list` |
 | `dashboard` | a signed-in person, no workspace yet | refused | `workspaces.create`, `workspaces.list` |
 
@@ -73,6 +73,14 @@ reason in `details.reason` (`INVALID_DOCUMENT`, `NEWER_VERSION` for a document
 from a newer editor, with `details.document_version`, `UNSUPPORTED_VERSION`,
 `MISSING_VERSION`) and the failing paths in `details.issues`. A document over
 `MAX_DOCUMENT_BYTES` is `payload_too_large`.
+
+A document's `id` is optional (the contract's `TemplateDocument` and the core
+schema agree). The service stores a document exactly as sent: without an id it
+is saved, compiled and sent without one, and an id is kept verbatim; an id that
+is not a string is `validation_failed` at `document.id`. The editor assigns an
+id when it opens an id-less document and emits it from then on, so the first
+save after opening such a document adds the id and bumps the version once;
+later saves of the same document keep the version.
 
 **Versions.** `templates.version` is an optimistic lock: a save sends
 `base_version`, and if someone saved since, the answer is `conflict` (409) with
@@ -113,6 +121,49 @@ Storage Brain) and `nosniff`. An unknown id is 404 (cached a minute); Storage
 Brain unreachable is 503 with `Retry-After`, never cached. With an
 `Idempotency-Key`, a retried upload replays the first answer; the fingerprint is
 the parsed parts (a new multipart boundary on the retry still matches).
+
+**Importing a remote image.** `POST /v1/assets/import` with `{ url, filename? }`
+copies an image from the web into the workspace and answers with the same
+`Asset` as an upload (`asset.imported` in the audit log, with the source
+address). The fetch runs from the service's network, so it carries the
+webhooks' server-side request forgery (SSRF) guard (`src/assets/remote.ts`):
+`http` and `https` only, no credentials in the address, and no private,
+loopback or link-local target, checked before the request and again inside
+the socket's own DNS lookup on the addresses it then connects to (a name that
+changes its answer in between cannot slip through). A redirect is refused,
+never followed. The size limit is checked on `Content-Length` and while
+reading; the deadline is 10 seconds. The remote `Content-Type` is ignored: the
+bytes are sniffed exactly as an upload's. Blocked addresses, redirects and a
+remote 4xx are `invalid_request` (with `details.status`); a network failure, a
+timeout or a remote 5xx is `provider_error` with `details.service =
+"asset_import"`. `WEBHOOK_ALLOW_INSECURE_TARGETS=true` lifts the private-target
+check here too, for local development only.
+
+**Asset policy.** `settings.asset_policy` decides where a workspace's mails may
+load images, stylesheets and fonts from: `any` (the default) or
+`service_only`, the service's own host (`PUBLIC_BASE_URL`), where `/a/<id>`
+serves uploads and imports. Every compile goes through
+`src/compile/workspace-compile.ts`: under `service_only` MJML's automatic
+Google Fonts imports are left out (the font falls back to its stack), and
+`src/compile/asset-policy.ts` walks the compiled HTML and reports every other
+address as a compile error, so `compile` (the editor's preview),
+`templates.compile`, `mailings.test` and `mailings.send` (`compile_failed`)
+refuse the same documents. It reads `src`, `srcset`, `poster`, `background`
+and `data` on any element (Outlook's `<v:fill src>` included, inside
+conditional comments), `href` on `<link>`, `<base>` and SVG images, and every
+`url()`, `@import` and `image-set()` in a `style` attribute or a `<style>`
+element (so `@font-face`). It fails closed: a relative or protocol-relative
+address, another scheme, or one built from a merge field is an error; `data:`
+and `cid:` pass; links (`<a href>`) are not loads and are not checked. A test
+send of a mailing's stored snapshot is held to the policy as it is now. A
+mailing already accepted for sending finishes with its snapshot. Workspaces
+written before the setting existed read as `any` (`withSettingDefaults`, on
+every read, so no backfill migration). A change is audited in
+`workspace.updated` with `asset_policy: { from, to }`. To switch a workspace,
+an admin calls `PATCH /v1/workspace` with `{ "settings": { "asset_policy":
+"service_only" } }`; before that, compile its templates under the new policy
+(or look for remote image hosts and `metadata.fonts`) and import what is
+remote, since every such document stops being sendable at once.
 
 ## Layout
 
@@ -284,7 +335,7 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
 - **Rotation window.** `rotateSecret` keeps the old secret for 24 hours (`WEBHOOK_SECRET_ROTATION_WINDOW_MS`, migration 0007). Until then every request carries two comma-separated `v1=` signatures, so a receiver holding either secret verifies. After the window only the new secret signs.
 - **Delivery.** A 2xx reply means delivered. A non-2xx reply, a timeout (10 seconds) or a network error retries on `WEBHOOK_RETRY_DELAYS_SECONDS` up to `WEBHOOK_MAX_ATTEMPTS`, then the delivery is `failed`. Redirects are never followed (a 3xx is a failed attempt). An endpoint disabled while a delivery is waiting is skipped without consuming an attempt, and resumes when re-enabled. `webhooks.redeliver` resets one delivery to pending, due now, and is audited as `webhook.redelivered`. The last status code, a response snippet (500 characters) and the duration are kept in `webhook_deliveries` for operators, not returned by the API.
 - **Ordering and duplicates.** Order is not guaranteed and a delivery can repeat (a retry after a lost reply). **Receivers must deduplicate on the event id** (`id` in the body, `x-mail-event-id` in the headers).
-- **Server-side request forgery (SSRF) guard.** Only `https` endpoints are accepted, and a hostname that resolves to a private, loopback or link-local address is refused, at create and update and again immediately before every send (so a DNS rebinding cannot slip through). Setting `WEBHOOK_ALLOW_INSECURE_TARGETS=true` lifts both, for local development only; never in production.
+- **Server-side request forgery (SSRF) guard.** Only `https` endpoints are accepted, and a hostname that resolves to a private, loopback or link-local address is refused, at create and update and again immediately before every send (so a DNS rebinding cannot slip through). Setting `WEBHOOK_ALLOW_INSECURE_TARGETS=true` lifts both, for local development only; never in production. The same policy guards `assets.import`.
 ### F1: providers, topics, contacts and suppressions
 
 - **Providers.** The password or API key is taken on create and update, sealed
