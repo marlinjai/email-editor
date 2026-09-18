@@ -12,6 +12,17 @@ import { execute, executeMultipart, type CoreConfig, type RequestOpts } from './
  */
 export function createNamespaces(config: CoreConfig) {
   return {
+    /**
+     * `workspaces` (plural) is the dashboard-only pair for a person with no
+     * workspace context yet: creating one, and listing the ones they belong to.
+     * `workspace` (singular, below) is the ordinary per-workspace read/update,
+     * reachable with a workspace API key or a dashboard call already bound to one.
+     */
+    workspaces: {
+      create: (body: RouteBody<'workspaces.create'>, opts?: RequestOpts) => execute(config, 'workspaces.create', { body }, opts),
+      list: (query?: RouteQuery<'workspaces.list'>, opts?: RequestOpts) => execute(config, 'workspaces.list', { query }, opts),
+    },
+
     workspace: {
       get: (opts?: RequestOpts) => execute(config, 'workspace.get', {}, opts),
       update: (body: RouteBody<'workspace.update'>, opts?: RequestOpts) => execute(config, 'workspace.update', { body }, opts),
@@ -19,7 +30,12 @@ export function createNamespaces(config: CoreConfig) {
 
     members: {
       list: (query?: RouteQuery<'members.list'>, opts?: RequestOpts) => execute(config, 'members.list', { query }, opts),
-      invite: (body: RouteBody<'members.invite'>, opts?: RequestOpts) => execute(config, 'members.invite', { body }, opts),
+      /**
+       * The service binds people by auth-brain subject only (it never sees a
+       * login), so the caller resolves the person first and sends the subject
+       * with their email and name.
+       */
+      add: (body: RouteBody<'members.add'>, opts?: RequestOpts) => execute(config, 'members.add', { body }, opts),
       update: (id: string, body: RouteBody<'members.update'>, opts?: RequestOpts) =>
         execute(config, 'members.update', { params: { id }, body }, opts),
       remove: (id: string, opts?: RequestOpts) => execute(config, 'members.remove', { params: { id } }, opts),

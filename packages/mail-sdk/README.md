@@ -122,6 +122,31 @@ The service checks that `subject`'s membership and role in `workspaceId` on
 every call; the SDK never assumes the caller is authorized, it only carries the
 headers.
 
+### Creating a workspace: the one call with no workspace yet
+
+`workspaces.create` and `workspaces.list` are `dashboard`-access routes: they
+run before the signed-in person has a workspace to be scoped to, so
+`workspaceId` is optional on `forUser` for exactly these two calls (every other
+route needs it, and the service checks membership against it on every call).
+
+```ts
+const client = dashboardMail.forUser({ subject: session.subject }); // no workspaceId yet
+const workspace = await client.workspaces.create({
+  slug: 'opuntia',
+  name: 'ŌPUNTIA',
+  owner: { email: session.email, name: session.name },
+});
+// From here on, calls for this workspace pass its id: forUser({ subject, workspaceId: workspace.id }).
+```
+
+Adding a person to an existing workspace binds them by their auth-brain
+subject, not an email invite (the service never sees a login, so the caller
+resolves the person first):
+
+```ts
+await client.members.add({ subject: person.subject, email: person.email, name: person.name, role: 'editor' });
+```
+
 ## A webhook receiver
 
 The webhook signature helpers and the `WebhookEvent` union are re-exported from
@@ -203,6 +228,19 @@ condition they report does not clear on its own within the request's lifetime.
   configurable on `createMailClient`.
 - A caller-provided `AbortSignal` (also in the last `opts` argument) is never
   itself retried: an abort you asked for propagates immediately.
+
+## Health check
+
+`client.health()` hits the service's liveness probe (`HEALTH_PATH`, outside
+`/v1`, no credentials) and never throws: a network failure or a non-2xx status
+both resolve `false`. Meant for a caller polling "is it up" (a deploy script, a
+monitor), not for anything that needs a typed error.
+
+```ts
+if (!(await mail.health())) {
+  // back off and retry, or alert
+}
+```
 
 ## Configuration
 

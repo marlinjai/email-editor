@@ -1,4 +1,4 @@
-import { SUBJECT_HEADER, WORKSPACE_HEADER, type OperationId, type RouteResponse } from '@marlinjai/mail-contract';
+import { HEALTH_PATH, SUBJECT_HEADER, WORKSPACE_HEADER, type OperationId, type RouteResponse } from '@marlinjai/mail-contract';
 import { buildAuthorizationHeader, execute, type CoreConfig, type ExecuteArgs, type RequestOpts } from './core';
 import { createNamespaces, type MailNamespaces } from './namespaces';
 import { paginate, type PageItem, type PaginatableOperationId, type PaginateArgs } from './pagination';
@@ -37,6 +37,13 @@ export interface MailClient extends MailNamespaces {
     args?: PaginateArgs<K>,
     opts?: RequestOpts,
   ): AsyncGenerator<PageItem<K>, void, void>;
+  /**
+   * Checks the service's liveness probe (`HEALTH_PATH`, outside `/v1`, no
+   * credentials sent). Never throws: a network failure or a non-2xx status both
+   * resolve `false`, since this is meant for a caller polling "is it up", not one
+   * that wants a typed error.
+   */
+  health(opts?: { signal?: AbortSignal }): Promise<boolean>;
 }
 
 function resolveFetch(provided: typeof fetch | undefined): typeof fetch {
@@ -64,11 +71,24 @@ function buildConfig(options: BaseClientOptions, authHeaders: () => Record<strin
   };
 }
 
+async function checkHealth(config: CoreConfig, opts?: { signal?: AbortSignal }): Promise<boolean> {
+  try {
+    const response = await config.fetch(`${config.baseUrl.replace(/\/+$/, '')}${HEALTH_PATH}`, {
+      method: 'GET',
+      signal: opts?.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 function buildClient(config: CoreConfig): MailClient {
   return {
     ...createNamespaces(config),
     request: (operationId, args, opts) => execute(config, operationId, args ?? {}, opts),
     paginate: (operationId, args, opts) => paginate(config, operationId, args ?? {}, opts),
+    health: (opts) => checkHealth(config, opts),
   } as MailClient;
 }
 
@@ -91,7 +111,12 @@ export interface DashboardMailClientOptions extends BaseClientOptions {
 export interface DashboardUserContext {
   /** The person's auth-brain subject. */
   subject: string;
-  workspaceId: string;
+  /**
+   * Omit for a `dashboard`-access route reached before a workspace exists yet
+   * (`workspaces.create`, `workspaces.list`): the service checks membership and
+   * role against this workspace on every other route, so it is required there.
+   */
+  workspaceId?: string;
 }
 
 export interface DashboardMailClient {
@@ -122,7 +147,7 @@ export function createDashboardMailClient(options: DashboardMailClientOptions): 
       const config = buildConfig(options, () => ({
         ...buildAuthorizationHeader(options.serviceToken),
         [SUBJECT_HEADER]: user.subject,
-        [WORKSPACE_HEADER]: user.workspaceId,
+        ...(user.workspaceId ? { [WORKSPACE_HEADER]: user.workspaceId } : {}),
       }));
       return buildClient(config);
     },
