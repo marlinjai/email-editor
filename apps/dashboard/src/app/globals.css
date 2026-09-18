@@ -1,0 +1,163 @@
+@import 'tailwindcss';
+
+/*
+ * Lumitra Mail. Dark only, pure black, brushed gold: the Lumitra brand
+ * (email-mcp site/style.css is the reference). Operate mode: gold is spent on
+ * the one primary action per view, the focus ring, the current navigation item
+ * and the live sending rail, never on decoration.
+ *
+ * Contrast (WCAG 2.2 SC 1.4.3), measured on --bg #000 and --panel #0f0e0c:
+ *   --ink #f3f2f7: 18.9:1 / 17.6:1
+ *   --muted #a89f8c: 8.0:1 / 7.4:1
+ *   --faint #8a8373: 5.6:1 / 5.2:1 (the floor for any text)
+ *   --gold-ink #1a1200 on the gradient's darkest stop #c9a04a: 7.6:1
+ *   --danger #ff8a80: 8.3:1; --ok #5fd9a3: 11.2:1; --warn #f0c05a: 11.6:1
+ */
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --panel: #0f0e0c;
+  --panel-2: #16140f;
+  --raised: #1c1a15;
+  --ink: #f3f2f7;
+  --muted: #a89f8c;
+  --faint: #8a8373;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --gold: #e0bb54;
+  --gold-deep: #c9a04a;
+  --gold-ink: #1a1200;
+  --gold-edge: rgba(241, 211, 122, 0.35);
+  --gold-wash: rgba(224, 187, 84, 0.1);
+  --gold-grad:
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.1) 0 1px, rgba(255, 255, 255, 0) 1px 3px),
+    linear-gradient(135deg, #c9a04a 0%, #f1d37a 42%, #d9b552 58%, #c9a04a 100%);
+  --ok: #5fd9a3;
+  --ok-wash: rgba(95, 217, 163, 0.1);
+  --warn: #f0c05a;
+  --warn-wash: rgba(240, 192, 90, 0.1);
+  --danger: #ff8a80;
+  --danger-wash: rgba(255, 138, 128, 0.1);
+  --danger-solid: #b3261e;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.6), 0 24px 64px rgba(0, 0, 0, 0.7);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
+  --color-gold-wash: var(--gold-wash);
+  --color-ok: var(--ok);
+  --color-ok-wash: var(--ok-wash);
+  --color-warn: var(--warn);
+  --color-warn-wash: var(--warn-wash);
+  --color-danger: var(--danger);
+  --color-danger-wash: var(--danger-wash);
+  --color-danger-solid: var(--danger-solid);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background:
+    radial-gradient(1200px 520px at 18% -8%, rgba(224, 187, 84, 0.07), rgba(224, 187, 84, 0) 70%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.012) 0 1px, rgba(255, 255, 255, 0) 1px 4px),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+/* Browser surfaces carry the palette too. */
+::selection {
+  background: rgba(224, 187, 84, 0.32);
+  color: var(--ink);
+}
+* {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-width: thin;
+}
+input,
+textarea,
+select {
+  caret-color: var(--gold);
+}
+a {
+  text-underline-offset: 3px;
+}
+table,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* One focus treatment everywhere (SC 2.4.7 and 2.4.11): a gold ring off the element. */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* The gold surface: primary actions and the live progress rail. */
+.gold-surface {
+  background: var(--gold-grad);
+  color: var(--gold-ink);
+  border: 1px solid var(--gold-edge);
+}
+
+/* Native dialogs: the element is modal and traps focus by itself. */
+dialog {
+  color: var(--ink);
+}
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+}
+dialog[open] {
+  animation: dialog-in 180ms var(--ease-out);
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+}
+
+/* Skeletons: a slow sheen, off entirely for reduced motion. */
+.skeleton {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  background-size: 200% 100%;
+  animation: sheen 1.4s linear infinite;
+  border-radius: 6px;
+}
+@keyframes sheen {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

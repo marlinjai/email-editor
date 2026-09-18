@@ -1,0 +1,43 @@
+{
+  "name": "@email-editor/dashboard",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Lumitra Mail dashboard (app.mail.lumitra.co): the human interface over the mail service's v1 API",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "predev": "pnpm --filter \"@email-editor/dashboard^...\" build",
+    "dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4 --domain=https://infisical.lumitra.co --env=dev --path=/dashboard -- next dev --port 3100",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "clean": "rm -rf .next"
+  },
+  "dependencies": {
+    "@marlinjai/auth-brain-nextjs": "^0.8.0",
+    "@marlinjai/email-editor": "workspace:*",
+    "@marlinjai/mail-contract": "workspace:*",
+    "@marlinjai/mail-sdk": "workspace:*",
+    "next": "^16.3.5",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "server-only": "^0.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@testcontainers/postgresql": "^12.1.0",
+    "@types/node": "22",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "postgres": "^3.4.9",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.4"
+  }
+}
