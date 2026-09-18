@@ -11,7 +11,8 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "docs:dev": "clearify dev",
     "docs:build": "clearify build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "check:roadmap": "npx --yes github:marlinjai/actions-shared#roadmap-check-v1 --root ."
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.3",

@@ -1,0 +1,84 @@
+# Continuous integration for every pull request and every push to main.
+#
+# - service: typecheck, unit tests, integration tests against a real Postgres 17
+#   service container, and the build of apps/service (the mail service).
+# - service-image: builds the service's container image for linux/arm64 (the
+#   shared Coolify server's architecture) without pushing it, so a broken
+#   Dockerfile fails the pull request instead of the deploy.
+# - roadmap-check: ROADMAP.md and docs/plans/ agree, and every open line is fresh.
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  service:
+    name: Service (typecheck, unit, integration, build)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: mail
+          POSTGRES_PASSWORD: mail
+          POSTGRES_DB: mail
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mail"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @email-editor/service...
+      # The workspace packages the service imports (the API contract) are
+      # consumed from their build output, so they build first.
+      - name: Build dependencies
+        run: pnpm --filter "@email-editor/service^..." build
+      - name: Typecheck
+        run: pnpm --filter @email-editor/service lint
+      - name: Unit tests
+        run: pnpm --filter @email-editor/service test:unit
+      # TEST_DATABASE_URL points the suite at the service container. Without it
+      # the suite fails loudly rather than skipping.
+      - name: Integration tests (Postgres 17)
+        env:
+          TEST_DATABASE_URL: postgres://mail:mail@localhost:5432/mail
+        run: pnpm --filter @email-editor/service test:integration
+      - name: Build
+        run: pnpm --filter @email-editor/service build
+
+  service-image:
+    name: Service image builds (linux/arm64)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/service/Dockerfile
+          platforms: linux/arm64
+          push: false
+          cache-from: type=gha,scope=service
+          cache-to: type=gha,scope=service,mode=max
+
+  roadmap-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: marlinjai/actions-shared/roadmap-check@roadmap-check-v1
+        with:
+          max-age: 30

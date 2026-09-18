@@ -1,0 +1,41 @@
+{
+  "name": "@email-editor/service",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Lumitra Mail: the multi-tenant mail service (API, and from S2 the send worker and hosted pages)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsup",
+    "predev": "pnpm --filter \"@email-editor/service^...\" build",
+    "dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4 --domain=https://infisical.lumitra.co --env=dev -- sh -c \"tsx src/main.ts migrate && tsx watch src/main.ts serve\"",
+    "db:dev": "docker start lumitra-mail-dev-db 2>/dev/null || docker run -d --name lumitra-mail-dev-db -p 55432:5432 -e POSTGRES_USER=mail -e POSTGRES_PASSWORD=mail -e POSTGRES_DB=lumitra_mail postgres:17-alpine",
+    "premigrate:dev": "pnpm --filter \"@email-editor/service^...\" build",
+    "migrate:dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4 --domain=https://infisical.lumitra.co --env=dev -- tsx src/main.ts migrate",
+    "migrate": "node dist/main.js migrate",
+    "start": "node dist/main.js serve",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run -c vitest.unit.config.ts",
+    "test:integration": "vitest run test/integration",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@marlinjai/brain-core": "^1.0.0",
+    "@marlinjai/mail-contract": "workspace:*",
+    "hono": "^4.13.8",
+    "postgres": "^3.4.9",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.1.0",
+    "@types/node": "22",
+    "tsup": "^8.0.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.4"
+  }
+}

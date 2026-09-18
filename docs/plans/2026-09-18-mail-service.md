@@ -296,6 +296,68 @@ Written once so the phases built in parallel cannot drift apart:
   prompt beside the canvas, the model returns a document in the same schema,
   applied as a reviewed diff), custom domains per workspace.
 
+## Progress
+
+### S0, foundation (built 2026-09-18, branch `feat/s0-foundation`)
+
+Built and verified:
+
+- **Service** `apps/service` (`@email-editor/service`): Hono on Node 22, Postgres 17,
+  migration `0001_foundation` (workspaces, workspace_members, api_keys, audit_log,
+  idempotency_keys), the explicit `migrate` command, repositories that take
+  `workspaceId` first, API-key and dashboard authentication, the shared
+  `Idempotency-Key` middleware (stored responses sealed with AES-256-GCM under
+  `MAIL_SECRETS_KEY`, since one of them carries a freshly minted key), the typed
+  error envelope. Routes and the role table
+  are in `apps/service/README.md`.
+- **Tests**: 27 unit, 69 integration on Testcontainers Postgres 17 (tenancy proven on
+  every route, revoked keys, the last-owner rule including a concurrent race,
+  idempotency on all four stateful-flow paths, migrations from empty, after a failed
+  file, and under two concurrent runners). CI runs them against a Postgres service
+  container, builds the arm64 image, and runs `roadmap-check`.
+- **Infrastructure** (marlinjai/infra#37, applied): Infisical project "Lumitra Mail"
+  (`f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4`) with the app machine identity; Coolify
+  project, `postgres:17-alpine` and the `mail.lumitra.co` A record; GitHub deploy
+  secrets through Terraform; the Coolify application `c60ld4gx620wemkvvj9l9p51`
+  pulling `ghcr.io/marlinjai/email-editor-service`. `MAIL_SECRETS_KEY` and
+  `DASHBOARD_SERVICE_TOKEN` minted per environment with `copy_secret op=generate`.
+- **auth-brain** (marlinjai/auth-brain#141): the `mail` app-grant, hidden until the
+  dashboard ships.
+
+Defaults taken in S0 (each can be overturned later):
+
+1. **One source of shapes.** The service imports `@marlinjai/mail-contract`
+   (`workspace:*`): request and response schemas, error codes, header names and
+   the route table. Every operation is registered from `routes[id]`, and a
+   conformance suite parses every S0 response with the contract's schemas.
+2. **Members are added by auth-brain subject** (`members.add`: `subject`, `email`,
+   `name`, `role`), not invited by email. The service never sees a login, so an
+   email-only invite would need a pending-invite model and an accept step; the
+   dashboard resolves the person first. Creating a workspace takes the owner's
+   email in the body, since the service does not ask auth-brain who a subject is.
+3. **Permissions** are the contract's access levels (`read`: viewer or any key;
+   `write`: editor or a send or full key; `admin`: admin or a full key;
+   `dashboard`: a person before any workspace). Beyond the table: only an owner,
+   signed in, grants or removes the owner role, and anyone may leave.
+4. **Idempotency** is opt-in per request, stores every response below 500 sealed, keeps
+   keys 24 hours, and clears a claim left `in_progress` for more than 5 minutes.
+5. **The auth-brain app slug is `mail`**, hidden until S3; the grant for the Lumitra
+   company (and ŌPUNTIA's) is written after that PR deploys.
+6. **Image** `ghcr.io/marlinjai/email-editor-service`, deployed by
+   `.github/workflows/deploy-service.yml` on pushes to `main` that touch the service.
+   `/healthz` reports the served commit, and the deploy waits until every reply
+   carries it.
+7. **The in-memory `ek_` key counting in `packages/core/src/api/validation.ts` stays**
+   for now: nothing published depends on it, but the deployed demo's compile route
+   (`examples/nextjs/app/api/compile/route.ts`) does, and S1's compile API is what
+   replaces that route. It is retired together with the demo route in S1.
+
+Inputs for later phases, found while building S0:
+
+- **Erasure** (auth-brain's `tenant.erased` webhook) needs each workspace keyed to
+  an auth-brain company. S3 adds that column when the dashboard creates workspaces
+  for a signed-in company, and subscribes the `mail` app to erasure then.
+
 ## Legal shape
 
 The service is a data processor for each workspace's controller. It ships with a

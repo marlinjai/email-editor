@@ -1,5 +1,5 @@
 # pnpm workspace configuration
 packages:
   - 'packages/*'
+  - 'apps/*'
   - 'examples/*'
-
