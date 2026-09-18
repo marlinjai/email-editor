@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 import { hashApiKey, mintApiKey } from '../../src/api-key.js';
-import { authenticate, MANAGE, permit, READ_ADMIN, requireWorkspace, type AuthDeps } from '../../src/auth.js';
+import { ACCESS_RULES, authenticate, permit, requireWorkspace, type AuthDeps } from '../../src/auth.js';
 import type { AppEnv } from '../../src/context.js';
-import { ApiError } from '../../src/errors.js';
+import { ApiError } from '../../src/api-error.js';
 import type { Member } from '../../src/repo/members.js';
 
 const TOKEN = 'f'.repeat(64);
@@ -29,8 +29,9 @@ async function setup(overrides: Partial<AuthDeps> = {}) {
   app.use('*', authenticate(deps));
   app.get('/who', (c) => c.json(c.get('caller')));
   app.get('/ws', requireWorkspace(deps), (c) => c.json(c.get('access')));
-  app.get('/admin-read', requireWorkspace(deps), permit(READ_ADMIN), (c) => c.json({ ok: true }));
-  app.get('/manage', requireWorkspace(deps), permit(MANAGE), (c) => c.json({ ok: true }));
+  app.get('/read', requireWorkspace(deps), permit('read'), (c) => c.json({ ok: true }));
+  app.get('/write', requireWorkspace(deps), permit('write'), (c) => c.json({ ok: true }));
+  app.get('/manage', requireWorkspace(deps), permit('admin'), (c) => c.json({ ok: true }));
   return { app, deps, good };
 }
 
@@ -134,6 +135,21 @@ describe('authenticate', () => {
 });
 
 describe('permit', () => {
+  it('maps the contract access levels to roles and key scopes', () => {
+    expect(ACCESS_RULES).toEqual({
+      read: { role: 'viewer', scopes: ['full', 'read', 'send'] },
+      write: { role: 'editor', scopes: ['full', 'send'] },
+      admin: { role: 'admin', scopes: ['full'] },
+    });
+  });
+
+  it('lets an editor write but not administer', async () => {
+    const { app } = await setup();
+    const headers = { authorization: `Bearer ${TOKEN}`, 'x-mail-subject': 'alice', 'x-mail-workspace': WS };
+    expect((await app.request('/write', { headers })).status).toBe(200);
+    expect((await app.request('/manage', { headers })).status).toBe(403);
+  });
+
   it('turns a role below the minimum into insufficient_role', async () => {
     const { app } = await setup();
     const res = await app.request('/manage', {
@@ -150,7 +166,8 @@ describe('permit', () => {
         hash === readKey.hash ? { id: 'k3', workspace_id: WS, key_hash: hash, scope: 'read', revoked_at: null } : null,
     });
     const headers = { authorization: `Bearer ${readKey.key}` };
-    expect((await app.request('/admin-read', { headers })).status).toBe(200);
+    expect((await app.request('/read', { headers })).status).toBe(200);
+    expect((await app.request('/write', { headers })).status).toBe(403);
     const res = await app.request('/manage', { headers });
     expect(res.status).toBe(403);
     expect(await code(res)).toBe('forbidden');

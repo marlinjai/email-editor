@@ -1,5 +1,5 @@
 import type { Db } from '../db.js';
-import type { WorkspaceSettings } from '../schemas.js';
+import type { WorkspaceSettings } from '@marlinjai/mail-contract';
 
 export type Workspace = {
   id: string;
@@ -44,16 +44,34 @@ export function workspacesRepo(db: Db) {
     },
 
     /**
-     * The workspaces a person belongs to, with their role in each. Keyed by the
-     * person rather than a workspace, because it answers "which tenants may this
-     * subject enter"; it returns only rows the subject is a member of.
+     * The workspaces a person belongs to, with their role in each, a page at a
+     * time. Keyed by the person rather than a workspace, because it answers
+     * "which tenants may this subject enter"; it returns only rows the subject is
+     * a member of.
      */
-    async listForSubject(subject: string): Promise<Array<Workspace & { role: string }>> {
+    async listForSubject(
+      subject: string,
+      page: { afterId?: string; limit: number },
+    ): Promise<Array<Workspace & { role: string }>> {
       return db<Array<Workspace & { role: string }>>`
         SELECT w.id, w.slug, w.name, w.settings, w.created_at, w.updated_at, m.role
         FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id
         WHERE m.subject = ${subject}
-        ORDER BY w.created_at, w.id`;
+        ${
+          page.afterId
+            ? db`AND (w.created_at, w.id) > (
+                SELECT w2.created_at, w2.id FROM workspace_members m2 JOIN workspaces w2 ON w2.id = m2.workspace_id
+                WHERE m2.subject = ${subject} AND w2.id = ${page.afterId})`
+            : db``
+        }
+        ORDER BY w.created_at, w.id
+        LIMIT ${page.limit}`;
+    },
+
+    /** Whether the subject is a member of the workspace; validates a cursor of listForSubject. */
+    async subjectBelongsTo(subject: string, workspaceId: string): Promise<boolean> {
+      const rows = await db`SELECT 1 FROM workspace_members WHERE workspace_id = ${workspaceId} AND subject = ${subject}`;
+      return rows.length > 0;
     },
   };
 }

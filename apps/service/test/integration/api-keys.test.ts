@@ -86,15 +86,40 @@ describe('API keys', () => {
     expect((await h.call({ path: '/v1/workspace', key: 'not-the-dashboard-token' })).body.error.code).toBe('unauthenticated');
   });
 
-  it('enforces key scopes: read keys read, send keys do not see keys, only full keys manage', async () => {
+  it('enforces key scopes as the contract says: read and send keys read, only full keys administer', async () => {
     const read = (await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, body: { name: 'r', scope: 'read' } })).body.key;
     const send = (await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, body: { name: 's', scope: 'send' } })).body.key;
-    expect((await h.call({ path: '/v1/api-keys', key: read })).status).toBe(200);
-    expect((await h.call({ path: '/v1/audit-log', key: read })).status).toBe(200);
-    expect((await h.call({ method: 'POST', path: '/v1/api-keys', key: read, body: { name: 'x' } })).status).toBe(403);
-    expect((await h.call({ path: '/v1/workspace', key: send })).status).toBe(200);
-    expect((await h.call({ path: '/v1/api-keys', key: send })).status).toBe(403);
-    expect((await h.call({ method: 'PATCH', path: '/v1/workspace', key: send, body: { name: 'x' } })).status).toBe(403);
+    for (const k of [read, send]) {
+      expect((await h.call({ path: '/v1/workspace', key: k })).status).toBe(200);
+      expect((await h.call({ path: '/v1/members', key: k })).status).toBe(200);
+      for (const [method, path, body] of [
+        ['GET', '/v1/api-keys'],
+        ['GET', '/v1/audit-log'],
+        ['POST', '/v1/api-keys', { name: 'x' }],
+        ['PATCH', '/v1/workspace', { name: 'x' }],
+        ['POST', '/v1/members', { subject: 'x', email: 'x@x.io', role: 'viewer' }],
+      ] as const) {
+        const res = await h.call({ method, path, body, key: k });
+        expect(res.status, `${method} ${path}`).toBe(403);
+        expect(res.body.error.code, `${method} ${path}`).toBe('forbidden');
+      }
+    }
+  });
+
+  it('a full key manages members, but can never grant or take away the owner role', async () => {
+    const added = await h.call({ method: 'POST', path: '/v1/members', key: W.key, body: { subject: 'by-key', email: 'k@keys.io', role: 'editor' } });
+    expect(added.status).toBe(201);
+    const promote = await h.call({ method: 'PATCH', path: `/v1/members/${added.body.id}`, key: W.key, body: { role: 'admin' } });
+    expect(promote.body.role).toBe('admin');
+    const owner = await h.call({ method: 'POST', path: '/v1/members', key: W.key, body: { subject: 'o', email: 'o@keys.io', role: 'owner' } });
+    expect(owner.body.error.code).toBe('forbidden');
+    const ownerId = (await h.call({ path: '/v1/members', key: W.key })).body.data.find((m: { role: string }) => m.role === 'owner').id;
+    expect((await h.call({ method: 'PATCH', path: `/v1/members/${ownerId}`, key: W.key, body: { role: 'viewer' } })).body.error.code).toBe('forbidden');
+    expect((await h.call({ method: 'DELETE', path: `/v1/members/${ownerId}`, key: W.key })).body.error.code).toBe('forbidden');
+    const removed = await h.call({ method: 'DELETE', path: `/v1/members/${added.body.id}`, key: W.key });
+    expect(removed.body).toEqual({ ok: true });
+    const audit = await h.call({ path: `/v1/audit-log?target_id=${added.body.id}`, key: W.key });
+    expect(audit.body.data.every((e: { actor: { type: string } }) => e.actor.type === 'api_key')).toBe(true);
   });
 
   it('pages through keys with a cursor, newest first', async () => {

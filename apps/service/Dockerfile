@@ -11,9 +11,13 @@ RUN corepack enable
 # package change does not invalidate this layer.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/service/package.json apps/service/package.json
+COPY packages/mail-contract/package.json packages/mail-contract/package.json
 RUN pnpm install --frozen-lockfile --filter @email-editor/service...
+# The service and the workspace packages it imports (the API contract).
+COPY tsconfig.json ./
+COPY packages/mail-contract packages/mail-contract
 COPY apps/service apps/service
-RUN pnpm --filter @email-editor/service build \
+RUN pnpm --filter "@email-editor/service..." build \
  && pnpm --filter @email-editor/service deploy --prod /out
 
 FROM node:22-alpine AS runner

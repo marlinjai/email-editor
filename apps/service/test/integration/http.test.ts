@@ -56,9 +56,10 @@ describe('the error envelope', () => {
     expect(res.body.error.code).toBe('not_found');
   });
 
-  it('a non-uuid id is validation_failed, never a database error', async () => {
+  it('an id this service never issued is not_found, never a database error', async () => {
     const res = await h.call({ method: 'DELETE', path: '/v1/api-keys/not-a-uuid', key: W.key });
-    expect(res.body.error.code).toBe('validation_failed');
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('not_found');
   });
 
   it('every response carries a request id, and an incoming one is echoed', async () => {

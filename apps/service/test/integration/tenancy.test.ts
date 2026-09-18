@@ -111,15 +111,32 @@ describe('tenancy isolation', () => {
     }
   });
 
-  it('members routes in A cannot address a member of B by id', async () => {
-    const patch = await h.call({ method: 'PATCH', path: `/v1/members/${bMemberId}`, subject: A.owner, workspace: A.id, body: { role: 'viewer' } });
-    expect(patch.status).toBe(404);
-    const del = await h.call({ method: 'DELETE', path: `/v1/members/${bMemberId}`, subject: A.owner, workspace: A.id });
-    expect(del.status).toBe(404);
-    const list = await h.call({ path: '/v1/members', subject: A.owner, workspace: A.id });
-    expect(list.body.data.map((m: { id: string }) => m.id)).not.toContain(bMemberId);
+  it('members routes in A cannot address a member of B by id, by key or through the dashboard', async () => {
+    for (const as of [{ subject: A.owner, workspace: A.id }, { key: A.key }]) {
+      const patch = await h.call({ method: 'PATCH', path: `/v1/members/${bMemberId}`, ...as, body: { role: 'viewer' } });
+      expect(patch.status).toBe(404);
+      const del = await h.call({ method: 'DELETE', path: `/v1/members/${bMemberId}`, ...as });
+      expect(del.status).toBe(404);
+      const list = await h.call({ path: '/v1/members', ...as });
+      expect(list.body.data.map((m: { id: string }) => m.id)).not.toContain(bMemberId);
+      const cursor = await h.call({ path: `/v1/members?cursor=${bMemberId}`, ...as });
+      expect(cursor.body.error.code).toBe('invalid_cursor');
+    }
     const [row] = await h.sql`SELECT role FROM workspace_members WHERE id = ${bMemberId}`;
     expect(row!.role).toBe('editor');
+  });
+
+  it("POST /v1/members with A's key adds the person to A only", async () => {
+    const res = await h.call({
+      method: 'POST',
+      path: '/v1/members',
+      key: A.key,
+      body: { subject: 'shared-person', email: 'p@alpha.io', role: 'viewer' },
+      headers: { 'x-mail-workspace': B.id },
+    });
+    expect(res.status).toBe(201);
+    const [row] = await h.sql`SELECT workspace_id FROM workspace_members WHERE id = ${res.body.id}`;
+    expect(row!.workspace_id).toBe(A.id);
   });
 
   it("GET /v1/workspaces lists only the subject's own workspaces", async () => {
@@ -127,18 +144,20 @@ describe('tenancy isolation', () => {
     expect(res.body.data.map((w: { id: string }) => w.id)).toEqual([A.id]);
   });
 
-  it('dashboard-only routes refuse API keys outright', async () => {
+  it('the dashboard-only routes refuse API keys outright', async () => {
     for (const [method, path, body] of [
       ['POST', '/v1/workspaces', { slug: 'x', name: 'x', owner: { email: 'x@x.io' } }],
       ['GET', '/v1/workspaces'],
-      ['GET', '/v1/members'],
-      ['POST', '/v1/members', { subject: 'x', email: 'x@x.io', role: 'viewer' }],
-      ['PATCH', `/v1/members/${bMemberId}`, { role: 'viewer' }],
-      ['DELETE', `/v1/members/${bMemberId}`],
     ] as const) {
       const res = await h.call({ method, path, body, key: A.key });
       expect(res.status, `${method} ${path}`).toBe(403);
+      expect(res.body.error.code, `${method} ${path}`).toBe('forbidden');
     }
+  });
+
+  it('GET /v1/workspaces refuses a cursor naming a workspace the person is not in', async () => {
+    const res = await h.call({ path: `/v1/workspaces?cursor=${B.id}`, subject: A.owner });
+    expect(res.body.error.code).toBe('invalid_cursor');
   });
 
   it('the same Idempotency-Key in two workspaces are two different requests', async () => {

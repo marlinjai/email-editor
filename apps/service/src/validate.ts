@@ -1,7 +1,7 @@
+import { DEFAULT_PAGE_LIMIT, routes, type OperationId, type RouteDef } from '@marlinjai/mail-contract';
 import type { Context } from 'hono';
 import type { z } from 'zod';
-import { ApiError } from './errors.js';
-import { DEFAULT_PAGE_LIMIT } from './schemas.js';
+import { ApiError } from './api-error.js';
 
 function issues(error: z.ZodError) {
   return error.issues.map((i) => ({ path: i.path, message: i.message }));
@@ -15,8 +15,19 @@ function check<T extends z.ZodTypeAny>(schema: T, value: unknown, where: string)
   return parsed.data;
 }
 
-/** Parses and validates a JSON body. Malformed JSON is `invalid_request`, a wrong shape `validation_failed`. */
-export async function jsonBody<T extends z.ZodTypeAny>(c: Context, schema: T): Promise<z.infer<T>> {
+type Def<K extends OperationId> = (typeof routes)[K];
+type SchemaOf<K extends OperationId, F extends 'body' | 'query' | 'params'> = Def<K> extends Record<F, infer S extends z.ZodTypeAny>
+  ? S
+  : never;
+
+function schemaOf(id: OperationId, field: 'body' | 'query' | 'params'): z.ZodTypeAny {
+  const schema = (routes[id] as RouteDef)[field];
+  if (!schema) throw new Error(`route ${id} declares no ${field}`);
+  return schema;
+}
+
+/** The JSON body of operation `id`, validated against the contract. Malformed JSON is `invalid_request`. */
+export async function body<K extends OperationId>(c: Context, id: K): Promise<z.infer<SchemaOf<K, 'body'>>> {
   const raw = await c.req.text();
   let value: unknown;
   try {
@@ -24,23 +35,34 @@ export async function jsonBody<T extends z.ZodTypeAny>(c: Context, schema: T): P
   } catch {
     throw new ApiError('invalid_request', 'The request body is not valid JSON.');
   }
-  return check(schema, value, 'request body');
+  return check(schemaOf(id, 'body'), value, 'request body');
 }
 
-export function query<T extends z.ZodTypeAny>(c: Context, schema: T): z.infer<T> {
-  return check(schema, c.req.query(), 'query string');
+export function query<K extends OperationId>(c: Context, id: K): z.infer<SchemaOf<K, 'query'>> {
+  return check(schemaOf(id, 'query'), c.req.query(), 'query string');
 }
 
-export function params<T extends z.ZodTypeAny>(c: Context, schema: T): z.infer<T> {
-  return check(schema, c.req.param(), 'path');
+export function params<K extends OperationId>(c: Context, id: K): z.infer<SchemaOf<K, 'params'>> {
+  return check(schemaOf(id, 'params'), c.req.param(), 'path');
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Ids are opaque strings in the contract; this service happens to issue UUIDs.
+ * Anything else cannot name a row here, so it is `not_found`, exactly like a
+ * well-formed id that does not exist, and it never reaches the database as a
+ * failed cast.
+ */
+export function rowId(id: string, what: string): string {
+  if (!UUID.test(id)) throw new ApiError('not_found', `No such ${what} in this workspace.`);
+  return id.toLowerCase();
+}
 
 /**
  * Keyset pagination. The cursor is the id of the last row of the previous page,
- * and it must belong to the same workspace, or it is `invalid_cursor` rather
- * than a silently empty page.
+ * and it must belong to the same list, or it is `invalid_cursor` rather than a
+ * silently empty page.
  */
 export async function pageArgs(
   q: { cursor?: string; limit?: number },
@@ -48,10 +70,10 @@ export async function pageArgs(
 ): Promise<{ afterId?: string; limit: number }> {
   const limit = q.limit ?? DEFAULT_PAGE_LIMIT;
   if (q.cursor === undefined) return { limit };
-  if (!UUID.test(q.cursor) || !(await cursorExists(q.cursor))) {
+  if (!UUID.test(q.cursor) || !(await cursorExists(q.cursor.toLowerCase()))) {
     throw new ApiError('invalid_cursor', 'The cursor is not valid for this list. Start again without one.');
   }
-  return { afterId: q.cursor, limit };
+  return { afterId: q.cursor.toLowerCase(), limit };
 }
 
 /** Fetches one row more than asked, to know whether there is a next page without a count. */

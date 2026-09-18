@@ -1,5 +1,5 @@
 import type { Db } from '../db.js';
-import type { MemberRole } from '../schemas.js';
+import type { MemberRole } from '@marlinjai/mail-contract';
 
 export type Member = {
   id: string;

@@ -1,3 +1,4 @@
+import { HEALTH_PATH } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import type { AppEnv } from '../context.js';
 import type { Sql } from '../db.js';
@@ -17,7 +18,7 @@ const COMMIT = process.env.GIT_SHA ?? 'unknown';
  */
 export function healthRoutes(sql: Sql) {
   const app = new Hono<AppEnv>();
-  app.get('/healthz', async (c) => {
+  app.get(HEALTH_PATH, async (c) => {
     c.header('cache-control', 'no-store');
     let timer: NodeJS.Timeout | undefined;
     try {

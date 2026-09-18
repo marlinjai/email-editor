@@ -1,5 +1,5 @@
 import type { Db } from '../db.js';
-import type { AuditAction, AuditActor } from '../schemas.js';
+import type { AuditAction, AuditActor } from '@marlinjai/mail-contract';
 
 export type AuditEntry = {
   id: string;

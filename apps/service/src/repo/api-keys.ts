@@ -1,5 +1,5 @@
 import type { Db } from '../db.js';
-import type { ApiKeyScope, AuditActor } from '../schemas.js';
+import type { ApiKeyScope, AuditActor } from '@marlinjai/mail-contract';
 
 export type ApiKey = {
   id: string;

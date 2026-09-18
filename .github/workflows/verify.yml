@@ -43,6 +43,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile --filter @email-editor/service...
+      # The workspace packages the service imports (the API contract) are
+      # consumed from their build output, so they build first.
+      - name: Build dependencies
+        run: pnpm --filter "@email-editor/service^..." build
       - name: Typecheck
         run: pnpm --filter @email-editor/service lint
       - name: Unit tests

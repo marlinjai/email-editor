@@ -1,4 +1,4 @@
-import type { ApiKeyScope, AuditActor, MemberRole } from './schemas.js';
+import type { ApiKeyScope, AuditActor, MemberRole } from '@marlinjai/mail-contract';
 import type { Member } from './repo/members.js';
 
 /** Who is calling. Set by the auth middleware before any route runs. */

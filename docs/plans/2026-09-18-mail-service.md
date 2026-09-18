@@ -301,7 +301,7 @@ Built and verified:
   `MAIL_SECRETS_KEY`, since one of them carries a freshly minted key), the typed
   error envelope. Routes and the role table
   are in `apps/service/README.md`.
-- **Tests**: 25 unit, 63 integration on Testcontainers Postgres 17 (tenancy proven on
+- **Tests**: 27 unit, 69 integration on Testcontainers Postgres 17 (tenancy proven on
   every route, revoked keys, the last-owner rule including a concurrent race,
   idempotency on all four stateful-flow paths, migrations from empty, after a failed
   file, and under two concurrent runners). CI runs them against a Postgres service
@@ -317,17 +317,19 @@ Built and verified:
 
 Defaults taken in S0 (each can be overturned later):
 
-1. **Dashboard headers** follow the contract package: `x-mail-subject` and
-   `x-mail-workspace`, not the `X-Acting-Subject` named in the task brief.
-2. **Members are added by auth-brain subject** (`subject`, `email`, `name`, `role`),
-   not invited by email. The service never sees a login, so an email-only invite
-   would need a pending-invite model and an accept step; the dashboard resolves the
-   person before calling. Creating a workspace takes the owner's email in the body,
-   since the service does not ask auth-brain who a subject is.
-3. **Permissions**: reading the workspace needs viewer (any key scope); reading keys
-   and the audit log needs admin (full or read key); every change needs admin (full
-   key); anything touching the owner role needs an owner. Members and workspace
-   creation are dashboard-only.
+1. **One source of shapes.** The service imports `@marlinjai/mail-contract`
+   (`workspace:*`): request and response schemas, error codes, header names and
+   the route table. Every operation is registered from `routes[id]`, and a
+   conformance suite parses every S0 response with the contract's schemas.
+2. **Members are added by auth-brain subject** (`members.add`: `subject`, `email`,
+   `name`, `role`), not invited by email. The service never sees a login, so an
+   email-only invite would need a pending-invite model and an accept step; the
+   dashboard resolves the person first. Creating a workspace takes the owner's
+   email in the body, since the service does not ask auth-brain who a subject is.
+3. **Permissions** are the contract's access levels (`read`: viewer or any key;
+   `write`: editor or a send or full key; `admin`: admin or a full key;
+   `dashboard`: a person before any workspace). Beyond the table: only an owner,
+   signed in, grants or removes the owner role, and anyone may leave.
 4. **Idempotency** is opt-in per request, stores every response below 500 sealed, keeps
    keys 24 hours, and clears a claim left `in_progress` for more than 5 minutes.
 5. **The auth-brain app slug is `mail`**, hidden until S3; the grant for the Lumitra
@@ -346,8 +348,6 @@ Inputs for later phases, found while building S0:
 - **Erasure** (auth-brain's `tenant.erased` webhook) needs each workspace keyed to
   an auth-brain company. S3 adds that column when the dashboard creates workspaces
   for a signed-in company, and subscribes the `mail` app to erasure then.
-- The service mirrors the contract's shapes in `src/schemas.ts` and `src/errors.ts`
-  until `@marlinjai/mail-contract` merges; the switch is an import swap.
 
 ## Legal shape
 

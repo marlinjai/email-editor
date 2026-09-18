@@ -1,50 +1,34 @@
 import { Hono } from 'hono';
-import { dashboardOnly, MANAGE, permit, READ_WORKSPACE, requireWorkspace } from '../auth.js';
+import { ApiError } from '../api-error.js';
 import { actorOf, type AppEnv } from '../context.js';
 import type { Sql } from '../db.js';
-import type { Sealer } from '../sealing.js';
-import { ApiError } from '../errors.js';
-import { idempotent, subjectScope, workspaceScope } from '../idempotency.js';
+import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
-import {
-  DEFAULT_WORKSPACE_SETTINGS,
-  settingsProblem,
-  WorkspaceCreate,
-  WorkspaceUpdate,
-  type WorkspaceSettings,
-} from '../schemas.js';
-import { jsonBody } from '../validate.js';
+import { body, pageArgs, query, toPage } from '../validate.js';
+import { DEFAULT_WORKSPACE_SETTINGS, mergeSettings } from '../workspace-settings.js';
 
-function mergedSettings(base: WorkspaceSettings, patch: Partial<WorkspaceSettings> | undefined): WorkspaceSettings {
-  const merged = { ...base, ...(patch ?? {}) };
-  const problem = settingsProblem(merged);
-  if (problem) {
-    throw new ApiError('validation_failed', 'The workspace settings are not valid.', {
-      issues: [{ path: ['settings', 'default_locale'], message: problem }],
-    });
-  }
-  return merged;
+function subjectOf(c: { get(key: 'caller'): AppEnv['Variables']['caller'] }): string {
+  const caller = c.get('caller');
+  if (caller.kind !== 'dashboard') throw new ApiError('forbidden', 'Only a signed-in person has workspaces.');
+  return caller.subject;
 }
 
-export function workspaceRoutes(sql: Sql, sealer: Sealer) {
+export function workspaceRoutes(sql: Sql, deps: MountDeps) {
   const app = new Hono<AppEnv>();
-  const pool = repos(sql);
-  const withWorkspace = requireWorkspace({ findMember: (ws, subject) => pool.members.bySubject(ws, subject) });
-  const ledger = () => pool.idempotency;
+  const { pool } = deps;
 
-  // Creating a workspace: dashboard only. The acting person becomes its first owner.
-  app.post('/v1/workspaces', dashboardOnly, idempotent(ledger, sealer, subjectScope), async (c) => {
-    const caller = c.get('caller');
-    if (caller.kind !== 'dashboard') throw new ApiError('forbidden', 'Only a person can create a workspace.');
-    const input = await jsonBody(c, WorkspaceCreate);
-    const settings = mergedSettings(DEFAULT_WORKSPACE_SETTINGS, input.settings);
+  // The acting person becomes the new workspace's first owner.
+  mount(app, 'workspaces.create', deps, async (c) => {
+    const subject = subjectOf(c);
+    const input = await body(c, 'workspaces.create');
+    const settings = mergeSettings(DEFAULT_WORKSPACE_SETTINGS, input.settings);
 
     const workspace = await sql.begin(async (tx) => {
       const r = repos(tx);
       const created = await r.workspaces.create({ slug: input.slug, name: input.name, settings });
       if (!created) throw new ApiError('already_exists', `A workspace with the slug "${input.slug}" already exists.`);
       const owner = await r.members.create(created.id, {
-        subject: caller.subject,
+        subject,
         email: input.owner.email,
         name: input.owner.name ?? null,
         role: 'owner',
@@ -71,27 +55,28 @@ export function workspaceRoutes(sql: Sql, sealer: Sealer) {
   });
 
   // The workspaces the signed-in person belongs to, for the dashboard's switcher.
-  app.get('/v1/workspaces', dashboardOnly, async (c) => {
-    const caller = c.get('caller');
-    if (caller.kind !== 'dashboard') throw new ApiError('forbidden', 'Only a person has workspaces.');
-    const rows = await pool.workspaces.listForSubject(caller.subject);
-    return c.json({ data: rows, next_cursor: null });
+  mount(app, 'workspaces.list', deps, async (c) => {
+    const subject = subjectOf(c);
+    const q = query(c, 'workspaces.list');
+    const page = await pageArgs(q, (id) => pool.workspaces.subjectBelongsTo(subject, id));
+    const rows = await pool.workspaces.listForSubject(subject, { afterId: page.afterId, limit: page.limit + 1 });
+    return c.json(toPage(rows, page.limit));
   });
 
-  app.get('/v1/workspace', withWorkspace, permit(READ_WORKSPACE), async (c) => {
+  mount(app, 'workspace.get', deps, async (c) => {
     const workspace = await pool.workspaces.get(c.get('access').workspaceId);
     if (!workspace) throw new ApiError('not_found', 'The workspace no longer exists.');
     return c.json(workspace);
   });
 
-  app.patch('/v1/workspace', withWorkspace, permit(MANAGE), idempotent(ledger, sealer, workspaceScope), async (c) => {
+  mount(app, 'workspace.update', deps, async (c) => {
     const access = c.get('access');
-    const input = await jsonBody(c, WorkspaceUpdate);
+    const input = await body(c, 'workspace.update');
     const updated = await sql.begin(async (tx) => {
       const r = repos(tx);
       const current = await r.workspaces.get(access.workspaceId);
       if (!current) throw new ApiError('not_found', 'The workspace no longer exists.');
-      const settings = input.settings ? mergedSettings(current.settings, input.settings) : undefined;
+      const settings = input.settings ? mergeSettings(current.settings, input.settings) : undefined;
       const next = await r.workspaces.update(access.workspaceId, { name: input.name, settings });
       await r.audit.record(access.workspaceId, {
         action: 'workspace.updated',

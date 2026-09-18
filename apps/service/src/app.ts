@@ -1,9 +1,10 @@
+import { REQUEST_ID_HEADER } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { authenticate } from './auth.js';
 import type { AppEnv } from './context.js';
 import type { Sql } from './db.js';
-import { ApiError } from './errors.js';
+import { ApiError } from './api-error.js';
 import { repos } from './repo/index.js';
 import { createSealer, type SecretsKeys } from './sealing.js';
 import { apiKeyRoutes } from './routes/api-keys.js';
@@ -12,7 +13,6 @@ import { healthRoutes } from './routes/health.js';
 import { memberRoutes } from './routes/members.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 
-export const REQUEST_ID_HEADER = 'x-request-id';
 export const MAX_BODY_BYTES = 1024 * 1024;
 
 export type AppOptions = {
@@ -57,10 +57,11 @@ export function createApp({ sql, dashboardServiceToken, secretsKeys, log = conso
     }),
   );
 
-  app.route('/', workspaceRoutes(sql, sealer));
-  app.route('/', memberRoutes(sql, sealer));
-  app.route('/', apiKeyRoutes(sql, sealer));
-  app.route('/', auditRoutes(sql));
+  const deps = { pool, sealer };
+  app.route('/', workspaceRoutes(sql, deps));
+  app.route('/', memberRoutes(sql, deps));
+  app.route('/', apiKeyRoutes(sql, deps));
+  app.route('/', auditRoutes(deps));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 

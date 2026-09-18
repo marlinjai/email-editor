@@ -24,26 +24,32 @@ the audit log, idempotent mutations, and the deploy chain. Sending arrives in S2
 Membership and role are read on every dashboard call, so removing someone takes
 effect on their next request. The browser never holds either credential.
 
-Roles (`owner`, `admin`, `editor`, `viewer`) and key scopes (`full`, `read`, `send`):
+Who may call what comes from the route table in `@marlinjai/mail-contract`
+(`routes`): every operation is registered through `mount()` (`src/mount.ts`), which
+takes its method, path, access level and idempotency from the table, so the
+service cannot drift from what the SDK and the dashboard are built against. The
+access levels map to roles (`owner`, `admin`, `editor`, `viewer`) and key scopes
+(`full`, `send`, `read`) in `ACCESS_RULES` (`src/auth.ts`):
 
-| Route | Member needs | Key needs |
-| --- | --- | --- |
-| `GET /healthz` | none (public, checks the database, reports the served commit) | none |
-| `GET /v1/workspace` | viewer | any scope |
-| `PATCH /v1/workspace` | admin | full |
-| `POST /v1/api-keys` (the key is in this response only), `DELETE /v1/api-keys/:id` (revokes) | admin | full |
-| `GET /v1/api-keys`, `GET /v1/audit-log` | admin | full or read |
-| `POST /v1/workspaces`, `GET /v1/workspaces` | dashboard only | refused |
-| `GET /v1/members` | viewer, dashboard only | refused |
-| `POST /v1/members`, `PATCH /v1/members/:id` | admin (owner to grant or remove the owner role), dashboard only | refused |
-| `DELETE /v1/members/:id` | admin, or anyone removing themselves | refused |
+| Access | Member needs | Key needs | S0 operations |
+| --- | --- | --- | --- |
+| `read` | viewer | any scope | `workspace.get`, `members.list` |
+| `write` | editor | send or full | none in S0 |
+| `admin` | admin | full | `workspace.update`, `members.add`, `members.update`, `members.remove`, `apiKeys.create` (the key is in this response only), `apiKeys.list`, `apiKeys.revoke`, `audit.list` |
+| `dashboard` | a signed-in person, no workspace yet | refused | `workspaces.create`, `workspaces.list` |
+
+On top of the table: only an owner, signed in through the dashboard, grants or
+takes away the owner role (a key never can), and any member may remove
+themselves (`members.remove` for your own member id). `GET /healthz` is public; it
+checks the database and reports the served commit.
 
 A workspace never loses its last owner (`last_owner`, 409), by demotion, removal
 or leaving; owner rows are locked first, so two owners demoting each other at once
 cannot both succeed.
 
-Every error is `{ "error": { "code", "message", "details"? } }`; the codes are the
-ones in `@marlinjai/mail-contract`. Every response carries `x-request-id`.
+Every error is `{ "error": { "code", "message", "details"? } }`, built with the
+contract's `errorBody` and `ERROR_STATUS`. Ids are opaque strings in the contract;
+an id this service never issued is `not_found`. Every response carries `x-request-id`.
 
 **Idempotency.** Every mutating route accepts `Idempotency-Key` (1 to 255
 printable characters). The same key and the same request replay the first
@@ -59,7 +65,9 @@ through `idempotent()` in `src/idempotency.ts`.
 ## Layout
 
 - `src/main.ts`: the two commands, `migrate` and `serve`.
-- `src/app.ts`: middleware and route wiring; `src/routes/*`: one file per resource.
+- `src/app.ts`: middleware and wiring; `src/routes/*`: one file per resource, each
+  operation registered with `mount()`. Request and response shapes are the
+  contract's; `test/integration/contract.test.ts` parses every S0 response with them.
 - `src/repo/*`: every query. Each workspace-owned function takes `workspaceId`
   first; there is no unscoped helper. The one unscoped lookup is finding a key by
   its hash, which is how its workspace is found.

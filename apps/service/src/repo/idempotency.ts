@@ -1,3 +1,4 @@
+import { IDEMPOTENCY_KEY_RETENTION_HOURS } from '@marlinjai/mail-contract';
 import type { Db } from '../db.js';
 
 export type IdempotencyRecord = {
@@ -7,8 +8,8 @@ export type IdempotencyRecord = {
   response_body: string | null;
 };
 
-/** How long a key is remembered. Matches IDEMPOTENCY_KEY_RETENTION_HOURS in the contract. */
-export const RETENTION_HOURS = 24;
+/** How long a key is remembered: the contract's retention window. */
+export const RETENTION_HOURS = IDEMPOTENCY_KEY_RETENTION_HOURS;
 
 /**
  * A claim still `in_progress` after this long belongs to a request that died

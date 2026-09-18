@@ -1,13 +1,11 @@
 import { createHash } from 'node:crypto';
 import type { Context, MiddlewareHandler } from 'hono';
+import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENCY_KEY_MAX_LENGTH } from '@marlinjai/mail-contract';
+import { ApiError } from './api-error.js';
 import type { AppEnv } from './context.js';
-import { ApiError } from './errors.js';
 import type { idempotencyRepo } from './repo/idempotency.js';
 import type { Sealer } from './sealing.js';
 
-/** Identical to IDEMPOTENCY_KEY_HEADER and its limit in `@marlinjai/mail-contract`. */
-export const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
-export const IDEMPOTENCY_KEY_MAX_LENGTH = 255;
 /** Set on a response that is a replay of the first one, so a client can tell. */
 export const IDEMPOTENT_REPLAYED_HEADER = 'idempotent-replayed';
 

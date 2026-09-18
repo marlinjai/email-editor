@@ -1,14 +1,17 @@
+import {
+  AUTHORIZATION_HEADER,
+  SUBJECT_HEADER,
+  WORKSPACE_HEADER,
+  type ApiKeyScope,
+  type MemberRole,
+  type RouteAccess,
+} from '@marlinjai/mail-contract';
 import type { MiddlewareHandler } from 'hono';
 import { hashApiKey, looksLikeApiKey, timingSafeEqual, verifyApiKey } from './api-key.js';
+import { ApiError } from './api-error.js';
 import type { AppEnv } from './context.js';
-import { ApiError } from './errors.js';
 import type { ApiKeyCredential } from './repo/api-keys.js';
 import type { Member } from './repo/members.js';
-import type { ApiKeyScope, MemberRole } from './schemas.js';
-
-/** Header names, identical to `@marlinjai/mail-contract` headers.ts. */
-export const SUBJECT_HEADER = 'x-mail-subject';
-export const WORKSPACE_HEADER = 'x-mail-workspace';
 
 export type AuthDeps = {
   dashboardServiceToken: string;
@@ -36,7 +39,7 @@ function bearer(header: string | undefined): string | null {
  */
 export function authenticate(deps: AuthDeps): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const token = bearer(c.req.header('authorization'));
+    const token = bearer(c.req.header(AUTHORIZATION_HEADER));
     if (!token) throw new ApiError('unauthenticated', 'Send a workspace API key as "Authorization: Bearer <key>".');
 
     if (token.startsWith('sk_')) {
@@ -90,18 +93,18 @@ export function requireWorkspace(deps: Pick<AuthDeps, 'findMember'>): Middleware
       });
       return next();
     }
-    const workspaceId = c.req.header(WORKSPACE_HEADER)?.trim();
+    const workspaceId = c.req.header(WORKSPACE_HEADER)?.trim().toLowerCase();
     if (!workspaceId || !UUID.test(workspaceId)) {
       throw new ApiError('invalid_request', `A dashboard call must name its workspace id in "${WORKSPACE_HEADER}".`);
     }
-    const member = await deps.findMember(workspaceId.toLowerCase(), caller.subject);
+    const member = await deps.findMember(workspaceId, caller.subject);
     if (!member) throw new ApiError('forbidden', 'You are not a member of this workspace.');
-    c.set('access', { workspaceId: workspaceId.toLowerCase(), via: 'member', member, role: member.role });
+    c.set('access', { workspaceId, via: 'member', member, role: member.role });
     return next();
   };
 }
 
-/** Routes only a person may call through the dashboard (workspaces, members). */
+/** The contract's `dashboard` access: a person through the dashboard, before any workspace. */
 export const dashboardOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (c.get('caller').kind !== 'dashboard') {
     throw new ApiError('forbidden', 'This route is only available to signed-in people through the dashboard.');
@@ -116,21 +119,30 @@ export function roleAtLeast(role: MemberRole, minimum: MemberRole): boolean {
 }
 
 /**
- * What a caller may do, in two vocabularies that map onto each other: a member
- * needs at least `role`, a key needs one of `scopes`. `read` actions accept a
- * read key; managing the workspace needs a full key.
+ * The contract's workspace access levels (`RouteAccess` in
+ * `@marlinjai/mail-contract` routes.ts), as a member role and the key scopes
+ * that satisfy it.
  */
-export function permit(rule: { role: MemberRole; scopes: readonly ApiKeyScope[] }): MiddlewareHandler<AppEnv> {
+export const ACCESS_RULES = {
+  read: { role: 'viewer', scopes: ['full', 'read', 'send'] },
+  write: { role: 'editor', scopes: ['full', 'send'] },
+  admin: { role: 'admin', scopes: ['full'] },
+} as const satisfies Record<Exclude<RouteAccess, 'dashboard' | 'public'>, { role: MemberRole; scopes: readonly ApiKeyScope[] }>;
+
+export type WorkspaceAccessLevel = keyof typeof ACCESS_RULES;
+
+export function permit(level: WorkspaceAccessLevel): MiddlewareHandler<AppEnv> {
+  const rule = ACCESS_RULES[level];
   return async (c, next) => {
     const access = c.get('access');
     if (access.via === 'member') {
-      if (!roleAtLeast(access.role, rule.role)) {
+      if (!roleAtLeast(access.role, rule.role as MemberRole)) {
         throw new ApiError('insufficient_role', `This needs the ${rule.role} role or higher; you are ${access.role}.`, {
           required: rule.role,
           actual: access.role,
         });
       }
-    } else if (!rule.scopes.includes(access.scope)) {
+    } else if (!(rule.scopes as readonly ApiKeyScope[]).includes(access.scope)) {
       throw new ApiError('forbidden', `This API key's scope (${access.scope}) does not allow this.`, {
         required: rule.scopes,
         actual: access.scope,
@@ -139,10 +151,3 @@ export function permit(rule: { role: MemberRole; scopes: readonly ApiKeyScope[] 
     return next();
   };
 }
-
-/** Reading the workspace itself: every member, every key. */
-export const READ_WORKSPACE = { role: 'viewer', scopes: ['full', 'read', 'send'] } as const;
-/** Reading administrative records (keys, audit log): admins, full and read keys. */
-export const READ_ADMIN = { role: 'admin', scopes: ['full', 'read'] } as const;
-/** Changing the workspace, its keys or its people: admins, full keys. */
-export const MANAGE = { role: 'admin', scopes: ['full'] } as const;
