@@ -1,3 +1,4 @@
+import { handlePermanentRejection } from '../bounces.js';
 import { ledgerBudget, type Budget } from '../budget.js';
 import type { Db, Sql } from '../db.js';
 import { repos } from '../repo/index.js';
@@ -369,6 +370,16 @@ export class SendWorker {
         const error = retryable ? `${outcome.error.message} (after ${recipient.attempts} attempts)` : outcome.error.message;
         const row = await recordFailed(tx, workspaceId, { ...archive, outcome: 'failed', error, providerMessageId: null }, { ...eventCtx, retryable });
         await this.settle(tx, workspaceId, recipient.id, { status: 'failed', messageId: row.id, error });
+        if (outcome.error instanceof PermanentSendError) {
+          // A hard bounce suppresses the address; the sender's own problem is counted on the provider.
+          await handlePermanentRejection(tx, workspaceId, {
+            provider,
+            error: outcome.error,
+            handedOver: outcome.handedOver,
+            to: recipient.email,
+            message: row,
+          });
+        }
       } else {
         // Unknown outcome: it may have been delivered. Keep the budget spent, never retry.
         await this.settle(tx, workspaceId, recipient.id, {

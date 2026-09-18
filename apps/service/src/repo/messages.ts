@@ -76,6 +76,18 @@ export function messagesRepo(db: Db) {
         LIMIT ${query.limit}`;
     },
 
+    /**
+     * The message a provider event names, by the provider's id for it, within
+     * one provider of one workspace.
+     */
+    async byProviderMessageId(workspaceId: string, providerId: string, providerMessageId: string): Promise<MessageSummaryRow | null> {
+      const rows = await db<MessageSummaryRow[]>`
+        SELECT ${db.unsafe(SUMMARY)} FROM messages
+        WHERE workspace_id = ${workspaceId} AND provider_id = ${providerId} AND provider_message_id = ${providerMessageId}
+        ORDER BY created_at DESC, id DESC LIMIT 1`;
+      return rows[0] ?? null;
+    },
+
     /** The latest message archived for a queue row: how a crashed send is reconciled. */
     async latestForRecipient(workspaceId: string, recipientId: string): Promise<MessageSummaryRow | null> {
       const rows = await db<MessageSummaryRow[]>`

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyRejection, parseSmtpReply, type RejectionClass } from '../../src/transport/rejection.js';
+import { classifyRejection, parseSmtpReply, rejectionAction, type RejectionClass } from '../../src/transport/rejection.js';
 
 /** [reply code as nodemailer reports it (null when only the text has it), reply text, expected class] */
 const TABLE: Array<[number | null, string, RejectionClass]> = [
@@ -76,5 +76,22 @@ describe('parseSmtpReply', () => {
 
   it('finds nothing in text without codes', () => {
     expect(parseSmtpReply(null, 'the connection broke')).toEqual({ code: null, enhanced: null });
+  });
+});
+
+describe('rejectionAction', () => {
+  const cases: Array<[kind: 'smtp' | 'resend', code: number | null, message: string, handedOver: boolean, expected: string]> = [
+    ['smtp', 550, '550 5.1.1 user unknown', true, 'suppress'],
+    ['smtp', 550, '550 5.7.1 relay denied', true, 'count'],
+    ['smtp', 552, '552 5.2.2 mailbox full', true, 'none'],
+    ['smtp', null, 'no credential is stored for this provider', false, 'count'],
+    ['resend', 403, '403 validation_error: The example.com domain is not verified', true, 'count'],
+    ['resend', 401, '401 invalid_api_key: API key is invalid', true, 'count'],
+    // An HTTP 422 is not an SMTP 5.1.1, whatever its text says.
+    ['resend', 422, '422 validation_error: Invalid `to` field. 550 5.1.1', true, 'none'],
+    ['resend', 550, '550 5.1.1 user unknown', true, 'none'],
+  ];
+  it.each(cases)('%s %s %j (handed over %s) is %s', (kind, code, message, handedOver, expected) => {
+    expect(rejectionAction(kind, { code, message }, handedOver)).toBe(expected);
   });
 });

@@ -219,7 +219,7 @@ export function createApp({
     }),
   );
   app.route('/', webhookRoutes(sql, deps, webhookUrlPolicy));
-  app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch }));
+  app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch, publicBaseUrl, log }));
   app.route('/', topicRoutes(sql, deps));
   app.route('/', contactRoutes(sql, deps));
   app.route('/', suppressionRoutes(sql, deps));

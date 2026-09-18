@@ -1,4 +1,12 @@
-import { ICLOUD_SMTP_POLICY, type Provider, type ProviderPolicy, type ProviderVerifyResult } from '@marlinjai/mail-contract';
+import {
+  ICLOUD_SMTP_POLICY,
+  RESEND_EVENT_TYPES,
+  ResendSigningSecret,
+  type AuditActor,
+  type Provider,
+  type ProviderPolicy,
+  type ProviderVerifyResult,
+} from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { ApiError } from '../api-error.js';
 import { ledgerBudget } from '../budget.js';
@@ -9,6 +17,7 @@ import { repos } from '../repo/index.js';
 import { policyOf, type ProviderRow } from '../repo/providers.js';
 import type { SmtpSettings } from '../transport/smtp.js';
 import { SendError, type Transport } from '../transport/types.js';
+import type { Sealer } from '../sealing.js';
 import { body, pageArgs, params, query, rowId, toPage } from '../validate.js';
 import { assertWithinLimit } from '../billing/usage.js';
 
@@ -17,9 +26,17 @@ export type ProviderRouteOptions = {
   smtpTransport: (settings: SmtpSettings) => Transport;
   /** How long `verify` waits for the provider before it reports the host unreachable. */
   verifyTimeoutMs: number;
-  /** The HTTP client `verify` checks a Resend key with. */
+  /** The HTTP client `verify` checks a Resend key with, and registers the Resend events endpoint through. */
   fetch: typeof fetch;
+  /** The service's public origin: a Resend provider's events endpoint is built on it. */
+  publicBaseUrl: string;
+  log?: Pick<Console, 'error'>;
 };
+
+/** Where Resend posts a provider's events; outside /v1 and the contract, like the Stripe webhook. */
+export function resendEventsUrl(publicBaseUrl: string, providerId: string): string {
+  return `${publicBaseUrl.replace(/\/+$/, '')}/providers/${providerId}/events/resend`;
+}
 
 export const RESEND_API_URL = 'https://api.resend.com';
 
@@ -30,7 +47,7 @@ const ICLOUD_HARD_LIMITS = { daily_recipient_budget: 1000, max_recipients_per_me
 const SMTP_CONFIG_KEYS = ['host', 'port', 'security', 'username'] as const;
 
 /** Shapes a stored row into the contract's `Provider`: non-secret config only, the policy grouped. */
-export function toProvider(row: ProviderRow): Provider {
+export function toProvider(row: ProviderRow, publicBaseUrl: string): Provider {
   const common = {
     id: row.id,
     name: row.name,
@@ -39,6 +56,7 @@ export function toProvider(row: ProviderRow): Provider {
     from_email: row.from_email,
     reply_to: row.reply_to,
     policy: policyOf(row),
+    rejections: { count: row.rejections_count, last_error: row.last_rejection, last_at: row.last_rejection_at },
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -55,7 +73,111 @@ export function toProvider(row: ProviderRow): Provider {
       },
     };
   }
-  return { ...common, kind: 'resend', config: {} };
+  return {
+    ...common,
+    kind: 'resend',
+    config: {},
+    events: {
+      status: row.has_events_secret ? 'active' : 'needs_secret',
+      source: row.events_source,
+      url: resendEventsUrl(publicBaseUrl, row.id),
+      error: row.events_error,
+    },
+  };
+}
+
+/**
+ * Registers the provider's events endpoint at Resend (`POST /webhooks`) and
+ * stores the signing secret Resend answers with, sealed. Does nothing when a
+ * secret is already stored (registered earlier, or pasted by hand), so calling
+ * it again never registers a second endpoint.
+ *
+ * Never throws for a Resend-side failure: the reason is stored on the provider
+ * (`events.error`) and the provider stays usable; the member can register the
+ * endpoint by hand and paste the secret instead. The usual reason is a key that
+ * may only send (`restricted_api_key`), which cannot manage webhooks.
+ */
+export async function registerResendEvents(
+  sql: Sql,
+  sealer: Sealer,
+  opts: Pick<ProviderRouteOptions, 'fetch' | 'publicBaseUrl' | 'verifyTimeoutMs'>,
+  workspaceId: string,
+  row: ProviderRow,
+  apiKey: string,
+  actor: AuditActor,
+): Promise<ProviderRow> {
+  if (row.kind !== 'resend' || row.has_events_secret) return row;
+  const url = resendEventsUrl(opts.publicBaseUrl, row.id);
+  const fail = async (reason: string) => (await repos(sql).providers.setEventsError(workspaceId, row.id, reason)) ?? row;
+  if (!url.startsWith('https://')) {
+    return fail('This instance has no public https address, so Resend cannot deliver events to it.');
+  }
+  let res: Response;
+  try {
+    res = await opts.fetch(`${RESEND_API_URL}/webhooks`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ endpoint: url, events: RESEND_EVENT_TYPES }),
+      signal: AbortSignal.timeout(opts.verifyTimeoutMs),
+    });
+  } catch {
+    return fail('Resend could not be reached to register the events endpoint. Verify the provider to try again.');
+  }
+  let payload: { id?: unknown; signing_secret?: unknown; name?: unknown; message?: unknown } = {};
+  try {
+    payload = (await res.json()) as typeof payload;
+  } catch {
+    // A non-JSON body: the status alone decides.
+  }
+  if (!res.ok) {
+    if (res.status === 401 && payload.name === 'restricted_api_key') {
+      return fail('The API key may only send, so the endpoint could not be registered automatically. Add it at Resend by hand and paste its signing secret here.');
+    }
+    const detail = typeof payload.message === 'string' ? `: ${payload.message.slice(0, 300)}` : '';
+    return fail(`Resend refused to register the events endpoint (status ${res.status})${detail}.`);
+  }
+  const secret = ResendSigningSecret.safeParse(payload.signing_secret);
+  if (typeof payload.id !== 'string' || !secret.success) {
+    return fail('Resend registered the events endpoint but answered without a usable signing secret. Paste the secret from the Resend dashboard.');
+  }
+  const webhookId = payload.id;
+  return (await sql.begin(async (tx) => {
+    const r = repos(tx);
+    const updated = await r.providers.setEventsSecret(workspaceId, row.id, {
+      secretSealed: sealer.seal(secret.data),
+      source: 'automatic',
+      webhookId,
+    });
+    if (!updated) return row;
+    await r.audit.record(workspaceId, {
+      action: 'provider.events_registered',
+      actor,
+      targetType: 'provider',
+      targetId: row.id,
+      details: { webhook_id: webhookId, events: [...RESEND_EVENT_TYPES] },
+    });
+    return updated;
+  })) as ProviderRow;
+}
+
+/** Removes an events endpoint the service registered at Resend itself. Best effort: a failure is logged. */
+async function unregisterResendEvents(
+  opts: Pick<ProviderRouteOptions, 'fetch' | 'verifyTimeoutMs' | 'log'>,
+  webhookId: string,
+  apiKey: string,
+): Promise<void> {
+  try {
+    const res = await opts.fetch(`${RESEND_API_URL}/webhooks/${encodeURIComponent(webhookId)}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(opts.verifyTimeoutMs),
+    });
+    if (!res.ok && res.status !== 404) {
+      (opts.log ?? console).error(`[providers] Resend refused to delete events endpoint ${webhookId} (status ${res.status}); remove it in the Resend dashboard`);
+    }
+  } catch (err) {
+    (opts.log ?? console).error(`[providers] could not reach Resend to delete events endpoint ${webhookId}:`, err instanceof Error ? err.message : err);
+  }
 }
 
 /** Only the non-secret settings are stored in `config`; the secret is sealed apart. */
@@ -191,7 +313,7 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
     const page = await pageArgs(q, async (id) => (await pool.providers.get(workspaceId, id)) !== null);
     const rows = await pool.providers.list(workspaceId, { afterId: page.afterId, limit: page.limit + 1 });
     const { data, next_cursor } = toPage(rows, page.limit);
-    return c.json({ data: data.map(toProvider), next_cursor });
+    return c.json({ data: data.map((row) => toProvider(row, opts.publicBaseUrl)), next_cursor });
   });
 
   // The secret arrives here and leaves only sealed: never in the response, the
@@ -233,8 +355,11 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
       });
       return created;
     });
+    // Resend: register the events endpoint now, so bounces and complaints are
+    // accepted from the first send. A failure is recorded, never fatal.
+    const withEvents = await registerResendEvents(sql, sealer, opts, access.workspaceId, row, secret, actorOf(access));
     c.header('cache-control', 'no-store');
-    return c.json(toProvider(row), 201);
+    return c.json(toProvider(withEvents, opts.publicBaseUrl), 201);
   });
 
   mount(app, 'providers.get', deps, async (c) => {
@@ -242,7 +367,7 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
     const id = rowId(params(c, 'providers.get').id, 'provider');
     const row = await pool.providers.get(workspaceId, id);
     if (!row) throw new ApiError('not_found', 'No such provider in this workspace.');
-    return c.json(toProvider(row));
+    return c.json(toProvider(row, opts.publicBaseUrl));
   });
 
   mount(app, 'providers.update', deps, async (c) => {
@@ -301,14 +426,14 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
       return updated;
     });
     c.header('cache-control', 'no-store');
-    return c.json(toProvider(row));
+    return c.json(toProvider(row, opts.publicBaseUrl));
   });
 
   // Soft delete, refused while a mailing still needs the provider to send.
   mount(app, 'providers.delete', deps, async (c) => {
     const access = c.get('access');
     const id = rowId(params(c, 'providers.delete').id, 'provider');
-    await sql.begin(async (tx) => {
+    const deleted = await sql.begin(async (tx) => {
       const r = repos(tx);
       const existing = await r.providers.lock(access.workspaceId, id);
       if (!existing || (await r.providers.get(access.workspaceId, id)) === null) {
@@ -328,7 +453,14 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
         targetId: id,
         details: { name: existing.name, kind: existing.kind },
       });
+      return existing;
     });
+    // The endpoint the service registered at Resend is removed with the
+    // provider. Events already in flight still verify: the secret stays stored.
+    if (deleted.kind === 'resend' && deleted.events_source === 'automatic' && deleted.events_webhook_id) {
+      const forSend = await pool.providers.getForSend(access.workspaceId, id);
+      if (forSend?.secret_sealed) await unregisterResendEvents(opts, deleted.events_webhook_id, sealer.open(forSend.secret_sealed));
+    }
     return c.json({ ok: true as const });
   });
 
@@ -343,7 +475,48 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
     if (!provider.secret_sealed) return c.json(failure('no_secret', 'No credential is stored for this provider.'));
     const secret = sealer.open(provider.secret_sealed);
     const result = provider.kind === 'smtp' ? await verifySmtp(opts, provider.config, secret) : await verifyResend(opts, secret);
+    // A verified Resend key without an events endpoint yet (its registration
+    // failed on create, or the provider predates it): try again now.
+    if (result.ok && provider.kind === 'resend' && !provider.has_events_secret) {
+      await registerResendEvents(sql, sealer, opts, workspaceId, provider, secret, actorOf(c.get('access')));
+    }
     return c.json(result);
+  });
+
+  // The signing secret of an events endpoint a member registered at Resend by
+  // hand (a sending-only key cannot register one). Arrives here, leaves sealed.
+  mount(app, 'providers.set_events_secret', deps, async (c) => {
+    const access = c.get('access');
+    const id = rowId(params(c, 'providers.set_events_secret').id, 'provider');
+    const input = await body(c, 'providers.set_events_secret');
+    const row = await sql.begin(async (tx) => {
+      const r = repos(tx);
+      const existing = await r.providers.lock(access.workspaceId, id);
+      if (!existing || (await r.providers.get(access.workspaceId, id)) === null) {
+        throw new ApiError('not_found', 'No such provider in this workspace.');
+      }
+      if (existing.kind !== 'resend') {
+        throw new ApiError('validation_failed', 'Only a Resend provider receives events; an SMTP provider has no signing secret.', {
+          issues: [{ path: ['signing_secret'], message: `this provider is ${existing.kind}` }],
+        });
+      }
+      const updated = await r.providers.setEventsSecret(access.workspaceId, id, {
+        secretSealed: sealer.seal(input.signing_secret),
+        source: 'manual',
+        webhookId: null,
+      });
+      if (!updated) throw new ApiError('not_found', 'No such provider in this workspace.');
+      await r.audit.record(access.workspaceId, {
+        action: 'provider.events_secret_set',
+        actor: actorOf(access),
+        targetType: 'provider',
+        targetId: id,
+        details: { replaced: existing.has_events_secret },
+      });
+      return updated;
+    });
+    c.header('cache-control', 'no-store');
+    return c.json(toProvider(row, opts.publicBaseUrl));
   });
 
   mount(app, 'providers.usage', deps, async (c) => {

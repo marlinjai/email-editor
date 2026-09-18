@@ -81,3 +81,29 @@ export function classifyRejection(code: number | null, text: string): RejectionC
   }
   return 'other';
 }
+
+/**
+ * What the worker does about a permanent rejection, by the provider's kind:
+ * `suppress` the recipient (a hard bounce), `count` it against the provider
+ * (the sender's problem), or `none` (the message is failed, nothing else).
+ *
+ * - SMTP replies are classified by `classifyRejection`.
+ * - Resend answers over HTTP, so its code is an HTTP status, never an SMTP
+ *   reply: 401 and 403 (a refused key, an unverified domain) are the sender's
+ *   problem; nothing Resend answers synchronously is a hard bounce. Its bounces
+ *   arrive as events instead.
+ * - A rejection before anything was handed over (no transport could be built:
+ *   a missing credential or sealing key) is the sender's problem too.
+ */
+export type RejectionAction = 'suppress' | 'count' | 'none';
+
+export function rejectionAction(
+  kind: 'smtp' | 'resend',
+  error: { code: number | null; message: string },
+  handedOver: boolean,
+): RejectionAction {
+  if (!handedOver) return 'count';
+  if (kind === 'resend') return error.code === 401 || error.code === 403 ? 'count' : 'none';
+  const cls = classifyRejection(error.code, error.message);
+  return cls === 'recipient' ? 'suppress' : cls === 'sender' ? 'count' : 'none';
+}

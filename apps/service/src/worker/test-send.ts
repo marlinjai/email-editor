@@ -9,6 +9,7 @@ import { OutcomeUnknownSendError, PermanentSendError, SendError, TransientSendEr
 import type { UnsubscribeSigner } from '../unsubscribe.js';
 import { composeMessage } from './compose.js';
 import { DEFAULT_PUBLIC_BASE_URL, unsubscribeUrl } from './merge.js';
+import { handlePermanentRejection } from '../bounces.js';
 import { recordFailed, recordSent } from './settle.js';
 import type { TransportFor } from './transports.js';
 // The contact id a test send's token carries: the hosted page recognises it,
@@ -144,9 +145,17 @@ export function createTestSender(options: TestSenderOptions) {
       });
     }
     if (failure instanceof PermanentSendError) {
-      const row = await sql.begin((tx) =>
-        recordFailed(tx, workspaceId, { ...archive, outcome: 'failed', error: failure.message, providerMessageId: null }, { ...eventCtx, retryable: false }),
-      );
+      const row = await sql.begin(async (tx) => {
+        const failed = await recordFailed(
+          tx,
+          workspaceId,
+          { ...archive, outcome: 'failed', error: failure.message, providerMessageId: null },
+          { ...eventCtx, retryable: false },
+        );
+        // A test address that hard-bounces is dead for broadcasts too; a policy rejection is the provider's.
+        await handlePermanentRejection(tx, workspaceId, { provider, error: failure, handedOver, to: input.to, message: failed });
+        return failed;
+      });
       throw new ApiError('provider_error', `The provider refused the test message: ${failure.message}`, {
         retryable: false,
         message_id: row.id,

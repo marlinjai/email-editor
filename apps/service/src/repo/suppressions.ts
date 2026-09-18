@@ -47,6 +47,24 @@ export function suppressionsRepo(db: Db) {
       return { suppression: rows[0]!, created: inserted.length > 0 };
     },
 
+    /**
+     * Replaces the reason (and the message that caused it) of an existing
+     * block. Used only to harden a block: an `unsubscribed` block the person
+     * could lift themselves becomes `bounced` or `complained` once the address
+     * bounces or complains.
+     */
+    async harden(
+      workspaceId: string,
+      suppressionId: string,
+      input: { reason: 'bounced' | 'complained'; sourceMessageId: string | null },
+    ): Promise<SuppressionRow | null> {
+      await db`
+        UPDATE suppressions SET reason = ${input.reason}, source_message_id = ${input.sourceMessageId}
+        WHERE workspace_id = ${workspaceId} AND id = ${suppressionId}`;
+      const rows = await db<SuppressionRow[]>`${SELECT(db)} WHERE s.workspace_id = ${workspaceId} AND s.id = ${suppressionId}`;
+      return rows[0] ?? null;
+    },
+
     async get(workspaceId: string, suppressionId: string): Promise<SuppressionRow | null> {
       const rows = await db<SuppressionRow[]>`${SELECT(db)} WHERE s.workspace_id = ${workspaceId} AND s.id = ${suppressionId}`;
       return rows[0] ?? null;
