@@ -16,6 +16,7 @@ import {
 } from './workspace';
 import {
   Asset,
+  AssetImport,
   CompileRequest,
   CompileResult,
   Template,
@@ -329,6 +330,15 @@ export const templateRoutes = {
     method: 'POST',
     path: '/v1/assets',
     multipart: { fileField: 'file' },
+    response: Asset,
+    status: 201,
+    access: 'write',
+    phase: 'S1',
+  },
+  'assets.import': {
+    method: 'POST',
+    path: '/v1/assets/import',
+    body: AssetImport,
     response: Asset,
     status: 201,
     access: 'write',

@@ -81,3 +81,18 @@ describe('health', () => {
     await expect(client.health()).resolves.toBe(false);
   });
 });
+
+describe('assets.import', () => {
+  it('posts the remote address as JSON to /v1/assets/import', async () => {
+    const { client, fetchMock } = createTestClient({ validateResponses: false });
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, {}));
+
+    await client.assets.import({ url: 'https://cdn.example.com/hero.png' }, { idempotencyKey: 'import-hero' });
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe('https://mail.test.internal/v1/assets/import');
+    expect((init as RequestInit).method).toBe('POST');
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ url: 'https://cdn.example.com/hero.png' });
+    expect(new Headers((init as RequestInit).headers).get('idempotency-key')).toBe('import-hero');
+  });
+});

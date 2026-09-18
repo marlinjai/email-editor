@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   Asset,
+  AssetImport,
   CompileRequest,
   CompileResult,
   MAX_ASSET_BYTES,
+  MAX_IMPORT_URL_LENGTH,
   Template,
   TemplateCreate,
   TemplateDocument,
@@ -101,5 +103,31 @@ describe('assets', () => {
     expect(Asset.safeParse({ ...asset, content_type: 'image/svg+xml' }).success).toBe(false);
     expect(Asset.safeParse({ ...asset, size_bytes: MAX_ASSET_BYTES + 1 }).success).toBe(false);
     expect(Asset.safeParse({ ...asset, url: '/a/ast_1' }).success).toBe(false);
+  });
+});
+
+describe('asset import', () => {
+  it('takes an https address and an optional file name; http only for localhost, as for webhooks', () => {
+    expect(AssetImport.safeParse({ url: 'https://cdn.example.com/hero.png', filename: 'hero.png' }).success).toBe(true);
+    expect(AssetImport.safeParse({ url: 'http://cdn.example.com/hero.png' }).success).toBe(false);
+    expect(AssetImport.safeParse({ url: 'http://127.0.0.1:8080/hero.png' }).success).toBe(true);
+    expect(AssetImport.safeParse({ url: 'http://localhost/hero.png' }).success).toBe(true);
+  });
+
+  it('refuses other schemes, relative and overlong addresses', () => {
+    for (const url of ['ftp://cdn.example.com/a.png', 'file:///etc/passwd', 'data:image/png;base64,AAAA', '/a.png', 'javascript:alert(1)']) {
+      expect(AssetImport.safeParse({ url }).success, url).toBe(false);
+    }
+    expect(AssetImport.safeParse({ url: `https://x.example/${'a'.repeat(MAX_IMPORT_URL_LENGTH)}` }).success).toBe(false);
+    expect(AssetImport.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('template document id', () => {
+  it('is optional: a document with or without an id passes the envelope', () => {
+    expect(TemplateDocument.safeParse(doc).success).toBe(true);
+    expect(TemplateDocument.safeParse({ ...doc, id: 'tpl_doc_1' }).success).toBe(true);
+    const { id: _id, ...withoutId } = doc as typeof doc & { id?: string };
+    expect(TemplateDocument.safeParse(withoutId).success).toBe(true);
   });
 });

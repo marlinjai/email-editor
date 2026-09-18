@@ -4,6 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type { AssetStorage } from './assets/storage.js';
 import { authenticate } from './auth.js';
 import type { Compiler } from './compile/pool.js';
+import { workspaceCompile } from './compile/workspace-compile.js';
 import type { TemplateDocument } from '@marlinjai/mail-contract';
 import type { AppEnv } from './context.js';
 import type { Sql } from './db.js';
@@ -62,8 +63,11 @@ export type AppOptions = {
    * Overrides the webhook endpoint URL policy (https-only, no private
    * targets). Only ever relaxed by an explicit development flag, never in
    * production; the integration tests use it to reach a local receiver.
+   * `assets.import` fetches remote images under the same policy.
    */
   webhookUrlPolicy?: SsrfPolicy;
+  /** How long `assets.import` waits for a remote image (10 seconds by default). */
+  assetImportTimeoutMs?: number;
   /** Compiles documents off the request thread (a CompilePool in production). */
   compiler: Compiler;
   /** Where uploaded images are stored (Storage Brain in production). */
@@ -120,6 +124,7 @@ export function createApp({
   dashboardServiceToken,
   secretsKeys,
   webhookUrlPolicy,
+  assetImportTimeoutMs,
   compiler,
   assetStorage,
   publicBaseUrl,
@@ -190,8 +195,19 @@ export function createApp({
   app.route('/', memberRoutes(sql, deps));
   app.route('/', apiKeyRoutes(sql, deps));
   app.route('/', auditRoutes(deps));
-  app.route('/', templateRoutes(sql, { ...deps, compiler }));
-  app.route('/', assetRoutes(sql, { ...deps, storage: assetStorage, publicBaseUrl, log }));
+  const compileForWorkspace = workspaceCompile(pool, compiler, publicBaseUrl);
+  app.route('/', templateRoutes(sql, { ...deps, compiler: compileForWorkspace }));
+  app.route(
+    '/',
+    assetRoutes(sql, {
+      ...deps,
+      storage: assetStorage,
+      publicBaseUrl,
+      log,
+      importPolicy: webhookUrlPolicy ?? {},
+      importTimeoutMs: assetImportTimeoutMs,
+    }),
+  );
   app.route('/', webhookRoutes(sql, deps, webhookUrlPolicy));
   app.route('/', providerRoutes(sql, deps, { smtpTransport, verifyTimeoutMs: providerVerifyTimeoutMs, fetch: providerFetch }));
   app.route('/', topicRoutes(sql, deps));
@@ -203,7 +219,8 @@ export function createApp({
     '/',
     mailingRoutes(sql, {
       ...deps,
-      compile: (document) => compiler.compile(document),
+      compile: (workspaceId, document) => compileForWorkspace.compile(workspaceId, document),
+      assetErrors: (workspaceId, html) => compileForWorkspace.check(workspaceId, html),
       loadTemplateDocument: async (workspaceId, templateId) =>
         ((await pool.templates.get(workspaceId, templateId))?.document as TemplateDocument | undefined) ?? null,
       sendTest: unsubscribeSigner
@@ -219,7 +236,7 @@ export function createApp({
     }),
   );
   app.route('/', messageRoutes(deps));
-  app.route('/', mailingPlatformRoutes(sql, { ...deps, compile: (document) => compiler.compile(document) }));
+  app.route('/', mailingPlatformRoutes(sql, { ...deps, compile: (workspaceId, document) => compileForWorkspace.compile(workspaceId, document) }));
   app.route('/', tagRoutes(sql, deps));
   app.route('/', contactPropertyRoutes(sql, deps));
   app.route('/', segmentRoutes(sql, deps));
@@ -227,7 +244,7 @@ export function createApp({
     '/',
     signupFormRoutes(sql, {
       ...deps,
-      compile: (document) => compiler.compile(document),
+      compile: (workspaceId, document) => compileForWorkspace.compile(workspaceId, document),
       publicBaseUrl,
       service: signupService,
     }),

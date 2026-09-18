@@ -18,8 +18,14 @@ import { ApiError } from '../api-error.js';
  *   internal error and is replaced; the pool keeps serving.
  */
 
+/** Per-compile options, passed to the core's `MJMLCompiler.compile`. */
+export type CompileOptions = {
+  /** `false` leaves out MJML's automatic Google Fonts imports (the `service_only` asset policy). */
+  webFonts?: boolean;
+};
+
 export interface Compiler {
-  compile(document: unknown): Promise<CompileResult>;
+  compile(document: unknown, options?: CompileOptions): Promise<CompileResult>;
 }
 
 export type CompilePoolOptions = {
@@ -40,6 +46,7 @@ type Reply = { id: number; ok: true; result: RawResult } | { id: number; ok: fal
 type Job = {
   id: number;
   document: unknown;
+  options: CompileOptions;
   resolve: (r: CompileResult) => void;
   reject: (e: unknown) => void;
 };
@@ -79,7 +86,7 @@ export class CompilePool implements Compiler {
     for (let i = 0; i < options.size; i++) this.slots.push(this.spawn());
   }
 
-  compile(document: unknown): Promise<CompileResult> {
+  compile(document: unknown, options: CompileOptions = {}): Promise<CompileResult> {
     if (this.closed) return Promise.reject(new ApiError('service_unavailable', 'The service is shutting down.'));
     const busy = this.slots.every((s) => s.job !== null || !s.ready);
     if (busy && this.queue.length >= this.options.maxQueue) {
@@ -90,7 +97,7 @@ export class CompilePool implements Compiler {
       );
     }
     return new Promise<CompileResult>((resolve, reject) => {
-      this.queue.push({ id: this.nextId++, document, resolve, reject });
+      this.queue.push({ id: this.nextId++, document, options, resolve, reject });
       this.dispatch();
     });
   }
@@ -165,7 +172,7 @@ export class CompilePool implements Compiler {
       const job = this.queue.shift()!;
       slot.job = job;
       slot.timer = setTimeout(() => this.timeOut(slot, job), this.options.timeoutMs);
-      slot.worker.postMessage({ id: job.id, document: job.document });
+      slot.worker.postMessage({ id: job.id, document: job.document, options: job.options });
     }
   }
 

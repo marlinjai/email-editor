@@ -1,6 +1,7 @@
 // packages/core/src/schema/migrate.ts
 // Upgrade a persisted template document to the schema version this build understands
 
+import { nanoid } from 'nanoid';
 import type { EmailTemplate } from './types';
 import { validateTemplate } from './validation';
 
@@ -71,8 +72,13 @@ function compareVersions(a: [number, number], b: [number, number]): number {
  *
  * For a `1.0` document this is the identity: the same object is returned,
  * unchanged, after it has been validated against the schema. Fields the
- * schema does not describe (such as the store's `id`) are kept, because the
- * document is returned as stored, not as re-parsed.
+ * schema does not describe are kept, because the document is returned as
+ * stored, not as re-parsed.
+ *
+ * `id` is optional and never touched here: a document with an id keeps it, and
+ * one without stays without. The editor store assigns an id when it opens an
+ * id-less document (`createRootStore`, `createEditor`, `EmailEditorReact`), and
+ * the snapshots it emits carry that id from then on.
  *
  * @throws {TemplateMigrationError} when the input is not a document, has no
  * version, carries a version this build cannot read (older without a
@@ -135,4 +141,16 @@ export function migrateTemplate(doc: unknown): EmailTemplate {
   }
 
   return doc as EmailTemplate;
+}
+
+/**
+ * The document with an id: the same object when it already has a non-empty
+ * one, otherwise a shallow copy with a fresh id. The caller's object is never
+ * changed. Hosts that hold on to the document the editor opened (such as
+ * `createEditor`'s `getValue`) use this so that what they hand back carries the
+ * id the editor works with, even before the first edit.
+ */
+export function withTemplateId<T extends { id?: string }>(doc: T): T & { id: string } {
+  if (typeof doc.id === 'string' && doc.id.length > 0) return doc as T & { id: string };
+  return { ...doc, id: nanoid() };
 }

@@ -33,7 +33,8 @@ import { extractLinks } from './tracking.js';
  * release turns the same errors into `mailing.schedule_failed`.
  */
 
-export type Compile = (document: TemplateDocument) => Promise<CompiledDocument>;
+/** Compiles under the workspace's asset policy (src/compile/workspace-compile.ts). */
+export type Compile = (workspaceId: string, document: TemplateDocument) => Promise<CompiledDocument>;
 
 export type PreparedStart = {
   /** The mailing's `updated_at` the compile saw; a change since means another look is needed. */
@@ -43,9 +44,9 @@ export type PreparedStart = {
   variants: Map<string, CompiledDocument | null>;
 };
 
-async function compileChecked(compile: Compile, document: unknown, variant: string | null): Promise<CompiledDocument> {
+async function compileChecked(compile: Compile, workspaceId: string, document: unknown, variant: string | null): Promise<CompiledDocument> {
   const where = variant === null ? {} : { variant };
-  const compiled = await compile(validateDocument(document) as unknown as TemplateDocument);
+  const compiled = await compile(workspaceId, validateDocument(document) as unknown as TemplateDocument);
   if (compiled.errors.length > 0) {
     throw new ApiError('compile_failed', 'The document does not compile.', { errors: compiled.errors, ...where });
   }
@@ -61,11 +62,11 @@ async function compileChecked(compile: Compile, document: unknown, variant: stri
 }
 
 export async function prepareStart(compile: Compile, pool: Repos, workspaceId: string, row: MailingRow): Promise<PreparedStart> {
-  const base = await compileChecked(compile, row.document, null);
+  const base = await compileChecked(compile, workspaceId, row.document, null);
   const variants = new Map<string, CompiledDocument | null>();
   if (row.ab_test) {
     for (const v of await pool.mailingPlatform.variants(workspaceId, row.id)) {
-      variants.set(v.key, v.document ? await compileChecked(compile, v.document, v.key) : null);
+      variants.set(v.key, v.document ? await compileChecked(compile, workspaceId, v.document, v.key) : null);
     }
   }
   return { updatedAt: row.updated_at, base, variants };

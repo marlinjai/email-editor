@@ -16,6 +16,11 @@ export type DocumentSchemaVersion = z.infer<typeof DocumentSchemaVersion>;
  * schema version, and that `sections` is a list; the editor core owns the full
  * block schema and the service validates a document with it before compiling.
  * Importing the core here would pull the MJML compiler into an edge-safe package.
+ *
+ * `id` is optional and passes through unchanged: the service stores a document
+ * exactly as sent, with or without one. The editor assigns an id when it opens
+ * a document that has none and emits it from then on, so the first save after
+ * opening such a document adds the id (and bumps the template's version once).
  */
 export const TemplateDocument = z
   .object({
@@ -155,3 +160,38 @@ export const Asset = z.object({
 export type Asset = z.infer<typeof Asset>;
 
 export const ASSET_UPLOAD_FIELD = 'file';
+
+/** The longest address `assets.import` accepts. */
+export const MAX_IMPORT_URL_LENGTH = 2048;
+
+/**
+ * Copying a remote image into the workspace's assets: the service fetches
+ * `url` (`https` only, as for webhooks: a plain `http` fetch can be altered in transit, and a hosted asset is content the service vouches for; never a private, loopback or link-local address,
+ * never following a redirect), checks the bytes the way an upload is checked
+ * (PNG, JPEG, GIF or WebP, at most `MAX_ASSET_BYTES`) and answers with the new
+ * `Asset`, whose `url` is the service's own.
+ *
+ * Refusals: a blocked address or a redirect is `invalid_request`; a remote 4xx
+ * is `invalid_request` with `details.status`; a network failure, a timeout or
+ * a remote 5xx is `provider_error` (502, retryable) with `details.service =
+ * "asset_import"`; the bytes are `unsupported_media_type` or
+ * `payload_too_large` as for an upload.
+ */
+export const AssetImport = z.object({
+  url: z
+    .string()
+    .max(MAX_IMPORT_URL_LENGTH)
+    .url()
+    .refine((u) => {
+      try {
+        const url = new URL(u);
+        if (url.protocol === 'https:') return true;
+        return url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+      } catch {
+        return false;
+      }
+    }, 'must be https (http only for localhost)'),
+  /** The stored file name; derived from the address when omitted. */
+  filename: z.string().min(1).max(255).optional(),
+});
+export type AssetImport = z.infer<typeof AssetImport>;

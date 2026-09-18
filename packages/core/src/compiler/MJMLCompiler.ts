@@ -43,6 +43,18 @@ function spacingToString(spacing?: Spacing): string {
   return parts.join(' ') || '';
 }
 
+/** Options for one {@link MJMLCompiler.compile} call. */
+export interface CompileOptions {
+  /**
+   * MJML adds a Google Fonts `<link>` and `@import` on its own whenever a font
+   * family it knows (Open Sans, Droid Sans, Lato, Roboto, Ubuntu) appears in
+   * the document. `false` leaves them out, so the font falls back to the rest
+   * of its stack and the mail loads nothing from Google. Fonts the document
+   * declares itself (`metadata.fonts`) are always emitted. Default `true`.
+   */
+  webFonts?: boolean;
+}
+
 /**
  * MJML Compiler class
  * Converts EmailTemplate to MJML markup and compiles to HTML
@@ -57,13 +69,14 @@ export class MJMLCompiler {
   /**
    * Compile email template to MJML and HTML
    */
-  compile(template: EmailTemplate): CompileResult {
+  compile(template: EmailTemplate, options: CompileOptions = {}): CompileResult {
     try {
       this.needsSubColumnStyles = false;
       const mjml = this.templateToMJML(template);
       const result = mjml2html(mjml, {
         validationLevel: 'soft',
         minify: false,
+        ...(options.webFonts === false ? { fonts: {} } : {}),
       });
 
       return {

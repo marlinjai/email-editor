@@ -33,7 +33,7 @@ async function workspace() {
   const ws = await repos(sql).workspaces.create({
     slug: `ws-${++n}-${Date.now()}`,
     name: 'Test',
-    settings: { default_locale: 'en', locales: ['en'], tracking_enabled: false },
+    settings: { default_locale: 'en', locales: ['en'], tracking_enabled: false, asset_policy: 'any' },
   });
   return ws!.id;
 }

@@ -73,6 +73,12 @@ export function createNamespaces(config: CoreConfig) {
       /** `file` must be a `Blob` (edge-safe): wrap a Node `Buffer` with `new Blob([buffer])`. */
       upload: (file: Blob, filename?: string, opts?: RequestOpts) =>
         executeMultipart(config, 'assets.upload', { file, filename }, opts),
+      /**
+       * Copies a remote image into the workspace's assets and answers with the
+       * new asset, whose `url` is the service's own. The workspace setting
+       * `asset_policy: 'service_only'` accepts only such addresses in a mail.
+       */
+      import: (body: RouteBody<'assets.import'>, opts?: RequestOpts) => execute(config, 'assets.import', { body }, opts),
       get: (id: string, opts?: RequestOpts) => execute(config, 'assets.get', { params: { id } }, opts),
     },
 
