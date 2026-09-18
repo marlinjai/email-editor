@@ -343,6 +343,7 @@ export const SectionSchema = z.object({
  * Complete email template schema
  */
 export const EmailTemplateSchema = z.object({
+  id: z.string().optional(),
   version: z.literal('1.0'),
   metadata: TemplateMetadataSchema,
   sections: z.array(SectionSchema),

@@ -61,4 +61,73 @@ describe('createEditor', () => {
     expect(rendered.at(-1)!.onRequestImage).toBeUndefined();
     act(() => editor.destroy());
   });
+
+  describe('document id', () => {
+    const withoutId = () => ({
+      version: '1.0' as const,
+      metadata: { title: 'No id' },
+      sections: [],
+    });
+
+    it('opens a document without an id on a copy with a fresh id, and hands that id back before any edit', () => {
+      const container = document.createElement('div');
+      const input = withoutId();
+      let editor!: ReturnType<typeof createEditor>;
+      act(() => {
+        editor = createEditor({ container, initialValue: input });
+      });
+      const opened = rendered.at(-1)!.initialTemplate as { id: string };
+      expect(typeof opened.id).toBe('string');
+      expect(opened.id.length).toBeGreaterThan(0);
+      expect('id' in input).toBe(false);
+      expect(editor.getValue().id).toBe(opened.id);
+      act(() => editor.destroy());
+    });
+
+    it('keeps an existing id and the caller object', () => {
+      const container = document.createElement('div');
+      const input = { ...withoutId(), id: 'tpl_1' };
+      let editor!: ReturnType<typeof createEditor>;
+      act(() => {
+        editor = createEditor({ container, initialValue: input });
+      });
+      expect(rendered.at(-1)!.initialTemplate).toBe(input);
+      expect(editor.getValue()).toBe(input);
+      act(() => editor.destroy());
+    });
+
+    it('hands onSave the id-bearing document, then what onChange reported', () => {
+      const container = document.createElement('div');
+      const onSave = vi.fn();
+      let editor!: ReturnType<typeof createEditor>;
+      act(() => {
+        editor = createEditor({ container, initialValue: withoutId(), onSave });
+      });
+      const props = rendered.at(-1)!;
+      const opened = props.initialTemplate as { id: string };
+      (props.onSave as () => void)();
+      expect(onSave).toHaveBeenLastCalledWith(opened);
+      const edited = { ...opened, metadata: { title: 'Edited' } };
+      (props.onChange as (t: unknown) => void)(edited);
+      (props.onSave as () => void)();
+      expect(onSave).toHaveBeenLastCalledWith(edited);
+      act(() => editor.destroy());
+    });
+
+    it('setValue remounts the editor on the new document', () => {
+      const container = document.createElement('div');
+      let editor!: ReturnType<typeof createEditor>;
+      act(() => {
+        editor = createEditor({ container, initialValue: { ...withoutId(), id: 'first' } });
+      });
+      act(() => editor.setValue({ ...withoutId(), id: 'second' }));
+      expect((rendered.at(-1)!.initialTemplate as { id: string }).id).toBe('second');
+      expect(editor.getValue().id).toBe('second');
+      act(() => editor.setValue(withoutId()));
+      const third = rendered.at(-1)!.initialTemplate as { id: string };
+      expect(third.id).not.toBe('second');
+      expect(editor.getValue().id).toBe(third.id);
+      act(() => editor.destroy());
+    });
+  });
 });
