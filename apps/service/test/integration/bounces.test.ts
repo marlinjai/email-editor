@@ -1,12 +1,12 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { Provider, WebhookEvent, type WebhookEventOf } from '@marlinjai/mail-contract';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { repos } from '../../src/repo/index.js';
 import { svixSign } from '../../src/provider-events/svix.js';
 import { PermanentSendError } from '../../src/transport/index.js';
 import { appOver } from '../support/app-call.js';
-import { PUBLIC_BASE_URL, startHarness, type Harness } from '../support/harness.js';
-import { action, addRecipients, createMailing, drainUntilSettled, eventsOf, makeWorker, recipientsOf, seedContact, seedSending } from '../support/sending.js';
+import { ERASURE_SECRET, PUBLIC_BASE_URL, startHarness, type Harness } from '../support/harness.js';
+import { action, addRecipients, createMailing, drainUntilSettled, eventsOf, mailingStatus, makeWorker, recipientsOf, seedContact, seedSending } from '../support/sending.js';
 
 /**
  * Hard bounces and spam complaints suppress the address on every topic, whoever
@@ -92,7 +92,7 @@ describe('synchronous hard bounces (SMTP)', () => {
 
     // The provider is not blamed for a dead address.
     const provider = await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key });
-    expect(provider.body.rejections).toEqual({ count: 0, last_error: null, last_at: null });
+    expect(provider.body.rejections).toEqual({ count: 0, last_error: null, last_at: null, anomaly: null });
   });
 
   it('the next mailing skips the bounced address, on any topic', async () => {
@@ -292,6 +292,8 @@ describe('Resend events', () => {
     const r = repos(h.sql);
     await r.suppressions.create(W.id, { email: 'cyd@example.com', reason: 'unsubscribed', topicId: null });
     await r.suppressions.create(W.id, { email: 'dan@example.com', reason: 'manual', topicId: null, note: 'asked by phone' });
+    await archived(W.id, p.id, 'cyd@example.com', 're-x');
+    await archived(W.id, p.id, 'dan@example.com', 're-y');
     expect((await post(p.id, complaintEvent('re-x', 'cyd@example.com'))).body.outcome).toBe('suppressed');
     expect((await post(p.id, bounceEvent('re-y', 'dan@example.com'))).body.outcome).toBe('already_suppressed');
     const byEmail = new Map((await suppressionsOf(W.id)).map((s) => [s.email, s]));
@@ -300,20 +302,30 @@ describe('Resend events', () => {
     expect((await bouncedEvents(W.id)).map((e) => e.data.email)).toEqual(['cyd@example.com']);
   });
 
-  it('a bounce for an unknown message id still blocks the single address it names, without a source message', async () => {
+  it('an event for an email this provider never sent is counted and logged, never acted on', async () => {
     const p = await resendProvider(W.id);
-    const eve = await repos(h.sql).contacts.insert(W.id, { email: 'eve@example.com', externalId: 'ext-eve' });
-    const res = await post(p.id, bounceEvent('re-unknown', 'Eve@Example.com'));
-    expect(res.body.outcome).toBe('suppressed');
-    expect(await suppressionsOf(W.id)).toMatchObject([{ email: 'eve@example.com', reason: 'bounced', source_message_id: null }]);
-    expect((await bouncedEvents(W.id))[0]!.data).toMatchObject({ contact_id: eve!.id, external_id: 'ext-eve', message_id: null });
+    await repos(h.sql).contacts.insert(W.id, { email: 'eve@example.com', externalId: 'ext-eve' });
+    // Another system on the same Resend account sent this one: no message of ours has its id.
+    let firstId = '';
+    for (const event of [bounceEvent('re-unknown', 'eve@example.com'), complaintEvent('re-unknown-2', 'eve@example.com')]) {
+      const res = await post(p.id, event);
+      firstId ||= res.id;
+      expect(res).toMatchObject({ status: 200, body: { ok: true, duplicate: false, outcome: 'unmatched' } });
+    }
+    expect((await post(p.id, bounceEvent('re-unknown', 'eve@example.com'), { id: firstId })).body).toMatchObject({ duplicate: true, outcome: 'unmatched' });
+    expect(await suppressionsOf(W.id)).toEqual([]);
+    expect(await bouncedEvents(W.id)).toEqual([]);
+    const provider = await h.call({ path: `/v1/providers/${p.id}`, key: W.key });
+    expect(provider.body.events.unmatched).toBe(2);
+    // A retry of the same event is not counted twice.
+    const [again] = await h.sql<{ n: number }[]>`SELECT events_unmatched_count AS n FROM providers WHERE id = ${p.id}`;
+    expect(again!.n).toBe(2);
   });
 
-  it('an unknown message naming several addresses, a transient bounce and a delay are acknowledged and ignored', async () => {
+  it('a transient or undetermined bounce, a delay and other types are acknowledged and ignored', async () => {
     const p = await resendProvider(W.id);
-    const several = { ...bounceEvent('re-many', 'a@example.com'), data: { ...bounceEvent('re-many', 'a@example.com').data, to: ['a@example.com', 'b@example.com'] } };
+    for (const id of ['re-soft', 're-und', 're-d', 're-o']) await archived(W.id, p.id, `${id.slice(3)}@example.com`, id);
     for (const event of [
-      several,
       bounceEvent('re-soft', 'soft@example.com', 'Transient'),
       bounceEvent('re-und', 'und@example.com', 'Undetermined'),
       { type: 'email.delivery_delayed', created_at: new Date().toISOString(), data: { email_id: 're-d', to: ['slow@example.com'] } },
@@ -392,21 +404,25 @@ describe('Resend events', () => {
     await repos(h.sql).contacts.insert(B.id, { email: 'shared@example.com' });
     await archived(B.id, pb.id, 'shared@example.com', 're-b');
 
-    // B's message id, sent to A's endpoint: A has no such message, B is untouched.
+    // B's message id, sent to A's endpoint: A has no such message, so nothing happens anywhere.
     const res = await post(pa.id, bounceEvent('re-b', 'shared@example.com'));
-    expect(res.body.outcome).toBe('suppressed');
-    expect(await suppressionsOf(W.id)).toMatchObject([{ email: 'shared@example.com', source_message_id: null }]);
+    expect(res.body.outcome).toBe('unmatched');
+    expect(await suppressionsOf(W.id)).toEqual([]);
     expect(await suppressionsOf(B.id)).toEqual([]);
     expect(await bouncedEvents(B.id)).toEqual([]);
 
     expect((await post(pa.id, bounceEvent('re-z', 'z@example.com'), { secret: secretB })).status).toBe(400);
     // The same svix-id at another provider is another event.
-    expect((await post(pb.id, bounceEvent('re-b', 'shared@example.com'), { id: res.id, secret: secretB })).body.duplicate).toBe(false);
+    const atB = await post(pb.id, bounceEvent('re-b', 'shared@example.com'), { id: res.id, secret: secretB });
+    expect(atB.body).toMatchObject({ duplicate: false, outcome: 'suppressed' });
     expect(await suppressionsOf(B.id)).toHaveLength(1);
+    expect(await suppressionsOf(W.id)).toEqual([]);
   });
 
   it('the suppressions list filters by the new reasons', async () => {
     const p = await resendProvider(W.id);
+    await archived(W.id, p.id, 'b1@example.com', 're-7');
+    await archived(W.id, p.id, 'c1@example.com', 're-8');
     await post(p.id, bounceEvent('re-7', 'b1@example.com'));
     await post(p.id, complaintEvent('re-8', 'c1@example.com'));
     await repos(h.sql).suppressions.create(W.id, { email: 'm1@example.com', reason: 'manual', topicId: null });
@@ -461,7 +477,7 @@ describe('Resend events endpoint registration', () => {
     const created = await app.call({ method: 'POST', path: '/v1/providers', key: W.key, body: createBody });
     expect(created.status).toBe(201);
     const url = `${PUBLIC_BASE_URL}/providers/${created.body.id}/events/resend`;
-    expect(created.body.events).toEqual({ status: 'active', source: 'automatic', url, error: null });
+    expect(created.body.events).toEqual({ status: 'active', source: 'automatic', url, error: null, unmatched: 0 });
     expect(Provider.safeParse(created.body).success).toBe(true);
     expect(resend.seen).toEqual([
       {
@@ -498,6 +514,7 @@ describe('Resend events endpoint registration', () => {
     expect(created.body.events).toMatchObject({ status: 'needs_secret', source: null, url: `${PUBLIC_BASE_URL}/providers/${created.body.id}/events/resend` });
     expect(created.body.events.error).toMatch(/may only send/);
     expect((await post(created.body.id, bounceEvent('re-10', 'i@example.com'))).status).toBe(503);
+    await archived(W.id, created.body.id, 'i@example.com', 're-10');
 
     const set = await h.call({ method: 'PUT', path: `/v1/providers/${created.body.id}/events-secret`, key: W.key, body: { signing_secret: SECRET } });
     expect(set.status).toBe(200);
@@ -565,9 +582,11 @@ describe('Resend events endpoint registration', () => {
     });
     const moved = await appOver(h, { providerFetch: other.fetch }).call({ method: 'PATCH', path: `/v1/providers/${created.body.id}`, key: W.key, body: rotate(otherKey) });
     expect(moved.body.events).toMatchObject({ status: 'active', source: 'automatic', error: null });
-    expect(other.seen.map((s) => `${s.method} ${s.url} ${s.auth === `Bearer ${otherKey}`}`)).toEqual([
-      'GET https://api.resend.com/webhooks/wh_123 true',
-      'POST https://api.resend.com/webhooks true',
+    // Checked with the new key, removed from the old account with the old key, registered with the new one.
+    expect(other.seen.map((s) => `${s.method} ${s.url} ${s.auth === `Bearer ${otherKey}` ? 'new' : s.auth === `Bearer ${sameKey}` ? 'old' : '?'}`)).toEqual([
+      'GET https://api.resend.com/webhooks/wh_123 new',
+      'DELETE https://api.resend.com/webhooks/wh_123 old',
+      'POST https://api.resend.com/webhooks new',
     ]);
     expect((await post(created.body.id, bounceEvent('re-13', 'l@example.com'))).status).toBe(400);
     expect((await post(created.body.id, bounceEvent('re-13', 'l@example.com'), { secret: otherSecret })).status).toBe(200);
@@ -631,5 +650,146 @@ describe('Resend events endpoint registration', () => {
     expect((await h.call({ method: 'PUT', path, key: minted.body.key, body: { signing_secret: SECRET } })).status).toBe(401);
     const send = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, body: { name: 'send', scope: 'send' } });
     expect((await h.call({ method: 'PUT', path, key: send.body.key, body: { signing_secret: SECRET } })).status).toBe(403);
+  });
+});
+
+// The bounce circuit breaker
+
+describe('bounce circuit breaker', () => {
+  const SAME = (i: number) => `550 5.1.1 <person${i}@example.com>: Recipient address rejected: User unknown in local recipient table`;
+
+  async function people(n: number) {
+    const s = await seedSending(h, W.id);
+    const contacts = [];
+    for (let i = 0; i < n; i++) contacts.push(await seedContact(h, W.id, s.topic.id, { email: `person${i}@example.com`, external_id: `ext-${i}` }));
+    return { s, contacts };
+  }
+
+  /** Drains until nothing is in flight; a paused mailing keeps its queued recipients. */
+  async function drained(mailingId: string) {
+    const worker = makeWorker(h);
+    for (let round = 0; round < 50; round++) {
+      await worker.drain();
+      const rows = await recipientsOf(h, W.id, mailingId);
+      if (!rows.some((r) => r.status === 'sending')) return;
+    }
+  }
+
+  it('forward: a few real bounces among many deliveries still block their addresses, no pause', async () => {
+    const { s, contacts } = await people(12);
+    h.transport.failNextWith(new PermanentSendError(SAME(0), 550));
+    h.transport.failNextWith(new PermanentSendError('550 5.1.1 <person1@example.com>: mailbox does not exist', 550));
+    const mailing = await mailingTo(s, contacts.map((c) => c.id));
+    await drainUntilSettled(h, makeWorker(h), W.id, mailing.id);
+    expect(await mailingStatus(h, W.id, mailing.id)).toBe('partially_failed');
+    expect((await suppressionsOf(W.id)).map((x) => x.email).sort()).toEqual(['person0@example.com', 'person1@example.com']);
+    const provider = await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key });
+    expect(provider.body.rejections.anomaly).toBeNull();
+  });
+
+  it("trip: five refusals in a row with the same reply undo the run's blocks, pause the mailing and flag the provider", async () => {
+    const { s, contacts } = await people(8);
+    for (let i = 0; i < 5; i++) h.transport.failNextWith(new PermanentSendError(SAME(i), 550));
+    const mailing = await mailingTo(s, contacts.map((c) => c.id));
+    await drained(mailing.id);
+
+    expect(await mailingStatus(h, W.id, mailing.id)).toBe('paused');
+    const rows = await recipientsOf(h, W.id, mailing.id);
+    expect(rows.filter((r) => r.status === 'failed')).toHaveLength(5);
+    expect(rows.filter((r) => r.status === 'queued')).toHaveLength(3);
+    // The four blocks made before the fifth refusal were undone; the fifth was never made.
+    expect(await suppressionsOf(W.id)).toEqual([]);
+    expect(await bouncedEvents(W.id)).toHaveLength(4);
+    const reverted = (await eventsOf(h, W.id, 'contact.resubscribed')).map((e) => WebhookEvent.parse(e.payload));
+    expect(reverted).toHaveLength(4);
+    for (const e of reverted) expect(e.data).toMatchObject({ source: 'bounce_reverted', topic: null, mailing_id: mailing.id });
+
+    const shown = await h.call({ path: `/v1/mailings/${mailing.id}`, key: W.key });
+    expect(shown.body.status).toBe('paused');
+    expect(shown.body.pause_reason).toMatch(/bounce circuit breaker.*5 recipients in a row.*4 bounce blocks from this run were undone/s);
+    const provider = await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key });
+    expect(provider.body.rejections.anomaly).toMatchObject({ mailing_id: mailing.id, sample: SAME(4) });
+    expect(provider.body.rejections.anomaly.reason).toMatch(/in a row/);
+    const audit = await h.sql<{ actor: any }[]>`SELECT actor FROM audit_log WHERE workspace_id = ${W.id} AND action = 'mailing.paused'`;
+    expect(audit.map((a) => a.actor.type)).toEqual(['system']);
+  });
+
+  it('trip: more than 20 percent of the first 50 refused, even with different replies', async () => {
+    const { s, contacts } = await people(14);
+    for (let i = 0; i < 11; i++) h.transport.failNextWith(new PermanentSendError(`550 5.1.1 user unknown, reference ${i}`, 550));
+    const mailing = await mailingTo(s, contacts.map((c) => c.id));
+    await drained(mailing.id);
+    expect(await mailingStatus(h, W.id, mailing.id)).toBe('paused');
+    expect(await suppressionsOf(W.id)).toEqual([]);
+    const provider = await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key });
+    expect(provider.body.rejections.anomaly.reason).toMatch(/20 percent of the first 50/);
+  });
+
+  it('resume: after the provider is fixed and the mailing resumed, the rest is sent and real bounces block again', async () => {
+    const { s, contacts } = await people(8);
+    for (let i = 0; i < 5; i++) h.transport.failNextWith(new PermanentSendError(SAME(i), 550));
+    const mailing = await mailingTo(s, contacts.map((c) => c.id));
+    await drained(mailing.id);
+    expect(await mailingStatus(h, W.id, mailing.id)).toBe('paused');
+
+    // Resuming starts a new run: one genuine bounce in it is blocked as usual.
+    h.transport.failNextWith(new PermanentSendError('550 5.1.1 <person5@example.com>: no such user', 550));
+    const resumed = await action(h, W, mailing.id, 'resume');
+    expect(resumed.status, JSON.stringify(resumed.body)).toBe(202);
+    await drainUntilSettled(h, makeWorker(h), W.id, mailing.id);
+    const shown = await h.call({ path: `/v1/mailings/${mailing.id}`, key: W.key });
+    expect(shown.body).toMatchObject({ status: 'partially_failed', pause_reason: null });
+    expect((await suppressionsOf(W.id)).map((x) => x.email)).toEqual(['person5@example.com']);
+    expect(h.transport.sent.map((m) => m.to[0]).sort()).toEqual(['person6@example.com', 'person7@example.com']);
+  });
+
+  it('re-entry: retrying the failed after the fix mails the addresses whose blocks were undone', async () => {
+    const { s, contacts } = await people(6);
+    for (let i = 0; i < 5; i++) h.transport.failNextWith(new PermanentSendError(SAME(i), 550));
+    const mailing = await mailingTo(s, contacts.map((c) => c.id));
+    await drained(mailing.id);
+    expect((await action(h, W, mailing.id, 'resume')).status).toBe(202);
+    await drainUntilSettled(h, makeWorker(h), W.id, mailing.id);
+    expect(await mailingStatus(h, W.id, mailing.id)).toBe('partially_failed');
+
+    const retried = await action(h, W, mailing.id, 'retry-failed');
+    expect(retried.status, JSON.stringify(retried.body)).toBe(202);
+    await drainUntilSettled(h, makeWorker(h), W.id, mailing.id);
+    expect(await mailingStatus(h, W.id, mailing.id)).toBe('sent');
+    expect(h.transport.sent.map((m) => m.to[0]).sort()).toEqual(contacts.map((c) => c.email).sort());
+    expect(await suppressionsOf(W.id)).toEqual([]);
+  });
+});
+
+describe('workspace erasure', () => {
+  it('unregisters the Resend events endpoints the service registered, best effort', async () => {
+    const seen: string[] = [];
+    const fake = (async (url: string, init: RequestInit) => {
+      const auth = String((init.headers as Record<string, string>).authorization);
+      seen.push(`${init.method ?? 'GET'} ${url} ${auth === `Bearer ${RESEND_KEY}`}`);
+      if (url.endsWith('/webhooks') && init.method === 'POST') return registered();
+      return new Response('{}', { status: 200 });
+    }) as unknown as typeof fetch;
+    const app = appOver(h, { providerFetch: fake, erasureWebhookSecret: ERASURE_SECRET });
+    const company = randomUUID();
+    const ws = await app.call({
+      method: 'POST',
+      path: '/v1/workspaces',
+      subject: 'erase-owner',
+      body: { slug: 'erase-me', name: 'Erase me', owner: { email: 'erase-owner@example.com' }, company_id: company },
+    });
+    expect(ws.status, JSON.stringify(ws.body)).toBe(201);
+    const created = await app.call({ method: 'POST', path: '/v1/providers', subject: 'erase-owner', workspace: ws.body.id, body: createBody });
+    expect(created.body.events.source).toBe('automatic');
+
+    const raw = JSON.stringify({ event_id: randomUUID(), kind: 'tenant.erased', user_id: 'u1', tenant_id: company, requested_at: '2026-09-19T10:00:00.000Z' });
+    const signature = `sha256=${createHmac('sha256', ERASURE_SECRET).update(raw, 'utf8').digest('hex')}`;
+    const res = await app.app.request('/internal/erasure', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-lumitra-erasure-signature': signature },
+      body: raw,
+    });
+    expect(res.status).toBe(200);
+    expect(seen.at(-1)).toBe('DELETE https://api.resend.com/webhooks/wh_123 true');
   });
 });

@@ -198,6 +198,17 @@ export function providersRepo(db: Db) {
       return rows[0] ?? null;
     },
 
+    /**
+     * The Resend events endpoints the service registered itself for a
+     * workspace's providers (deleted ones included), with the sealed API key to
+     * remove them with: what erasing the workspace unregisters.
+     */
+    async automaticEventEndpoints(workspaceId: string): Promise<Array<{ provider_id: string; webhook_id: string; secret_sealed: string | null }>> {
+      return db<Array<{ provider_id: string; webhook_id: string; secret_sealed: string | null }>>`
+        SELECT id AS provider_id, events_webhook_id AS webhook_id, secret_sealed FROM providers
+        WHERE workspace_id = ${workspaceId} AND kind = 'resend' AND events_source = 'automatic' AND events_webhook_id IS NOT NULL`;
+    },
+
     /** Counts a Resend event that names no message this provider sent. */
     async countUnmatchedEvent(workspaceId: string, providerId: string): Promise<void> {
       await db`

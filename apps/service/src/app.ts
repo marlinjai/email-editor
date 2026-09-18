@@ -174,7 +174,16 @@ export function createApp({
   app.route('/', stripeWebhookRoutes(sql, { config: billing, stripe, log: { error: log.error, log: console.log } }));
   // Public too: Resend signs a provider's events with that provider's secret.
   app.route('/', providerEventRoutes(sql, { sealer, log: { error: log.error, log: console.log } }));
-  app.route('/', erasureRoutes(sql, { secret: erasureWebhookSecret, storage: assetStorage, log: { error: log.error, log: console.log } }));
+  app.route(
+    '/',
+    erasureRoutes(sql, {
+      secret: erasureWebhookSecret,
+      storage: assetStorage,
+      log: { error: log.error, log: console.log },
+      sealer,
+      fetch: providerFetch,
+    }),
+  );
 
   const limit = (maxSize: number) =>
     bodyLimit({

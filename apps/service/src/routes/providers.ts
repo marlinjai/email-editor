@@ -214,7 +214,7 @@ async function resendWebhookExists(
 }
 
 /** Removes an events endpoint the service registered at Resend itself. Best effort: a failure is logged. */
-async function unregisterResendEvents(
+export async function unregisterResendEvents(
   opts: Pick<ProviderRouteOptions, 'fetch' | 'verifyTimeoutMs' | 'log'>,
   webhookId: string,
   apiKey: string,
@@ -427,6 +427,8 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
     const access = c.get('access');
     const id = rowId(params(c, 'providers.update').id, 'provider');
     const input = await body(c, 'providers.update');
+    // The key before a change, to remove an events endpoint from its Resend account.
+    const before = input.kind === 'resend' && input.config?.api_key ? await pool.providers.getForSend(access.workspaceId, id) : null;
     const row = await sql.begin(async (tx) => {
       const r = repos(tx);
       const existing = await r.providers.lock(access.workspaceId, id);
@@ -486,6 +488,11 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
       if (result.events_source === 'automatic' && result.events_webhook_id) {
         try {
           if ((await resendWebhookExists(opts, result.events_webhook_id, row.secret)) === false) {
+            // Another Resend account: remove the endpoint from the old one with
+            // the old key, or it keeps posting events nobody can verify.
+            if (before?.secret_sealed && before.events_webhook_id === result.events_webhook_id) {
+              await unregisterResendEvents(opts, result.events_webhook_id, sealer.open(before.secret_sealed));
+            }
             await pool.providers.clearEvents(access.workspaceId, id);
             result = (await pool.providers.get(access.workspaceId, id)) ?? result;
           }
