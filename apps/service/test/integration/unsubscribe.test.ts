@@ -19,6 +19,7 @@ const KEY_V1 = Buffer.alloc(32, 1);
 const KEY_V2 = Buffer.alloc(32, 2);
 const signer = createUnsubscribeSigner(new Map([[1, KEY_V1]]));
 const HOST = 'mail.lumitra.test';
+const ISSUED_AT = 1_790_000_000;
 
 let h: Harness;
 let pool: ReturnType<typeof repos>;
@@ -83,8 +84,10 @@ async function scenario(settings?: { default_locale: string; locales: string[] }
     enabled: true,
     secretSealed: 'sealed:v1:test',
   });
+  // A fixed issue time, so every call yields the same token: a page's form
+  // action and the token a test posts to must match across a second boundary.
   const token = (topicId: string | null = news.id, contactId: string = contact.id) =>
-    signer.sign({ workspace_id: ws.id, contact_id: contactId, mailing_id: null, topic_id: topicId });
+    signer.sign({ workspace_id: ws.id, contact_id: contactId, mailing_id: null, topic_id: topicId, iat: ISSUED_AT });
   return { ws, news, venues, contact, token };
 }
 
