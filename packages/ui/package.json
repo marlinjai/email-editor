@@ -19,8 +19,7 @@
     "react"
   ],
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "sideEffects": [
     "*.css"
