@@ -86,6 +86,10 @@ describe('route table', () => {
     }
   });
 
+  it('only workspace creation and listing are dashboard-only', () => {
+    expect(all.filter(([, r]) => r.access === 'dashboard').map(([id]) => id).sort()).toEqual(['workspaces.create', 'workspaces.list']);
+  });
+
   it('only signup submission is public', () => {
     expect(all.filter(([, r]) => r.access === 'public').map(([id]) => id)).toEqual(['signupForms.submit']);
   });
