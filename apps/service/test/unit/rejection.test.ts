@@ -15,7 +15,6 @@ const TABLE: Array<[number | null, string, RejectionClass]> = [
   [550, '550 #5.1.0 Address rejected.', 'recipient'],
   // Classic replies without an enhanced code: only when the text names the recipient.
   [550, '550 No such user here', 'recipient'],
-  [550, '550 Requested action not taken: mailbox unavailable', 'recipient'],
   [553, '553 sorry, that domain isn\'t in my list of allowed rcpthosts; no such mailbox', 'recipient'],
   [551, '551 User not local; unknown user', 'recipient'],
   [null, 'every recipient was rejected: 550 Unknown recipient', 'recipient'],
@@ -41,6 +40,9 @@ const TABLE: Array<[number | null, string, RejectionClass]> = [
   [552, '552 5.3.4 Message size exceeds fixed maximum message size', 'other'],
   [554, '554 5.4.4 Unable to route', 'other'],
   [550, '550 Requested action not taken', 'other'],
+  // RFC 5321's stock text for any 550: it does not name the cause.
+  [550, '550 Requested action not taken: mailbox unavailable', 'other'],
+  [550, '550 Mailbox unavailable', 'other'],
   [554, '554 Transaction failed', 'other'],
   [554, '554 No such user here', 'other'],
   [550, '550 4.2.0 Try again later', 'other'],

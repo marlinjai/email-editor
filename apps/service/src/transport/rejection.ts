@@ -34,15 +34,19 @@ export function parseSmtpReply(code: number | null, text: string): ParsedReply {
   return { code: basic, enhanced };
 }
 
-/** Wording that clearly names the recipient's mailbox as the cause. */
+/**
+ * Wording that clearly names the recipient's mailbox as the cause. Not
+ * "mailbox unavailable": it is RFC 5321's stock text for any 550, which servers
+ * also send for policy blocks.
+ */
 const RECIPIENT_TEXT = new RegExp(
   [
     String.raw`no such (user|mailbox|recipient|address|account)`,
-    String.raw`(user|mailbox|recipient|address|account)( name)? (is )?(unknown|not found|does not exist|doesn'?t exist|not exist|invalid|unavailable|disabled|inactive|not available)`,
+    String.raw`(user|mailbox|recipient|address|account)( name)? (is )?(unknown|not found|does not exist|doesn'?t exist|not exist|invalid|disabled|inactive)`,
     String.raw`unknown (user|mailbox|recipient|address|account)`,
     String.raw`(user|mailbox|recipient|account) (has been )?(disabled|deactivated|suspended|deleted)`,
     String.raw`invalid (recipient|mailbox|address)`,
-    String.raw`recipient address rejected: (user unknown|unknown|undeliverable|mailbox unavailable|invalid)`,
+    String.raw`recipient address rejected: (user unknown|unknown|invalid)`,
     String.raw`address (is )?(not|no longer) (valid|in use|available)`,
     String.raw`(email )?account that you tried to reach (does not exist|is disabled)`,
   ].join('|'),
