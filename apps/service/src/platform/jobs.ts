@@ -1,4 +1,6 @@
 import type { Compiler } from '../compile/pool.js';
+import { workspaceCompile } from '../compile/workspace-compile.js';
+import { repos } from '../repo/index.js';
 import { createImportJob } from '../imports/job.js';
 import type { Sql } from '../db.js';
 import type { UnsubscribeSigner } from '../unsubscribe.js';
@@ -23,7 +25,9 @@ export type PlatformDeps = {
 
 /** Every job the platform worker runs, in the order of one round. */
 export function platformJobs(deps: PlatformDeps): PlatformJob[] {
-  const compile = (document: Parameters<Compiler['compile']>[0]) => deps.compiler.compile(document);
+  // A scheduled start compiles under the workspace's asset policy, as a send does.
+  const forWorkspace = workspaceCompile(repos(deps.sql), deps.compiler, deps.publicBaseUrl);
+  const compile = (workspaceId: string, document: unknown) => forWorkspace.compile(workspaceId, document);
   return [
     createScheduleJob({ sql: deps.sql, compile, log: deps.log }),
     createAbDecisionJob({ sql: deps.sql, log: deps.log }),

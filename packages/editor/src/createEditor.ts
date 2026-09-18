@@ -3,36 +3,29 @@
 
 import { createRoot, Root } from 'react-dom/client';
 import { createElement } from 'react';
-import type { EmailTemplate, TemplateSnapshotIn, TemplateSnapshotOut } from '@marlinjai/email-editor-core';
+import { withTemplateId, type EmailTemplate, type TemplateSnapshotIn, type TemplateSnapshotOut } from '@marlinjai/email-editor-core';
 import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
 import { EmailEditor } from '@marlinjai/email-editor-ui';
 import type { EditorOptions, EditorInstance } from './types';
 import { themeToStyle } from './theme';
 import { assertSupportedBlocks } from './blocks';
 
-/**
- * Convert EmailTemplate to TemplateSnapshotIn
- * Handles differences between schema types and MST types
- */
-function toSnapshotIn(template: EmailTemplate | undefined): TemplateSnapshotIn {
-  if (!template) {
-    return {
-      id: `template-${Date.now()}`,
-      version: '1.0',
-      metadata: {
-        title: 'New Email',
-        subject: '',
-        previewText: '',
-      },
-      sections: [],
-    } as TemplateSnapshotIn;
-  }
-
-  // Use type assertion for compatibility
+/** What the editor opens when the host passes no document. */
+function emptyTemplate(): EmailTemplate {
   return {
-    id: (template as any).id || `template-${Date.now()}`,
-    ...template,
-  } as unknown as TemplateSnapshotIn;
+    version: '1.0',
+    metadata: { title: 'New Email', subject: '', previewText: '' },
+    sections: [],
+  };
+}
+
+/**
+ * The document the editor opens, with an id. A document without one gets a
+ * fresh id here, on a copy (the host's object is never changed), and that same
+ * id is what `getValue`, `onChange` and `onSave` hand back from then on.
+ */
+function openable(template: EmailTemplate | undefined): EmailTemplate & { id: string } {
+  return withTemplateId(template ?? emptyTemplate());
 }
 
 /**
@@ -52,9 +45,6 @@ export function createEditor(options: EditorOptions): EditorInstance {
 
   assertSupportedBlocks(blocks);
 
-  // Convert to MST-compatible snapshot
-  const initialSnapshot = toSnapshotIn(initialValue);
-
   // Create block registry with standard blocks
   const registry = createStandardBlockRegistry();
 
@@ -67,12 +57,10 @@ export function createEditor(options: EditorOptions): EditorInstance {
   // Pre-built sections, as the React wrapper offers them
   const prebuiltRegistry = createStandardPrebuiltRegistry();
 
-  // Current template state
-  let currentTemplate: EmailTemplate = initialValue || ({
-    version: '1.0',
-    metadata: { title: 'New Email', subject: '', previewText: '' },
-    sections: [],
-  } as EmailTemplate);
+  // Current template state: always the id-bearing document the editor holds.
+  let currentTemplate: EmailTemplate = openable(initialValue);
+  // Bumped by setValue, so the editor remounts with a store for the new document.
+  let generation = 0;
 
   // Handle template changes
   const handleChange = (snapshot: TemplateSnapshotOut) => {
@@ -95,7 +83,8 @@ export function createEditor(options: EditorOptions): EditorInstance {
 
     root.render(
       createElement(EmailEditor, {
-        initialTemplate: initialSnapshot,
+        key: generation,
+        initialTemplate: currentTemplate as unknown as TemplateSnapshotIn,
         onChange: handleChange,
         blockRegistry: registry,
         prebuiltRegistry,
@@ -116,9 +105,10 @@ export function createEditor(options: EditorOptions): EditorInstance {
     },
 
     setValue(template: EmailTemplate) {
-      currentTemplate = template;
-      // Note: Setting value requires re-mounting the editor
-      // This is a limitation of the current implementation
+      // The editor's store is created once per mount, so a new document means a
+      // new mount (undo history starts over with it).
+      currentTemplate = openable(template);
+      generation += 1;
       render();
     },
 

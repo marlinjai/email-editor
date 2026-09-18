@@ -606,10 +606,11 @@ Defaults taken (each can be overturned later):
     confirmation rolls back with a localised "not possible right now" page, its
     link still valid for when there is room.
 
-12. **`mailings.duplicate` copies no A/B test**: the copy is a plain draft
-    with the base content (variants, test settings and tracking are not
-    copied). Whether a copy should carry the test is a product call for when
-    the dashboard offers it.
+12. **`mailings.duplicate` copies the A/B test definition** (decided by the
+    orchestrator, 2026-09-18): variants, test fraction, winner metric and wait
+    come along; the winner, the decision time and all results are reset, so
+    the copy is a fresh draft whose test is `pending`. The plan and tracking
+    checks run again when the copy starts.
 
 Also fixed on the way: a transient retry's due time was stamped with the app
 host's clock and compared with the database's, so a few milliseconds of skew

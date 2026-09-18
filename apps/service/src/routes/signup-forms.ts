@@ -21,7 +21,8 @@ import type { SignupService } from '../signup/service.js';
 import { body, pageArgs, params, query, rawJson, rowId, toPage } from '../validate.js';
 
 export type SignupFormRouteDeps = MountDeps & {
-  compile: (document: TemplateDocument) => Promise<CompiledDocument>;
+  /** Compiles under the workspace's asset policy (src/compile/workspace-compile.ts). */
+  compile: (workspaceId: string, document: TemplateDocument) => Promise<CompiledDocument>;
   publicBaseUrl: string;
   /** Null when the instance has no signing key: submissions are then refused as unavailable. */
   service: SignupService | null;
@@ -136,6 +137,7 @@ export function signupFormRoutes(sql: Sql, deps: SignupFormRouteDeps) {
       const template = await r.templates.get(workspaceId, templateId);
       if (!template) throw new ApiError('not_found', 'No such template in this workspace.', { confirmation_template_id: templateId });
       const compiled = await deps.compile(
+        workspaceId,
         validateDocument(template.document, ['confirmation_template_id']) as unknown as TemplateDocument,
       );
       if (compiled.errors.length > 0) {

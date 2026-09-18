@@ -10,6 +10,19 @@ import { Email, Id, PageQuery, Slug, Timestamp } from './common';
 /** An auth-brain company (tenant) id, opaque to the service. */
 export const CompanyId = z.string().min(1).max(64);
 
+/**
+ * Where the images, stylesheets and web fonts in a workspace's mails may load
+ * from.
+ * - `any` (the default): anywhere, as the document says.
+ * - `service_only`: only from the service's own host (the `url` of an uploaded
+ *   or imported asset). Compiling reports every other address as an error, so
+ *   such a document cannot be sent, and MJML's automatic Google Fonts imports
+ *   are left out. `assets.import` copies a remote image into the workspace.
+ */
+export const ASSET_POLICIES = ['any', 'service_only'] as const;
+export const AssetPolicy = z.enum(ASSET_POLICIES);
+export type AssetPolicy = z.infer<typeof AssetPolicy>;
+
 export const WorkspaceSettings = z.object({
   /** Default language of the hosted unsubscribe page (BCP 47 tag, e.g. "de"). */
   default_locale: z.string().min(2).max(35),
@@ -17,6 +30,8 @@ export const WorkspaceSettings = z.object({
   locales: z.array(z.string().min(2).max(35)).min(1).max(20),
   /** Open and click tracking. Off by default, opt-in per workspace. */
   tracking_enabled: z.boolean(),
+  /** Where images, stylesheets and fonts in a mail may load from. `any` by default. */
+  asset_policy: AssetPolicy,
 });
 export type WorkspaceSettings = z.infer<typeof WorkspaceSettings>;
 
@@ -163,6 +178,7 @@ export const AUDIT_ACTIONS = [
   'template.updated',
   'template.deleted',
   'asset.uploaded',
+  'asset.imported',
   'contact.erased',
   'suppression.created',
   'suppression.deleted',

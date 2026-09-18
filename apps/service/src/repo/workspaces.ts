@@ -1,5 +1,6 @@
 import type { Db } from '../db.js';
 import type { WorkspaceSettings } from '@marlinjai/mail-contract';
+import { withSettingDefaults } from '../workspace-settings.js';
 
 export type Workspace = {
   id: string;
@@ -10,6 +11,13 @@ export type Workspace = {
   created_at: string;
   updated_at: string;
 };
+
+/** A row as read, its settings completed with the defaults of fields added later. */
+function complete<T extends Workspace>(row: T): T;
+function complete<T extends Workspace>(row: T | undefined): T | null;
+function complete<T extends Workspace>(row: T | undefined): T | null {
+  return row ? { ...row, settings: withSettingDefaults(row.settings) } : null;
+}
 
 export function workspacesRepo(db: Db) {
   return {
@@ -26,14 +34,14 @@ export function workspacesRepo(db: Db) {
         VALUES (${input.slug}, ${input.name}, ${db.json(input.settings)}, ${input.companyId ?? null})
         ON CONFLICT (slug) DO NOTHING
         RETURNING id, slug, name, settings, company_id, created_at, updated_at`;
-      return rows[0] ?? null;
+      return complete(rows[0]);
     },
 
     async get(workspaceId: string): Promise<Workspace | null> {
       const rows = await db<Workspace[]>`
         SELECT id, slug, name, settings, company_id, created_at, updated_at
         FROM workspaces WHERE id = ${workspaceId}`;
-      return rows[0] ?? null;
+      return complete(rows[0]);
     },
 
     async update(
@@ -47,7 +55,7 @@ export function workspacesRepo(db: Db) {
           updated_at = now()
         WHERE id = ${workspaceId}
         RETURNING id, slug, name, settings, company_id, created_at, updated_at`;
-      return rows[0] ?? null;
+      return complete(rows[0]);
     },
 
     /**
@@ -60,7 +68,7 @@ export function workspacesRepo(db: Db) {
       subject: string,
       page: { afterId?: string; limit: number },
     ): Promise<Array<Workspace & { role: string }>> {
-      return db<Array<Workspace & { role: string }>>`
+      const rows = await db<Array<Workspace & { role: string }>>`
         SELECT w.id, w.slug, w.name, w.settings, w.company_id, w.created_at, w.updated_at, m.role
         FROM workspace_members m JOIN workspaces w ON w.id = m.workspace_id
         WHERE m.subject = ${subject}
@@ -73,6 +81,7 @@ export function workspacesRepo(db: Db) {
         }
         ORDER BY w.created_at, w.id
         LIMIT ${page.limit}`;
+      return rows.map((row) => complete(row));
     },
 
     /** Whether the subject is a member of the workspace; validates a cursor of listForSubject. */

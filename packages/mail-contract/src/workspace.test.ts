@@ -20,7 +20,7 @@ const workspace = {
   id: 'ws_1',
   slug: 'opuntia',
   name: 'ŌPUNTIA',
-  settings: { default_locale: 'de', locales: ['de', 'en', 'fr', 'it', 'es'], tracking_enabled: false },
+  settings: { default_locale: 'de', locales: ['de', 'en', 'fr', 'it', 'es'], tracking_enabled: false, asset_policy: 'any' },
   company_id: 'tenant_opuntia',
   created_at: TS,
   updated_at: TS,
@@ -72,6 +72,13 @@ describe('workspace', () => {
     expect(WorkspaceUpdate.safeParse({ settings: { tracking_enabled: true } }).success).toBe(true);
     expect(WorkspaceUpdate.safeParse({}).success).toBe(false);
     expect(WorkspaceUpdate.safeParse({ name: '' }).success).toBe(false);
+  });
+
+  it('asset_policy is any or service_only, required on a workspace and optional on an update', () => {
+    expect(WorkspaceUpdate.safeParse({ settings: { asset_policy: 'service_only' } }).success).toBe(true);
+    expect(WorkspaceUpdate.safeParse({ settings: { asset_policy: 'anywhere' } }).success).toBe(false);
+    const { asset_policy: _p, ...withoutPolicy } = workspace.settings;
+    expect(Workspace.safeParse({ ...workspace, settings: withoutPolicy }).success).toBe(false);
   });
 });
 

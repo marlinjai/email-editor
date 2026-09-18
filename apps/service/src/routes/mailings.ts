@@ -29,8 +29,13 @@ import { assertCanSend, assertCanTest, assertWithinLimit, computeUsage, usageWar
 export type CompiledDocument = { mjml: string; html: string; warnings: CompileMessage[]; errors: CompileMessage[] };
 
 export type MailingRouteDeps = MountDeps & {
-  /** Compiles a validated document to MJML and HTML (S1's CompilePool in production). */
-  compile: (document: TemplateDocument) => Promise<CompiledDocument>;
+  /**
+   * Compiles a validated document to MJML and HTML under the workspace's
+   * asset policy (src/compile/workspace-compile.ts over S1's CompilePool).
+   */
+  compile: (workspaceId: string, document: TemplateDocument) => Promise<CompiledDocument>;
+  /** The asset policy's errors for HTML compiled earlier (a stored snapshot); empty under `any`. */
+  assetErrors: (workspaceId: string, html: string) => Promise<CompileMessage[]>;
   /** Sends one test message outside the queue (src/worker/test-send.ts). */
   sendTest: (input: {
     workspaceId: string;
@@ -307,11 +312,16 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     const stored = await pool.mailings.compiled(workspaceId, id);
     let html = stored?.html ?? null;
     if (html === null) {
-      const compiled = await deps.compile(validateDocument(mailing.document) as unknown as TemplateDocument);
+      const compiled = await deps.compile(workspaceId, validateDocument(mailing.document) as unknown as TemplateDocument);
       if (compiled.errors.length > 0) {
         throw new ApiError('compile_failed', 'The document does not compile.', { errors: compiled.errors });
       }
       html = compiled.html;
+    } else {
+      // A snapshot compiled before the workspace turned on service_only is
+      // held to the policy as it is now.
+      const errors = await deps.assetErrors(workspaceId, html);
+      if (errors.length > 0) throw new ApiError('compile_failed', 'The document does not compile.', { errors });
     }
     const merge = { ...(input.merge ?? {}) };
     // S5: a test is one more recipient on the plan's period.
@@ -447,14 +457,37 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
         metadata: source.metadata,
         createdBy: actorOf(access),
       });
+      // The A/B test's definition comes along (variants, test fraction, winner
+      // metric and wait); its run does not: no winner, no decision time, no
+      // results, as in any new draft. The plan and tracking checks apply again
+      // when the copy starts.
+      if (source.ab_test) {
+        const variants = await r.mailingPlatform.variants(access.workspaceId, id);
+        await r.mailingPlatform.replaceVariants(
+          access.workspaceId,
+          created.id,
+          variants.map((v) => ({ key: v.key, subject: v.subject, document: v.document })),
+        );
+        await r.mailingPlatform.setAbTest(access.workspaceId, created.id, {
+          variants: source.ab_test.variants,
+          test_fraction: source.ab_test.test_fraction,
+          winner_metric: source.ab_test.winner_metric,
+          decide_after_minutes: source.ab_test.decide_after_minutes,
+          status: 'pending',
+          decide_at: null,
+          winner: null,
+          decided_by: null,
+          decided_at: null,
+        });
+      }
       await r.audit.record(access.workspaceId, {
         action: 'mailing.created',
         actor: actorOf(access),
         targetType: 'mailing',
         targetId: created.id,
-        details: { duplicated_from: id },
+        details: { duplicated_from: id, ab_test: source.ab_test !== null },
       });
-      return respond(tx, access.workspaceId, created);
+      return respond(tx, access.workspaceId, (await r.mailings.get(access.workspaceId, created.id))!);
     });
     return c.json(mailing, 201);
   });

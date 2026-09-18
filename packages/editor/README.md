@@ -41,6 +41,7 @@ export function Composer({ initial }: { initial?: TemplateSnapshotOut }) {
 - The editor fills its container, so give the container a height.
 - `initialTemplate` is read once, on mount (the editor is uncontrolled). To load a different document, remount it with a new `key`.
 - `onChange` receives the full document, debounced by 300 ms. Persist it as JSON.
+- A document's `id` is optional. When the document you pass has none, the editor assigns one on mount (on its own copy: your object is not changed), and every document it hands back (`onChange`, `onExport`) carries that id. Save what you are handed and the id stays stable from then on.
 
 ### Props
 
@@ -107,6 +108,9 @@ import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
 export async function POST(request: Request) {
   try {
     const doc = migrateTemplate(await request.json());
+    // { webFonts: false } leaves out MJML's automatic Google Fonts imports
+    // (for fonts such as Roboto or Lato), when your mails must load nothing
+    // from third parties.
     const { html, mjml, errors } = createMJMLCompiler().compile(doc);
     return Response.json({ html, mjml, errors });
   } catch (error) {
@@ -195,9 +199,17 @@ const editor = createEditor({
   theme: { colors: { primary: '#0f766e' } },
 });
 
+// load another document (the editor remounts on it; undo history starts over)
+editor.setValue(otherDoc);
+
+// the document as it stands, with its id
+editor.getValue();
+
 // later
 editor.destroy();
 ```
+
+`initialValue` and `setValue` accept a document without an `id`: the editor opens it on a copy with a fresh id, and `getValue`, `onChange` and `onSave` return that id from the start, before any edit.
 
 `createEditor` still needs `react` and `react-dom` installed (the editor is built with React), but your app does not have to use React.
 

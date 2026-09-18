@@ -36,7 +36,7 @@ afterEach(() => h?.drop());
 
 const MIN = 60_000;
 const quiet = { error: () => {}, log: () => {} };
-const scheduleJob = () => createScheduleJob({ sql: h.sql, compile: (d) => h.compiler.compile(d), log: quiet });
+const scheduleJob = () => createScheduleJob({ sql: h.sql, compile: (_workspaceId, d) => h.compiler.compile(d), log: quiet });
 const abJob = () => createAbDecisionJob({ sql: h.sql, log: quiet });
 const tokens = createTrackingTokens(UNSUBSCRIBE_KEYS);
 /** A public /t/ endpoint answers a GIF, a redirect or a plain 404, never JSON. */
@@ -177,7 +177,7 @@ describe('scheduling', () => {
     const job = createScheduleJob({
       sql: h.sql,
       log: { error: (...x: unknown[]) => errors.push(x), log: () => {} },
-      compile: async (d) => {
+      compile: async (_workspaceId, d) => {
         if (JSON.stringify(d).includes('Stuck headline')) throw new ApiError('service_unavailable', 'the compile queue is full');
         return h.compiler.compile(d);
       },
@@ -314,6 +314,61 @@ describe('A/B tests', () => {
     const late = await setAb(mailing.id, abConfig());
     expect(late.status).toBe(409);
     expect(late.body.error.code).toBe('mailing_invalid_state');
+  });
+
+  it('a duplicate carries the test definition with its run reset, even from a finished test', async () => {
+    const { mailing, contacts } = await setup(4);
+    const config = abConfig({ variants: [{ key: 'a', document: newsletter('Variant A news') }, { key: 'b', subject: 'Subject B' }] });
+    expect((await setAb(mailing.id, config)).status).toBe(200);
+    await action(h, W, mailing.id, 'send');
+    await makeWorker(h).drain();
+    expect((await pick(mailing.id, 'b')).status).toBe(200);
+    await makeWorker(h).drain();
+    expect(await mailingStatus(h, W.id, mailing.id)).toBe('sent');
+
+    const copy = await action(h, W, mailing.id, 'duplicate');
+    expect(copy.status, JSON.stringify(copy.body)).toBe(201);
+    expect(copy.body).toMatchObject({ status: 'draft', counts: { total: 0 } });
+    expect(copy.body.ab_test).toEqual({
+      variants: [
+        { key: 'a', subject: null, has_document: true },
+        { key: 'b', subject: 'Subject B', has_document: false },
+      ],
+      test_fraction: 0.4,
+      winner_metric: 'manual',
+      decide_after_minutes: null,
+      status: 'pending',
+      decide_at: null,
+      winner: null,
+      decided_by: null,
+      decided_at: null,
+    });
+    const analytics = await h.call({ path: `/v1/mailings/${copy.body.id}/analytics`, key: W.key });
+    expect(analytics.body.variants).toEqual([
+      { key: 'a', sent: 0, unique_opens: null, unique_clicks: null },
+      { key: 'b', sent: 0, unique_opens: null, unique_clicks: null },
+    ]);
+
+    // The copy runs its own test: its variant document came along, and it waits for its own pick.
+    await addRecipients(h, W, copy.body.id, contacts.map((c) => ({ contact_id: c.id })));
+    const before = h.transport.sent.length;
+    await action(h, W, copy.body.id, 'send');
+    await makeWorker(h).drain();
+    const sent = h.transport.sent.slice(before);
+    expect(sent.filter((m) => m.html.includes('Variant A news'))).toHaveLength(1);
+    expect(sent.filter((m) => m.subject === 'Subject B')).toHaveLength(1);
+    expect(await mailingStatus(h, W.id, copy.body.id)).toBe('sending');
+    expect((await pick(copy.body.id, 'a')).status).toBe(200);
+    await makeWorker(h).drain();
+    expect(await mailingStatus(h, W.id, copy.body.id)).toBe('sent');
+    // The original keeps its own decision.
+    expect((await h.call({ path: `/v1/mailings/${mailing.id}`, key: W.key })).body.ab_test).toMatchObject({ winner: 'b' });
+  });
+
+  it('a duplicate of a mailing without a test has none', async () => {
+    const { mailing } = await setup(1);
+    const copy = await action(h, W, mailing.id, 'duplicate');
+    expect(copy.body.ab_test).toBeNull();
   });
 
   it('a variant document replaces the content for its recipients', async () => {

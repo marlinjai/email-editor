@@ -343,6 +343,12 @@ export interface Section {
  * Complete email template structure
  */
 export interface EmailTemplate {
+  /**
+   * The document's id. Optional: a document without one is valid, and the
+   * editor store assigns one when it opens it (see `TemplateModel`).
+   * `migrateTemplate` never adds or changes it.
+   */
+  id?: string;
   version: '1.0';
   metadata: TemplateMetadata;
   sections: Section[];

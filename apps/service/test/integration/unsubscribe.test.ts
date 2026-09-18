@@ -67,7 +67,7 @@ let seq = 0;
 async function scenario(settings?: { default_locale: string; locales: string[] }) {
   const n = ++seq;
   const ws = await h.seedWorkspace(`unsub-${n}`);
-  if (settings) await pool.workspaces.update(ws.id, { settings: { ...settings, tracking_enabled: false } });
+  if (settings) await pool.workspaces.update(ws.id, { settings: { ...settings, tracking_enabled: false, asset_policy: 'any' } });
   const news = (await pool.topics.create(ws.id, {
     slug: 'programme-updates',
     name: 'Programme updates',

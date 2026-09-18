@@ -132,10 +132,18 @@ export const TemplateMetadataModel = types
 
 /**
  * TemplateModel - The root model for an email template
+ *
+ * `id` is optional on the way in: a host may open a document that has none (the
+ * schema and the mail service's contract do not require one). The store then
+ * assigns a fresh id once, when the document is loaded, and every snapshot it
+ * emits carries that id, so a host that saves what `onChange` hands it keeps the
+ * same id from then on. It is a plain string rather than an MST identifier, so
+ * `loadTemplate` and `resetTemplate` can replace the document with one that has
+ * a different id.
  */
 export const TemplateModel = types
   .model('Template', {
-    id: types.identifier,
+    id: types.optional(types.string, () => nanoid()),
     version: types.optional(types.string, '1.0'),
     metadata: types.optional(TemplateMetadataModel, {}),
     sections: types.array(SectionModel),
