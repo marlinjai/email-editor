@@ -7,6 +7,7 @@ import type { ProviderForSend } from '../repo/providers.js';
 import type { RecipientRow } from '../repo/recipients.js';
 import { OutcomeUnknownSendError, PermanentSendError, SendError, TransientSendError } from '../transport/index.js';
 import type { UnsubscribeSigner } from '../unsubscribe.js';
+import { applyTracking, CLICK_PATH_PREFIX, OPEN_PATH_PREFIX, type TrackingTokens } from '../platform/tracking.js';
 import { composeMessage } from './compose.js';
 import { DEFAULT_PUBLIC_BASE_URL, unsubscribeUrl } from './merge.js';
 import { finishIfDrained, recordFailed, recordSent } from './settle.js';
@@ -34,6 +35,11 @@ export type SendWorkerOptions = {
   stuckAfterMs?: number;
   /** How often the loop looks for such rows (it also does at start). */
   reconcileEveryMs?: number;
+  /**
+   * S4: signs the open pixel and click links of a mailing whose tracking
+   * snapshot asks for them. Without it nothing is ever tracked.
+   */
+  tracking?: TrackingTokens;
 };
 
 /** The three retries of the plan, with backoff. */
@@ -52,6 +58,10 @@ class Wait extends Error {
 type Claimed = {
   mailing: MailingRow;
   html: string;
+  /** The recipient's A/B variant's subject, else the mailing's. */
+  subject: string;
+  /** The mailing's numbered links, when clicks are tracked. */
+  links: ReadonlyMap<string, number>;
   recipient: RecipientRow;
   contact: ContactWithTopics;
   provider: ProviderForSend;
@@ -264,9 +274,23 @@ export class SendWorker {
     const forSend = (await r.providers.getForSend(workspaceId, provider.id))!;
     const compiled = await r.mailings.compiled(workspaceId, mailingId);
     if (!compiled?.html) throw new Error(`mailing ${mailingId} is sending without compiled HTML`);
+    let html = compiled.html;
+    let subject = mailing.subject;
+    if (recipient.variant !== null) {
+      const variant = (await r.mailingPlatform.variants(workspaceId, mailingId)).find((v) => v.key === recipient.variant);
+      if (!variant) throw new Error(`recipient ${recipient.id} names variant ${recipient.variant}, which mailing ${mailingId} lacks`);
+      if (variant.document !== null) {
+        if (!variant.html) throw new Error(`variant ${variant.key} of mailing ${mailingId} is sending without compiled HTML`);
+        html = variant.html;
+      }
+      if (variant.subject !== null) subject = variant.subject;
+    }
+    const links = mailing.tracking?.clicks
+      ? new Map((await r.mailingPlatform.links(workspaceId, mailingId)).map((l) => [l.url, l.idx] as const))
+      : new Map<string, number>();
     return {
       kind: 'claimed',
-      claimed: { mailing, html: compiled.html, recipient, contact, provider: forSend, reservationId: reservation.reservationId },
+      claimed: { mailing, html, subject, links, recipient, contact, provider: forSend, reservationId: reservation.reservationId },
     };
   }
 
@@ -280,9 +304,9 @@ export class SendWorker {
       // Fixed per recipient, so a retry is byte-identical (Resend deduplicates on it).
       iat: Math.floor(new Date(recipient.created_at).getTime() / 1000),
     });
-    const message = composeMessage({
+    const composed = composeMessage({
       provider,
-      subject: mailing.subject,
+      subject: c.subject,
       preheader: mailing.preheader,
       html: c.html,
       to: recipient.email,
@@ -293,6 +317,7 @@ export class SendWorker {
         unsubscribeUrl: unsubscribeUrl(this.publicBaseUrl, token),
       },
     });
+    const message = { ...composed, html: this.track(workspaceId, c, composed.html) };
 
     let outcome: { ok: true; providerMessageId: string | null } | { ok: false; error: SendError; handedOver: boolean };
     try {
@@ -353,6 +378,25 @@ export class SendWorker {
         });
       }
       await finishIfDrained(tx, workspaceId, mailing.id);
+    });
+  }
+
+  /**
+   * Adds the open pixel and the click links a mailing's tracking snapshot asks
+   * for, and nothing when it asks for none (the default, and every workspace
+   * that never turned tracking on). Deterministic per recipient, so a retry is
+   * byte-identical.
+   */
+  private track(workspaceId: string, c: Claimed, html: string): string {
+    const snapshot = c.mailing.tracking;
+    const tokens = this.options.tracking;
+    if (!snapshot || !tokens || (!snapshot.opens && !snapshot.clicks)) return html;
+    const base = this.publicBaseUrl.replace(/\/+$/, '');
+    const ids = { workspaceId, mailingId: c.mailing.id, recipientId: c.recipient.id };
+    return applyTracking(html, {
+      openUrl: snapshot.opens ? `${base}${OPEN_PATH_PREFIX}${tokens.open(ids)}` : null,
+      clickUrl: snapshot.clicks ? (linkIdx) => `${base}${CLICK_PATH_PREFIX}${tokens.click({ ...ids, linkIdx })}` : null,
+      links: c.links,
     });
   }
 

@@ -15,12 +15,16 @@ export type RecipientRow = {
   claimed_at: string | null;
   message_id: string | null;
   last_error: string | null;
+  /** S4: the A/B variant this recipient gets; null without a test, or while held. */
+  variant: string | null;
+  /** S4: in the remainder of an A/B test, waiting for the winner; never claimed while true. */
+  held: boolean;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS = `id, mailing_id, contact_id, email, merge, status, skip_reason, attempts, next_attempt_at, claimed_at,
-  message_id, last_error, created_at, updated_at`;
+  message_id, last_error, variant, held, created_at, updated_at`;
 
 export function recipientsRepo(db: Db) {
   return {
@@ -86,7 +90,8 @@ export function recipientsRepo(db: Db) {
         UPDATE mailing_recipients SET status = 'sending', claimed_at = now(), attempts = attempts + 1, updated_at = now()
         WHERE id = (
           SELECT id FROM mailing_recipients
-          WHERE workspace_id = ${workspaceId} AND mailing_id = ${mailingId} AND status = 'queued' AND next_attempt_at <= now()
+          WHERE workspace_id = ${workspaceId} AND mailing_id = ${mailingId} AND status = 'queued' AND NOT held
+            AND next_attempt_at <= now()
           ORDER BY next_attempt_at, created_at, id
           LIMIT 1
           FOR UPDATE SKIP LOCKED)

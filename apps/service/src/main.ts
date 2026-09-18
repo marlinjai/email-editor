@@ -7,6 +7,7 @@ import { createSql } from './db.js';
 import { migrate, MigrationError } from './migrate.js';
 import { platformJobs } from './platform/jobs.js';
 import { PlatformWorker } from './platform/worker.js';
+import { createTrackingTokens } from './platform/tracking.js';
 import { repos } from './repo/index.js';
 import { createSealer } from './sealing.js';
 import { createUnsubscribeSigner } from './unsubscribe.js';
@@ -68,6 +69,7 @@ async function runServe(): Promise<void> {
     publicBaseUrl: config.publicBaseUrl,
     unsubscribeSigner,
     transportFor: transports.get,
+    platformKeys: config.unsubscribeKeys,
   });
   // The send worker: one loop per process. It reconciles what a previous
   // process left mid-send before it claims anything new.
@@ -76,6 +78,7 @@ async function runServe(): Promise<void> {
     transportFor: transports.get,
     signer: unsubscribeSigner,
     publicBaseUrl: config.publicBaseUrl,
+    tracking: createTrackingTokens(config.unsubscribeKeys),
   });
 
   // S4: scheduled releases, A/B decisions, import batches, signup confirmations.

@@ -3,6 +3,8 @@ import type { Sql } from '../db.js';
 import type { UnsubscribeSigner } from '../unsubscribe.js';
 import type { TransportFor } from '../worker/transports.js';
 import type { RootKeys } from './tokens.js';
+import { createAbDecisionJob } from './ab-job.js';
+import { createScheduleJob } from './schedule-job.js';
 import type { PlatformJob } from './worker.js';
 
 /** What the S4 jobs are built from; main.ts passes the same objects the API and the send worker use. */
@@ -18,6 +20,10 @@ export type PlatformDeps = {
 };
 
 /** Every job the platform worker runs, in the order of one round. */
-export function platformJobs(_deps: PlatformDeps): PlatformJob[] {
-  return [];
+export function platformJobs(deps: PlatformDeps): PlatformJob[] {
+  const compile = (document: Parameters<Compiler['compile']>[0]) => deps.compiler.compile(document);
+  return [
+    createScheduleJob({ sql: deps.sql, compile, log: deps.log }),
+    createAbDecisionJob({ sql: deps.sql, log: deps.log }),
+  ];
 }

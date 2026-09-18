@@ -1,4 +1,4 @@
-import type { AuditActor, MailingCounts, MailingMetadata, MailingStatus } from '@marlinjai/mail-contract';
+import type { AbTestState, AuditActor, MailingCounts, MailingMetadata, MailingStatus, TrackingSettings } from '@marlinjai/mail-contract';
 import type { Db } from '../db.js';
 import { asJson } from './json.js';
 
@@ -20,6 +20,10 @@ export type MailingRow = {
   metadata: MailingMetadata;
   created_by: AuditActor;
   scheduled_at: string | null;
+  /** S4: the A/B test as stored (the contract's AbTestState), null without one. */
+  ab_test: AbTestState | null;
+  /** S4: what is tracked for this mailing, fixed when it starts; null before. */
+  tracking: TrackingSettings | null;
   started_at: string | null;
   finished_at: string | null;
   created_at: string;
@@ -30,7 +34,7 @@ export type MailingRow = {
 export type MailingCompiled = { mjml: string | null; html: string | null };
 
 const COLUMNS_M = `m.id, m.name, m.subject, m.preheader, m.template_id, m.document, m.topic_id, t.slug AS topic,
-  m.provider_id, m.status, m.metadata, m.created_by, m.scheduled_at, m.started_at, m.finished_at, m.created_at, m.updated_at`;
+  m.provider_id, m.status, m.metadata, m.created_by, m.scheduled_at, m.ab_test, m.tracking, m.started_at, m.finished_at, m.created_at, m.updated_at`;
 
 const EMPTY_COUNTS: MailingCounts = { total: 0, queued: 0, sending: 0, sent: 0, failed: 0, skipped: 0 };
 

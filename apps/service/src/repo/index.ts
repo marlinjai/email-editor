@@ -17,6 +17,7 @@ import { webhookDeliveriesRepo, webhookEndpointsRepo, webhookEventsRepo } from '
 import { workspacesRepo } from './workspaces.js';
 import { tagsRepo } from './tags.js';
 import { contactPropertiesRepo } from './contact-properties.js';
+import { mailingPlatformRepo, workspaceTrackingRepo } from './mailing-platform.js';
 
 /**
  * Every query the service runs against workspace-owned data lives behind these
@@ -59,6 +60,8 @@ export function repos(db: Db) {
     // S4
     tags: tagsRepo(db),
     contactProperties: contactPropertiesRepo(db),
+    mailingPlatform: mailingPlatformRepo(db),
+    workspaceTracking: workspaceTrackingRepo(db),
   };
 }
 export type Repos = ReturnType<typeof repos>;

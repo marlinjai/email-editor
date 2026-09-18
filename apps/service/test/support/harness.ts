@@ -49,7 +49,7 @@ export async function startHarness(options: { webhookUrlPolicy?: SsrfPolicy; uns
   const log = { error: (...a: unknown[]) => errors.push(a) };
   /** A second, independent app over the same database: a service restart. */
   const restart = () =>
-    createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, webhookUrlPolicy: options.webhookUrlPolicy, log, ...appDeps, unsubscribeSigner: options.unsubscribeSigner ?? signer, transportFor: () => transport });
+    createApp({ sql: db.sql, dashboardServiceToken: DASHBOARD_TOKEN, secretsKeys: SECRETS_KEYS, webhookUrlPolicy: options.webhookUrlPolicy, log, ...appDeps, unsubscribeSigner: options.unsubscribeSigner ?? signer, transportFor: () => transport, platformKeys: UNSUBSCRIBE_KEYS });
   let app = restart();
   const sealer: Sealer = createSealer(SECRETS_KEYS);
 

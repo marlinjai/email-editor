@@ -21,6 +21,10 @@ import { unsubscribeRoutes } from './routes/unsubscribe.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 import { mailingRoutes } from './routes/mailings.js';
 import { messageRoutes } from './routes/messages.js';
+import { mailingPlatformRoutes } from './routes/mailing-platform.js';
+import { trackingRoutes } from './routes/track.js';
+import { createTrackingTokens } from './platform/tracking.js';
+import type { RootKeys } from './platform/tokens.js';
 import type { UnsubscribeSigner } from './unsubscribe.js';
 import { createTestSender } from './worker/test-send.js';
 import { createTransportCache, type TransportFor } from './worker/transports.js';
@@ -68,6 +72,12 @@ export type AppOptions = {
   unsubscribeSigner?: UnsubscribeSigner;
   /** F2: the provider transports for test sends; main.ts shares the worker's. Tests pass a MemoryTransport. */
   transportFor?: TransportFor;
+  /**
+   * S4: MAIL_UNSUBSCRIBE_KEY by version, from which the S4 token signers derive
+   * their keys (src/platform/tokens.ts). The public S4 endpoints (tracking,
+   * signup pages) are served only when it is given.
+   */
+  platformKeys?: RootKeys;
 };
 
 export function createApp({
@@ -84,6 +94,7 @@ export function createApp({
   providerFetch = fetch,
   unsubscribeSigner,
   transportFor,
+  platformKeys,
 }: AppOptions) {
   const app = new Hono<AppEnv>();
   const pool = repos(sql);
@@ -102,6 +113,7 @@ export function createApp({
   // Public and outside /v1: a browser page (HTML, its own body limit, no API
   // credentials), so none of the API middleware below applies to it.
   if (unsubscribeSigner) app.route('/', unsubscribeRoutes(sql, { signer: unsubscribeSigner, log }));
+  if (platformKeys) app.route('/', trackingRoutes(sql, { tokens: createTrackingTokens(platformKeys) }));
 
   const limit = (maxSize: number) =>
     bodyLimit({
@@ -159,6 +171,7 @@ export function createApp({
     }),
   );
   app.route('/', messageRoutes(deps));
+  app.route('/', mailingPlatformRoutes(sql, { ...deps, compile: (document) => compiler.compile(document) }));
 
   app.notFound((c) => c.json(new ApiError('not_found', `No route for ${c.req.method} ${c.req.path}.`).toBody(), 404));
 

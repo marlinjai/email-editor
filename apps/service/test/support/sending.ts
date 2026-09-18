@@ -3,7 +3,8 @@ import { repos } from '../../src/repo/index.js';
 import { createSealer } from '../../src/sealing.js';
 import { MemoryTransport } from '../../src/transport/index.js';
 import { SendWorker, type SendWorkerOptions } from '../../src/worker/loop.js';
-import { SECRETS_KEYS, type Harness } from './harness.js';
+import { createTrackingTokens } from '../../src/platform/tracking.js';
+import { SECRETS_KEYS, UNSUBSCRIBE_KEYS, type Harness } from './harness.js';
 import { newsletter } from './mail-documents.js';
 
 /**
@@ -96,6 +97,7 @@ export function makeWorker(h: Harness, transport: MemoryTransport = h.transport,
     sendTimeoutMs: 2_000,
     stuckAfterMs: 5_000,
     log: { error: () => {}, log: () => {} },
+    tracking: createTrackingTokens(UNSUBSCRIBE_KEYS),
     ...over,
   });
 }
