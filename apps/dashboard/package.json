@@ -9,7 +9,7 @@
   },
   "scripts": {
     "predev": "pnpm --filter \"@email-editor/dashboard^...\" build",
-    "dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4 --domain=https://infisical.lumitra.co --env=dev --path=/dashboard -- next dev --port 3100",
+    "dev": "INFISICAL_TOKEN=\"$($HOME/software-dev/infra/scripts/infisical-mi-token.sh)\" infisical run --projectId=f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4 --domain=https://infisical.lumitra.co --env=dev --path=/dashboard -- env MAIL_DASHBOARD_TEST_AUTH=1 next dev --port 3100",
     "build": "next build",
     "start": "next start",
     "lint": "next typegen && tsc --noEmit",

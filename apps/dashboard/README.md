@@ -66,8 +66,17 @@ pnpm -F @email-editor/dashboard dev    # the dashboard on :3100
 `dev` reads the Infisical project "Lumitra Mail" (`f868ed33-e6d0-4f12-9075-7ee1ea7fd7a4`),
 env `dev`, path `/dashboard`, through the per-org machine-identity token. Production
 auth-brain refuses `http://localhost` redirect URIs, so there is no local OIDC client:
-locally, sign in with the end-to-end identity cookie (below) by setting
-`MAIL_DASHBOARD_TEST_AUTH=1` for the dev server.
+`dev` runs with `MAIL_DASHBOARD_TEST_AUTH=1` (development mode only, see below), and you
+sign in by setting the test identity cookie once, from the browser's devtools console
+on `http://localhost:3100/sign-in`:
+
+```js
+await fetch('/api/test-auth/sign-in', {
+  method: 'POST',
+  body: JSON.stringify({ subject: 'dev-you', email: 'you@example.com', name: 'You', companies: [{ id: 'dev-company', name: 'Dev' }] }),
+});
+location.href = '/';
+```
 
 ## The test-only sign-in bypass
 
