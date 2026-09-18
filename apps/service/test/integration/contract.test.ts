@@ -4,6 +4,7 @@ import { emitEvent } from '../../src/events.js';
 import { brokenSpacerDocument, helloDocument } from '../support/documents.js';
 import { startHarness, type Harness } from '../support/harness.js';
 import { pngBytes } from '../support/images.js';
+import { ImageServer } from '../support/image-server.js';
 
 /**
  * The service answers every S0 operation of `@marlinjai/mail-contract` with a
@@ -98,6 +99,17 @@ describe('contract conformance, phase S1', () => {
     upload.append('file', new Blob([pngBytes(2, 2)], { type: 'image/png' }), 'c.png');
     const asset = await run('assets.upload', await h.call({ method: 'POST', path: '/v1/assets', key: W.key, form: upload }));
     await run('assets.get', await h.call({ path: `/v1/assets/${asset.body.id}`, key: W.key }));
+    // The import fetches from a local server, which only an open SSRF policy reaches.
+    const images = await ImageServer.start();
+    const open = await startHarness({ webhookUrlPolicy: { allowInsecureHttp: true, allowPrivateTargets: true } });
+    try {
+      images.on('/c.png', { body: pngBytes(2, 2) });
+      const O = await open.seedWorkspace('contract-import');
+      await run('assets.import', await open.call({ method: 'POST', path: '/v1/assets/import', key: O.key, body: { url: images.url('/c.png') } }));
+    } finally {
+      await images.stop();
+      await open.drop();
+    }
     await run('templates.delete', await h.call({ method: 'DELETE', path: `/v1/templates/${id}`, key: W.key }));
 
     expect([...covered].sort()).toEqual(Object.keys(templateRoutes).sort());
