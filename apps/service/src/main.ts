@@ -1,5 +1,7 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
+import { StorageBrainAssetStorage } from './assets/storage.js';
+import { CompilePool } from './compile/pool.js';
 import { ConfigError, loadConfig, loadMigrateConfig } from './config.js';
 import { createSql } from './db.js';
 import { migrate, MigrationError } from './migrate.js';
@@ -16,6 +18,12 @@ import { repos } from './repo/index.js';
 
 const IDEMPOTENCY_PURGE_INTERVAL_MS = 60 * 60 * 1000;
 
+/**
+ * The compile worker sits next to this file: src/compile-worker.js under tsx,
+ * dist/compile-worker.js once built (tsup emits both entries side by side).
+ */
+const COMPILE_WORKER_URL = new URL('./compile-worker.js', import.meta.url);
+
 async function runMigrate(): Promise<void> {
   const { databaseUrl } = loadMigrateConfig();
   const sql = createSql(databaseUrl, { max: 1 });
@@ -29,10 +37,20 @@ async function runMigrate(): Promise<void> {
 async function runServe(): Promise<void> {
   const config = loadConfig();
   const sql = createSql(config.databaseUrl, { max: config.databasePoolMax });
+  const compiler = new CompilePool({
+    workerUrl: COMPILE_WORKER_URL,
+    size: config.compile.workers,
+    timeoutMs: config.compile.timeoutMs,
+    maxQueue: config.compile.maxQueue,
+    log: console,
+  });
   const app = createApp({
     sql,
     dashboardServiceToken: config.dashboardServiceToken,
     secretsKeys: config.secretsKeys,
+    compiler,
+    assetStorage: new StorageBrainAssetStorage(config.storageBrain),
+    publicBaseUrl: config.publicBaseUrl,
   });
 
   const purge = setInterval(() => {
@@ -56,7 +74,7 @@ async function runServe(): Promise<void> {
     console.log(`[serve] ${signal}: draining`);
     clearInterval(purge);
     server.close(() => {
-      sql.end({ timeout: 5 }).finally(() => process.exit(0));
+      Promise.allSettled([compiler.close(), sql.end({ timeout: 5 })]).finally(() => process.exit(0));
     });
     setTimeout(() => process.exit(1), 10_000).unref();
   };

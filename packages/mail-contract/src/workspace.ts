@@ -146,6 +146,7 @@ export const AUDIT_ACTIONS = [
   'template.created',
   'template.updated',
   'template.deleted',
+  'asset.uploaded',
   'contact.erased',
   'suppression.created',
   'suppression.deleted',
