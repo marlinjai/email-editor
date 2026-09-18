@@ -385,7 +385,10 @@ export function ImportView({ ws, initial, lookups, rows, canWrite }: { ws: strin
 
       {job.status === 'failed' ? (
         <Notice tone="danger">
-          The import failed: {job.error ?? 'no reason given'}.{job.result ? ' The rows written before it failed stay imported.' : ' Nothing was imported.'}
+          The import failed: {(job.error ?? 'no reason given').replace(/\.+$/, '')}.{' '}
+          {job.result && job.result.created + job.result.updated > 0
+            ? `The ${formatCount(job.result.created + job.result.updated)} contacts written before it failed stay imported.`
+            : 'Nothing was imported.'}
         </Notice>
       ) : null}
       {job.status === 'cancelled' ? (

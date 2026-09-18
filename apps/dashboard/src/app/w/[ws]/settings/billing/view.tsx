@@ -68,7 +68,7 @@ function limitLine(plan: Plan, metric: UsageMetric): string {
   const limit = plan.limits[LIMIT_OF[metric]];
   const label = METRIC_LABELS[metric];
   if (limit === null) return `Unlimited ${label.unit}`;
-  return `${formatCount(limit)} ${label.unit}${label.period ? ' a month' : ''}`;
+  return `${formatCount(limit)} ${limit === 1 ? label.one : label.unit}${label.period ? ' a month' : ''}`;
 }
 
 export function BillingView({

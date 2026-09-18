@@ -6,12 +6,12 @@ import { formatCount } from './format';
  * banner and the notice after a send or test. Pure, safe on either side.
  */
 
-export const METRIC_LABELS: Record<UsageMetric, { name: string; unit: string; period: boolean }> = {
-  messages: { name: 'Messages', unit: 'messages', period: true },
-  contacts: { name: 'Contacts', unit: 'contacts', period: false },
-  members: { name: 'Members', unit: 'members', period: false },
-  providers: { name: 'Providers', unit: 'providers', period: false },
-  webhook_endpoints: { name: 'Webhook endpoints', unit: 'webhook endpoints', period: false },
+export const METRIC_LABELS: Record<UsageMetric, { name: string; unit: string; one: string; period: boolean }> = {
+  messages: { name: 'Messages', unit: 'messages', one: 'message', period: true },
+  contacts: { name: 'Contacts', unit: 'contacts', one: 'contact', period: false },
+  members: { name: 'Members', unit: 'members', one: 'member', period: false },
+  providers: { name: 'Providers', unit: 'providers', one: 'provider', period: false },
+  webhook_endpoints: { name: 'Webhook endpoints', unit: 'webhook endpoints', one: 'webhook endpoint', period: false },
 };
 
 /**
