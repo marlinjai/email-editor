@@ -34,6 +34,16 @@ export function resetMailClientForTests(): void {
   dashboard = null;
 }
 
+/**
+ * A client acting for someone other than the signed-in person. Used in exactly
+ * one place: accepting an invitation, where the dashboard adds the invitee on
+ * behalf of the admin who signed the invitation (src/app/invite). The service
+ * checks that admin's role in the workspace on the call.
+ */
+export function mailOnBehalfOf(subject: string, workspaceId: string): MailClient {
+  return client().forUser({ subject, workspaceId });
+}
+
 /** A client acting for the signed-in person, bound to one workspace (or none, for listing and creating). */
 export async function mail(workspaceId?: string): Promise<{ api: MailClient; viewer: Viewer }> {
   const viewer = await requireViewer();
