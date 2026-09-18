@@ -66,8 +66,10 @@
       `pnpm -F email-editor-nextjs-example deploy` (wrangler, logged in on
       Marlin's Mac with Workers write) and check that
       `curl -sI https://email-editor.lumitra.co/editor` answers 308 with
-      `location: https://mail.lumitra.co/`. Deploying earlier would send old
-      links to a 404 [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
+      `location: https://mail.lumitra.co/`. If wrangler fails on the custom
+      domain, delete the `routes` block from `redirect/wrangler.jsonc` and retry:
+      the domain stays bound to the script name `email-editor`. Deploying earlier
+      would send old links to a 404 [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
 - [ ] Lumitra Mail privacy notice (needs Marlin's legal review): lumitra.co/datenschutz
       covers the landing page but defers product-specific processing to a notice on
       the product's own domain, and Mail has none. Write `mail.lumitra.co/privacy`

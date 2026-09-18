@@ -1,4 +1,5 @@
 import type { Plan, PlanFeature, PlanId, PlanLimits, UsageMetric } from '@marlinjai/mail-contract';
+import type { StripeApi } from './stripe.js';
 
 /**
  * The plan catalogue. Limits and features are the service's own (what it
@@ -97,7 +98,7 @@ export type BillingConfig = {
  * Checkout fails closed on null, and the public landing page shows the plan as
  * "coming soon" on the same answer, so the two can never disagree.
  */
-export function checkoutPriceId(config: BillingConfig, stripe: unknown, plan: PaidPlanId): string | null {
+export function checkoutPriceId(config: BillingConfig, stripe: StripeApi | null, plan: PaidPlanId): string | null {
   if (!stripe) return null;
   return config.prices[plan] ?? null;
 }

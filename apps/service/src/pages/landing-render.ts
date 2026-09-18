@@ -277,7 +277,7 @@ function head(view: LandingView): string {
     `<meta property="og:image" content="${baseUrl}/og.png">` +
     '<meta property="og:image:width" content="1200">' +
     '<meta property="og:image:height" content="630">' +
-    `<meta property="og:image:alt" content="${lt(locale, 'mock_label')}">` +
+    `<meta property="og:image:alt" content="Lumitra Mail: ${lt(locale, 'hero_title_a')} ${lt(locale, 'hero_title_b')}">` +
     '<meta name="twitter:card" content="summary_large_image">' +
     `<style>${CSS}</style>`
   );

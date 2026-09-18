@@ -3,6 +3,7 @@ import axe from 'axe-core';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { LISTED_PLANS, PLANS, type BillingConfig } from '../../src/billing/plans.js';
+import type { StripeApi } from '../../src/billing/stripe.js';
 import { PAGE_LOCALES, type PageLocale } from '../../src/pages/i18n.js';
 import { LANDING_MESSAGES } from '../../src/pages/landing-i18n.js';
 import { formatPrice, LANDING_CSP, renderLanding } from '../../src/pages/landing-render.js';
@@ -11,13 +12,14 @@ import { landingPlans, landingRoutes, ROBOTS_DISALLOW } from '../../src/routes/l
 const BASE = 'https://mail.test';
 const NO_STRIPE: BillingConfig = { prices: {} };
 const SELLING: BillingConfig = { prices: { starter: 'price_starter', growth: 'price_growth' } };
-const FAKE_STRIPE = {};
+// Only its presence matters to the page; nothing here calls Stripe.
+const FAKE_STRIPE = {} as StripeApi;
 
-function app(billing: BillingConfig = NO_STRIPE, stripe: unknown = null) {
+function app(billing: BillingConfig = NO_STRIPE, stripe: StripeApi | null = null) {
   return landingRoutes({ publicBaseUrl: BASE, billing, stripe });
 }
 
-function page(locale: PageLocale, billing: BillingConfig = NO_STRIPE, stripe: unknown = null): string {
+function page(locale: PageLocale, billing: BillingConfig = NO_STRIPE, stripe: StripeApi | null = null): string {
   return renderLanding({ locale, baseUrl: BASE, plans: landingPlans(billing, stripe) });
 }
 

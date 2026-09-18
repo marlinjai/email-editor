@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { checkoutPriceId, LISTED_PLANS, type BillingConfig, type PaidPlanId } from '../billing/plans.js';
+import type { StripeApi } from '../billing/stripe.js';
 import type { AppEnv } from '../context.js';
 import { chooseLocale, PAGE_LOCALES, type PageLocale } from '../pages/i18n.js';
 import { OG_IMAGE_PNG_BASE64 } from '../pages/landing-og.js';
@@ -26,7 +27,7 @@ export type LandingRouteDeps = {
   publicBaseUrl: string;
   billing: BillingConfig;
   /** The Stripe client, or null without a key: then no paid plan is sellable. */
-  stripe: unknown;
+  stripe: StripeApi | null;
 };
 
 /** Paths search engines must stay out of: signed links, tracking, assets and the API. */
@@ -37,7 +38,7 @@ const ASSET_CACHE = 'public, max-age=86400';
 
 const OG_IMAGE = Buffer.from(OG_IMAGE_PNG_BASE64, 'base64');
 
-export function landingPlans(billing: BillingConfig, stripe: unknown): LandingPlan[] {
+export function landingPlans(billing: BillingConfig, stripe: StripeApi | null): LandingPlan[] {
   return LISTED_PLANS.map((plan) => ({
     plan,
     sellable: !plan.monthly_price_cents || checkoutPriceId(billing, stripe, plan.id as PaidPlanId) !== null,
