@@ -147,7 +147,8 @@ done <<<"$table"
 # --- What to register next ---------------------------------------------------------
 
 if [ "$DRY_RUN" -eq 1 ]; then say "Done (dry run: nothing was uploaded)"; else say "Done"; fi
-if [ "${#published[@]}" -gt 0 ]; then printf '  published: %s\n' "${published[@]}"; fi
+if [ "$DRY_RUN" -eq 1 ]; then done_label="would publish"; else done_label="published"; fi
+if [ "${#published[@]}" -gt 0 ]; then printf "  $done_label: %s\n" "${published[@]}"; fi
 if [ "${#skipped[@]}" -gt 0 ]; then printf '  already on npm: %s\n' "${skipped[@]}"; fi
 
 say "Now register a trusted publisher for each package on npmjs.com"
