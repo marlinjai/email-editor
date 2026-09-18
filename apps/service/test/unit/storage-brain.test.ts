@@ -76,7 +76,7 @@ beforeAll(async () => {
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
-afterAll(() => new Promise((r) => server.close(r)));
+afterAll(() => new Promise<void>((r) => server.close(() => r())));
 beforeEach(() => {
   files.clear();
   pending.clear();

@@ -66,6 +66,8 @@ describe('config', () => {
     expect(() => loadConfig({ ...valid, PUBLIC_BASE_URL: 'http://mail.lumitra.co' })).toThrow(/PUBLIC_BASE_URL/);
     expect(() => loadConfig({ ...valid, PUBLIC_BASE_URL: 'https://mail.lumitra.co/' })).toThrow(/PUBLIC_BASE_URL/);
     expect(() => loadConfig({ ...valid, PUBLIC_BASE_URL: 'https://mail.lumitra.co/x' })).toThrow(/PUBLIC_BASE_URL/);
+  });
+
   it('refuses to boot without the unsubscribe key, or with a malformed one', () => {
     const { MAIL_UNSUBSCRIBE_KEY: _omitted, ...withoutKey } = valid;
     expect(() => loadConfig(withoutKey)).toThrow(/MAIL_UNSUBSCRIBE_KEY is not set/);
