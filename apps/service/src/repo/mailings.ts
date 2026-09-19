@@ -208,6 +208,31 @@ export function mailingsRepo(db: Db) {
       return rows[0]?.paused ?? false;
     },
 
+    /**
+     * Pauses a provider's sending mailings for the provider-wide breaker. Rows a
+     * worker holds right now are skipped (no lock wait, so no deadlock with a
+     * worker waiting for the provider): the worker pauses them at its next
+     * claim, which checks the breaker. Returns the ids paused.
+     */
+    async pauseSendingForProvider(workspaceId: string, providerId: string, reason: string): Promise<string[]> {
+      const rows = await db<{ id: string }[]>`
+        UPDATE mailings SET status = 'paused', pause_reason = ${reason.slice(0, 1000)}, updated_at = now()
+        WHERE workspace_id = ${workspaceId} AND id IN (
+          SELECT id FROM mailings WHERE workspace_id = ${workspaceId} AND provider_id = ${providerId} AND status = 'sending'
+          FOR UPDATE SKIP LOCKED)
+        RETURNING id`;
+      return rows.map((r) => r.id);
+    },
+
+    /** Pauses one sending mailing with the service's reason; the caller holds its lock. */
+    async pauseWithReason(workspaceId: string, mailingId: string, reason: string): Promise<boolean> {
+      const rows = await db`
+        UPDATE mailings SET status = 'paused', pause_reason = ${reason.slice(0, 1000)}, updated_at = now()
+        WHERE workspace_id = ${workspaceId} AND id = ${mailingId} AND status = 'sending'
+        RETURNING id`;
+      return rows.length > 0;
+    },
+
     /** Live counts per recipient status. */
     async counts(workspaceId: string, mailingId: string): Promise<MailingCounts> {
       return (await this.countsFor(workspaceId, [mailingId])).get(mailingId) ?? { ...EMPTY_COUNTS };

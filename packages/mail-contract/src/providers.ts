@@ -67,7 +67,20 @@ export const ProviderRejections = z.object({
    * reply that tripped it.
    */
   anomaly: z
-    .object({ at: Timestamp, mailing_id: Id.nullable(), reason: z.string(), sample: z.string() })
+    .object({
+      at: Timestamp,
+      /** `mailing`: one mailing was paused. `provider`: 5 refusals in a row with the same reply across the provider's sends (test sends and one-recipient mailings included) within 24 hours. */
+      scope: z.enum(['mailing', 'provider']),
+      /**
+       * True while the provider-wide breaker is open: no bounce blocks through
+       * this provider, test sends refused and mailings not started or resumed
+       * (`provider_anomaly`), until an admin clears it (`providers.clearAnomaly`).
+       */
+      blocking: z.boolean(),
+      mailing_id: Id.nullable(),
+      reason: z.string(),
+      sample: z.string(),
+    })
     .nullable(),
 });
 export type ProviderRejections = z.infer<typeof ProviderRejections>;

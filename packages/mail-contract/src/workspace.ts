@@ -176,6 +176,8 @@ export const AUDIT_ACTIONS = [
   'provider.deleted',
   'provider.events_registered',
   'provider.events_secret_set',
+  'provider.bounces_halted',
+  'provider.anomaly_cleared',
   'topic.created',
   'topic.updated',
   'template.created',

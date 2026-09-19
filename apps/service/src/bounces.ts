@@ -1,9 +1,7 @@
-import type { AuditActor, ProviderKind } from '@marlinjai/mail-contract';
+import type { AuditActor } from '@marlinjai/mail-contract';
 import type { Db } from './db.js';
 import { emitEvent } from './events.js';
 import { repos } from './repo/index.js';
-import { rejectionAction } from './transport/rejection.js';
-import type { SendError } from './transport/types.js';
 
 /**
  * Suppression of addresses that bounce or complain. The service owns it: every
@@ -77,36 +75,4 @@ export async function suppressBounce(
     },
   });
   return 'suppressed';
-}
-
-/**
- * Acts on a permanent rejection, in the transaction that archives the failed
- * message: a hard bounce suppresses the recipient (see `rejectionAction`), a
- * rejection the sender is at fault for is counted on the provider, anything
- * else changes nothing more.
- */
-export async function handlePermanentRejection(
-  tx: Db,
-  workspaceId: string,
-  input: {
-    provider: { id: string; kind: ProviderKind };
-    error: SendError;
-    handedOver: boolean;
-    to: string;
-    message: { id: string; contact_id: string | null };
-  },
-): Promise<'suppressed' | 'already_suppressed' | 'counted' | 'none'> {
-  const action = rejectionAction(input.provider.kind, input.error, input.handedOver);
-  if (action === 'count') {
-    await repos(tx).providers.recordRejection(workspaceId, input.provider.id, input.error.message);
-    return 'counted';
-  }
-  if (action === 'none') return 'none';
-  return suppressBounce(tx, workspaceId, {
-    email: input.to,
-    reason: 'bounced',
-    message: input.message,
-    diagnostic: input.error.message,
-    actor: { type: 'system', reason: 'hard bounce reported by the receiving server' },
-  });
 }

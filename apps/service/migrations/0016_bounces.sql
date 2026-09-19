@@ -24,6 +24,14 @@ ALTER TABLE providers
   ADD COLUMN anomaly_mailing_id      uuid,
   ADD COLUMN anomaly_reason          text CHECK (length(anomaly_reason) <= 1000),
   ADD COLUMN anomaly_sample          text CHECK (length(anomaly_sample) <= 1000),
+  -- `mailing`: the breaker paused one mailing; `provider`: the provider-wide
+  -- streak tripped (across mailings and test sends).
+  ADD COLUMN anomaly_scope           text CHECK (anomaly_scope IN ('mailing', 'provider')),
+  -- Set while the provider-wide breaker is open: no bounce blocks through this
+  -- provider, no test sends, no mailing starts or resumes, until an admin clears it.
+  ADD COLUMN breaker_open_at         timestamptz,
+  -- When an admin last cleared the anomaly: the provider-wide streak counts only later messages.
+  ADD COLUMN breaker_reset_at        timestamptz,
   ADD CONSTRAINT providers_events_source_has_secret CHECK ((events_source IS NULL) = (events_secret_sealed IS NULL));
 
 -- The bounce circuit breaker (src/worker/breaker.ts). A run of a mailing
@@ -37,11 +45,19 @@ ALTER TABLE mailings
   ADD COLUMN pause_reason       text CHECK (length(pause_reason) <= 1000),
   ADD COLUMN breaker_tripped_at timestamptz;
 
+-- A bounce or complaint that hardened an existing block keeps what it
+-- replaced, so the breaker can restore it exactly instead of deleting it.
+ALTER TABLE suppressions
+  ADD COLUMN replaced_reason            text CHECK (replaced_reason IN ('unsubscribed', 'bounced', 'complained', 'manual')),
+  ADD COLUMN replaced_source_message_id uuid;
+
 -- How the worker classified a permanent rejection, and the reply text with the
 -- addresses stripped: what the breaker compares.
 ALTER TABLE messages
   ADD COLUMN rejection_class     text CHECK (rejection_class IN ('recipient', 'sender', 'unknown')),
   ADD COLUMN rejection_signature text CHECK (length(rejection_signature) <= 1000);
+-- The provider-wide streak: a provider's latest messages, test sends included.
+CREATE INDEX messages_provider_recent_idx ON messages (workspace_id, provider_id, created_at DESC, id DESC);
 CREATE INDEX messages_mailing_run_idx ON messages (workspace_id, mailing_id, created_at, id)
   WHERE mailing_id IS NOT NULL AND is_test = false;
 

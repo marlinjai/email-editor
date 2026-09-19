@@ -744,7 +744,7 @@ describe('bounce circuit breaker', () => {
     expect(shown.body.status).toBe('paused');
     expect(shown.body.pause_reason).toMatch(/bounce circuit breaker.*5 recipients in a row.*4 bounce blocks from this run were undone/s);
     const provider = await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key });
-    expect(provider.body.rejections.anomaly).toMatchObject({ mailing_id: mailing.id, sample: SAME(4) });
+    expect(provider.body.rejections.anomaly).toMatchObject({ scope: 'mailing', blocking: false, mailing_id: mailing.id, sample: SAME(4) });
     expect(provider.body.rejections.anomaly.reason).toMatch(/in a row/);
     const audit = await h.sql<{ actor: any }[]>`SELECT actor FROM audit_log WHERE workspace_id = ${W.id} AND action = 'mailing.paused'`;
     expect(audit.map((a) => a.actor.type)).toEqual(['system']);

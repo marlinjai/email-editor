@@ -424,6 +424,15 @@ export const sendingRoutes = {
     access: 'admin',
     phase: 'S2',
   },
+  'providers.clearAnomaly': {
+    method: 'POST',
+    path: '/v1/providers/:id/clear-anomaly',
+    params: IdParams,
+    response: Provider,
+    status: 200,
+    access: 'admin',
+    phase: 'S2',
+  },
   'providers.usage': {
     method: 'GET',
     path: '/v1/providers/:id/usage',

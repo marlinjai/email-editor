@@ -61,7 +61,14 @@ export function toProvider(row: ProviderRow, publicBaseUrl: string): Provider {
       last_error: row.last_rejection,
       last_at: row.last_rejection_at,
       anomaly: row.anomaly_at
-        ? { at: row.anomaly_at, mailing_id: row.anomaly_mailing_id, reason: row.anomaly_reason ?? '', sample: row.anomaly_sample ?? '' }
+        ? {
+            at: row.anomaly_at,
+            scope: row.anomaly_scope ?? 'mailing',
+            blocking: row.breaker_open_at !== null,
+            mailing_id: row.anomaly_mailing_id,
+            reason: row.anomaly_reason ?? '',
+            sample: row.anomaly_sample ?? '',
+          }
         : null,
     },
     created_at: row.created_at,
@@ -599,6 +606,34 @@ export function providerRoutes(sql: Sql, deps: MountDeps, opts: ProviderRouteOpt
       return updated;
     });
     c.header('cache-control', 'no-store');
+    return c.json(toProvider(row, opts.publicBaseUrl));
+  });
+
+  // Closes the provider's bounce circuit breaker after an admin checked the
+  // provider: bounce blocks, test sends and mailing starts work again. Paused
+  // mailings stay paused until someone resumes them.
+  mount(app, 'providers.clearAnomaly', deps, async (c) => {
+    const access = c.get('access');
+    const id = rowId(params(c, 'providers.clearAnomaly').id, 'provider');
+    const row = await sql.begin(async (tx) => {
+      const r = repos(tx);
+      const existing = await r.providers.lock(access.workspaceId, id);
+      if (!existing || (await r.providers.get(access.workspaceId, id)) === null) {
+        throw new ApiError('not_found', 'No such provider in this workspace.');
+      }
+      const cleared = await r.providers.clearAnomaly(access.workspaceId, id);
+      if (!cleared) throw new ApiError('not_found', 'No such provider in this workspace.');
+      if (existing.anomaly_at) {
+        await r.audit.record(access.workspaceId, {
+          action: 'provider.anomaly_cleared',
+          actor: actorOf(access),
+          targetType: 'provider',
+          targetId: id,
+          details: { scope: existing.anomaly_scope, was_blocking: existing.breaker_open_at !== null, reason: existing.anomaly_reason },
+        });
+      }
+      return cleared;
+    });
     return c.json(toProvider(row, opts.publicBaseUrl));
   });
 

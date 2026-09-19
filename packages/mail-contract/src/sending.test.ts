@@ -46,7 +46,11 @@ describe('providers', () => {
     const { rejections: _r, ...without } = smtpProvider;
     expect(Provider.safeParse(without).success).toBe(false);
     const rejected = { count: 3, last_error: '550 5.7.1 blocked', last_at: TS, anomaly: null };
-    const tripped = { ...rejected, anomaly: { at: TS, mailing_id: 'm_1', reason: 'five in a row', sample: '550 5.1.1 user unknown' } };
+    const tripped = {
+      ...rejected,
+      anomaly: { at: TS, scope: 'provider', blocking: true, mailing_id: null, reason: 'five in a row', sample: '550 5.1.1 user unknown' },
+    };
+    expect(Provider.safeParse({ ...smtpProvider, rejections: { ...tripped, anomaly: { ...tripped.anomaly, scope: 'account' } } }).success).toBe(false);
     expect(Provider.parse({ ...smtpProvider, rejections: tripped }).rejections.anomaly?.sample).toBe('550 5.1.1 user unknown');
     expect(Provider.parse({ ...smtpProvider, rejections: rejected }).rejections).toEqual(rejected);
     expect(Provider.safeParse({ ...smtpProvider, rejections: { ...rejected, count: -1 } }).success).toBe(false);

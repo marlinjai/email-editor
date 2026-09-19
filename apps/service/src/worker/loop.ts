@@ -8,8 +8,7 @@ import type { RecipientRow } from '../repo/recipients.js';
 import { OutcomeUnknownSendError, PermanentSendError, SendError, TransientSendError } from '../transport/index.js';
 import type { UnsubscribeSigner } from '../unsubscribe.js';
 import { applyTracking, CLICK_PATH_PREFIX, OPEN_PATH_PREFIX, type TrackingTokens } from '../platform/tracking.js';
-import { classifyRejection, rejectionAction, rejectionSignature } from '../transport/rejection.js';
-import { onDeadAddress } from './breaker.js';
+import { handlePermanentRejection, providerPauseReasonIfOpen } from './breaker.js';
 import { composeMessage } from './compose.js';
 import { DEFAULT_PUBLIC_BASE_URL, unsubscribeUrl } from './merge.js';
 import { finishIfDrained, recordFailed, recordSent } from './settle.js';
@@ -241,6 +240,22 @@ export class SendWorker {
     const mailing = await r.mailings.lock(workspaceId, mailingId);
     if (!mailing || mailing.status !== 'sending') return { kind: 'none' };
     this.providerOf.set(mailingId, mailing.provider_id);
+    // The provider-wide bounce breaker is open: pause instead of sending (a
+    // mailing a tripping transaction could not lock is caught here).
+    const forBreaker = await r.providers.getForSend(workspaceId, mailing.provider_id);
+    const breakerPause = forBreaker ? providerPauseReasonIfOpen(forBreaker) : null;
+    if (breakerPause) {
+      if (await r.mailings.pauseWithReason(workspaceId, mailingId, breakerPause)) {
+        await r.audit.record(workspaceId, {
+          action: 'mailing.paused',
+          actor: { type: 'system', reason: 'bounce circuit breaker' },
+          targetType: 'mailing',
+          targetId: mailingId,
+          details: { reason: forBreaker!.anomaly_reason },
+        });
+      }
+      return { kind: 'none' };
+    }
     const recipient = await r.recipients.claimNext(workspaceId, mailingId);
     if (!recipient) return { kind: 'empty' };
 
@@ -375,24 +390,17 @@ export class SendWorker {
           // A hard bounce suppresses the address (unless the circuit breaker says
           // the refusals are the provider's fault); the sender's own problem is
           // counted on the provider.
-          const err = outcome.error;
-          const action = rejectionAction(provider.kind, err, outcome.handedOver);
-          if (provider.kind === 'smtp' && outcome.handedOver) {
-            await r.messages.setRejection(workspaceId, row.id, {
-              rejectionClass: classifyRejection(err.code, err.message),
-              signature: rejectionSignature(err.message),
-            });
-          }
-          if (action === 'count') await r.providers.recordRejection(workspaceId, provider.id, err.message);
-          if (action === 'suppress') {
-            const verdict = await onDeadAddress(tx, workspaceId, {
-              mailing: locked,
-              providerId: provider.id,
-              to: recipient.email,
-              message: row,
-              diagnostic: err.message,
-            });
-            if (verdict === 'breaker_tripped') this.log.error(`[worker] bounce circuit breaker tripped on mailing ${mailing.id}; paused`);
+          const verdict = await handlePermanentRejection(tx, workspaceId, {
+            provider,
+            error: outcome.error,
+            handedOver: outcome.handedOver,
+            to: recipient.email,
+            message: row,
+            mailing: locked,
+          });
+          if (verdict === 'mailing_breaker_tripped') this.log.error(`[worker] bounce circuit breaker tripped on mailing ${mailing.id}; paused`);
+          if (verdict === 'provider_breaker_tripped') {
+            this.log.error(`[worker] bounce circuit breaker tripped on provider ${provider.id}; its sending mailings are paused`);
           }
         }
       } else {

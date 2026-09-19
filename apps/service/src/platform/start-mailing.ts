@@ -1,3 +1,4 @@
+import { assertProviderOpen } from '../worker/breaker.js';
 import {
   missingRequiredMergeFields,
   type AbTestState,
@@ -93,6 +94,7 @@ export async function applyStart(
       provider_id: row.provider_id,
     });
   }
+  await assertProviderOpen(tx, workspaceId, row.provider_id);
   const counts = await r.mailings.counts(workspaceId, row.id);
   if (counts.total === 0) throw new ApiError('mailing_not_ready', 'The mailing has no recipients yet.');
 

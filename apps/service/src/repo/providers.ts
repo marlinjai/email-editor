@@ -34,6 +34,9 @@ export type ProviderRow = {
   anomaly_mailing_id: string | null;
   anomaly_reason: string | null;
   anomaly_sample: string | null;
+  anomaly_scope: 'mailing' | 'provider' | null;
+  /** Set while the provider-wide bounce breaker is open. */
+  breaker_open_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -52,7 +55,7 @@ export type ProviderForSend = ProviderRow & { secret_sealed: string | null };
 const COLUMNS = `id, kind, name, config, secret_sealed IS NOT NULL AS has_secret, from_name, from_email, reply_to,
   daily_recipient_budget, min_interval_ms, max_recipients_per_message, rejections_count, last_rejection, last_rejection_at,
   events_secret_sealed IS NOT NULL AS has_events_secret, events_source, events_webhook_id, events_error, events_unmatched_count, anomaly_at, anomaly_mailing_id, anomaly_reason,
-  anomaly_sample, created_at, updated_at`;
+  anomaly_sample, anomaly_scope, breaker_open_at, created_at, updated_at`;
 
 /** Longest provider reply kept on the row (the column allows 1000). */
 const MAX_REJECTION_TEXT = 1000;
@@ -216,12 +219,30 @@ export function providersRepo(db: Db) {
         WHERE workspace_id = ${workspaceId} AND id = ${providerId}`;
     },
 
-    /** Records that the bounce circuit breaker tripped on one of this provider's mailings. */
-    async recordAnomaly(workspaceId: string, providerId: string, input: { mailingId: string; reason: string; sample: string }): Promise<void> {
+    /**
+     * Records that a bounce circuit breaker tripped. `provider` scope also opens
+     * the provider-wide breaker; a `mailing` one never closes an open one.
+     */
+    async recordAnomaly(
+      workspaceId: string,
+      providerId: string,
+      input: { scope: 'mailing' | 'provider'; mailingId: string | null; reason: string; sample: string },
+    ): Promise<void> {
       await db`
-        UPDATE providers SET anomaly_at = now(), anomaly_mailing_id = ${input.mailingId},
-          anomaly_reason = ${input.reason.slice(0, MAX_REJECTION_TEXT)}, anomaly_sample = ${input.sample.slice(0, MAX_REJECTION_TEXT)}
+        UPDATE providers SET anomaly_at = now(), anomaly_mailing_id = ${input.mailingId}, anomaly_scope = ${input.scope},
+          anomaly_reason = ${input.reason.slice(0, MAX_REJECTION_TEXT)}, anomaly_sample = ${input.sample.slice(0, MAX_REJECTION_TEXT)},
+          breaker_open_at = ${input.scope === 'provider' ? db`now()` : db`breaker_open_at`}
         WHERE workspace_id = ${workspaceId} AND id = ${providerId}`;
+    },
+
+    /** An admin cleared the anomaly: the provider-wide breaker closes. */
+    async clearAnomaly(workspaceId: string, providerId: string): Promise<ProviderRow | null> {
+      const rows = await db<ProviderRow[]>`
+        UPDATE providers SET anomaly_at = NULL, anomaly_mailing_id = NULL, anomaly_scope = NULL, anomaly_reason = NULL,
+          anomaly_sample = NULL, breaker_open_at = NULL, breaker_reset_at = clock_timestamp(), updated_at = now()
+        WHERE workspace_id = ${workspaceId} AND id = ${providerId} AND deleted_at IS NULL
+        RETURNING ${db.unsafe(COLUMNS)}`;
+      return rows[0] ?? null;
     },
 
     /** Records why automatic registration of the events endpoint failed (null clears it). */

@@ -24,6 +24,8 @@ export const ERROR_STATUS = {
   mailing_invalid_state: 409,
   idempotency_key_reused: 409,
   last_owner: 409,
+  /** The provider's bounce circuit breaker is open: an admin clears it with providers.clearAnomaly. */
+  provider_anomaly: 409,
   // 413
   payload_too_large: 413,
   // 422: well-formed, but the content cannot be used

@@ -9,7 +9,7 @@ import { OutcomeUnknownSendError, PermanentSendError, SendError, TransientSendEr
 import type { UnsubscribeSigner } from '../unsubscribe.js';
 import { composeMessage } from './compose.js';
 import { DEFAULT_PUBLIC_BASE_URL, unsubscribeUrl } from './merge.js';
-import { handlePermanentRejection } from '../bounces.js';
+import { assertProviderOpen, handlePermanentRejection } from './breaker.js';
 import { recordFailed, recordSent } from './settle.js';
 import type { TransportFor } from './transports.js';
 // The contact id a test send's token carries: the hosted page recognises it,
@@ -56,6 +56,7 @@ export function createTestSender(options: TestSenderOptions) {
           provider_id: mailing.provider_id,
         });
       }
+      await assertProviderOpen(tx, workspaceId, mailing.provider_id);
       const reservation = await budget.reserve(tx, workspaceId, mailing.provider_id, 1);
       if (!reservation.ok) {
         throw new ApiError(
@@ -153,7 +154,7 @@ export function createTestSender(options: TestSenderOptions) {
           { ...eventCtx, retryable: false },
         );
         // A test address that hard-bounces is dead for broadcasts too; a policy rejection is the provider's.
-        await handlePermanentRejection(tx, workspaceId, { provider, error: failure, handedOver, to: input.to, message: failed });
+        await handlePermanentRejection(tx, workspaceId, { provider, error: failure, handedOver, to: input.to, message: failed, mailing: null });
         return failed;
       });
       throw new ApiError('provider_error', `The provider refused the test message: ${failure.message}`, {

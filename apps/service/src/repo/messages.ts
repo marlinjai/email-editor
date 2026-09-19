@@ -130,6 +130,21 @@ export function messagesRepo(db: Db) {
       return { first, last: last.reverse() };
     },
 
+    /**
+     * A provider's latest messages within the last 24 hours and since an admin
+     * last cleared its anomaly, test sends included, oldest first.
+     */
+    async recentOfProvider(workspaceId: string, providerId: string, limit: number): Promise<RunMessage[]> {
+      const rows = await db<RunMessage[]>`
+        SELECT m.id, m.error, m.rejection_class, m.rejection_signature FROM messages m
+        JOIN providers p ON p.workspace_id = m.workspace_id AND p.id = m.provider_id
+        WHERE m.workspace_id = ${workspaceId} AND m.provider_id = ${providerId}
+          AND m.created_at > now() - interval '24 hours'
+          AND (p.breaker_reset_at IS NULL OR m.created_at > p.breaker_reset_at)
+        ORDER BY m.created_at DESC, m.id DESC LIMIT ${limit}`;
+      return rows.reverse();
+    },
+
     /** The latest message archived for a queue row: how a crashed send is reconciled. */
     async latestForRecipient(workspaceId: string, recipientId: string): Promise<MessageSummaryRow | null> {
       const rows = await db<MessageSummaryRow[]>`
