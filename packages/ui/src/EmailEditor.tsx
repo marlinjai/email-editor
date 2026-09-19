@@ -28,18 +28,20 @@ import {
   createRootStore,
   BlockType,
   createSection,
+  createWrapper,
+  cloneSectionSnapshot,
   isLeafBlockType,
   type RootStoreInstance,
   type TemplateSnapshotIn,
   type TemplateSnapshotOut,
   type BlockSnapshotIn,
-  type SectionSnapshotIn,
 } from '@marlinjai/email-editor-core';
 import { StoreProvider, useStore } from './store';
 import { EmailRenderer } from './renderer';
 import { PropertyInspector } from './inspector';
 import { LeftSidebar } from './sidebar/LeftSidebar';
 import { DragOverlayContent } from './DragOverlayContent';
+import { DeleteWrapperDialog } from './DeleteWrapperDialog';
 import { EditorHostProvider, type OnRequestImage } from './host/EditorHostContext';
 import { nanoid } from 'nanoid';
 import clsx from 'clsx';
@@ -201,9 +203,14 @@ const EmailEditorContent = observer(function EmailEditorContent({
   }, [template, editorUI]);
 
   const handleAddPrebuilt = useCallback((prebuilt: { section: any }) => {
-    const newSection = cloneSectionWithNewIds(prebuilt.section);
+    const newSection = cloneSectionSnapshot(prebuilt.section);
     template.addSection(newSection);
     editorUI.selectSection(newSection.id);
+  }, [template, editorUI]);
+
+  const handleAddWrapper = useCallback(() => {
+    const wrapper = template.addWrapper(createWrapper());
+    editorUI.selectWrapper(wrapper.id);
   }, [template, editorUI]);
 
   const handleDeleteBlock = useCallback((blockId: string) => {
@@ -241,6 +248,7 @@ const EmailEditorContent = observer(function EmailEditorContent({
             prebuiltRegistry={prebuiltRegistry}
             onAddSection={handleAddSection}
             onAddPrebuilt={handleAddPrebuilt}
+            onAddWrapper={handleAddWrapper}
           />
 
           <div className="flex-1 overflow-auto bg-canvas-1 p-8">
@@ -250,6 +258,8 @@ const EmailEditorContent = observer(function EmailEditorContent({
           <PropertyInspector onDeleteBlock={handleDeleteBlock} />
         </div>
       </div>
+
+      <DeleteWrapperDialog />
 
       <DragOverlay
         dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}
@@ -413,9 +423,20 @@ const ZoomControls = observer(function ZoomControls() {
 
 // === Utility Functions ===
 
+/** Whether a key press belongs to a field or to text being edited, not to the canvas. */
+function isTyping(target: EventTarget | null): boolean {
+  const el = (target instanceof Element ? target : null) ?? (document.activeElement as Element | null);
+  if (!el) return false;
+  if (el instanceof HTMLElement && el.isContentEditable) return true;
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+}
+
 function useKeyboardShortcuts(store: RootStoreInstance) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // The delete-container dialog handles its own keys (Escape closes it).
+      if (store.editorUI.pendingWrapperDeleteId) return;
+
       // Undo/Redo
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
@@ -424,14 +445,13 @@ function useKeyboardShortcuts(store: RootStoreInstance) {
 
       // Delete
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const activeEl = document.activeElement;
-        if (activeEl?.tagName !== 'INPUT' && activeEl?.tagName !== 'TEXTAREA') {
+        if (!isTyping(e.target)) {
           // Sub-column first: delete the sub-column or auto-merge back if count would drop to 1.
           if (store.editorUI.selectedSubColumnId) {
             e.preventDefault();
             const targetId = store.editorUI.selectedSubColumnId;
             let parent: any;
-            for (const section of store.template.sections) {
+            for (const section of store.template.allSections) {
               for (const col of section.columns) {
                 const has = (col.subColumns ?? []).some((s: any) => s.id === targetId);
                 if (has) { parent = col; break; }
@@ -453,6 +473,19 @@ function useKeyboardShortcuts(store: RootStoreInstance) {
             e.preventDefault();
             store.template.deleteBlock(store.editorUI.selectedBlockId);
             store.editorUI.clearSelection();
+            return;
+          }
+          // A section goes at once (undo brings it back); a container asks what happens to its sections.
+          if (store.editorUI.selectedSectionId) {
+            e.preventDefault();
+            store.template.removeSection(store.editorUI.selectedSectionId);
+            store.editorUI.clearSelection();
+            return;
+          }
+          if (store.editorUI.selectedWrapperId) {
+            e.preventDefault();
+            store.editorUI.requestWrapperDelete(store.editorUI.selectedWrapperId);
+            return;
           }
         }
       }
@@ -481,7 +514,7 @@ function handleDrop(
   if (templateId && prebuiltRegistry) {
     const prebuilt = prebuiltRegistry.get(templateId);
     if (prebuilt) {
-      const newSection = cloneSectionWithNewIds(prebuilt.section);
+      const newSection = cloneSectionSnapshot(prebuilt.section);
       template.addSection(newSection);
       editorUI.selectSection(newSection.id);
       return;
@@ -503,22 +536,20 @@ function handleDrop(
 
   if (!over) {
     // No target - add to last section or create new
-    if (template.sections.length === 0) {
-      const section = createSection();
-      template.addSection(section);
-      template.insertBlock(template.sections[0].columns[0].id, newBlock, 0);
+    const sections = template.allSections;
+    if (sections.length === 0) {
+      const section = template.addSection(createSection());
+      template.insertBlock(section.columns[0].id, newBlock, 0);
     } else {
-      const lastSection = template.sections[template.sections.length - 1];
-      const lastColumn = lastSection.columns[0];
+      const lastColumn = sections[sections.length - 1].columns[0];
       template.insertBlock(lastColumn.id, newBlock, lastColumn.blocks.length);
     }
   } else {
     const dropId = over.id.toString();
 
     if (dropId === 'drop-empty') {
-      const section = createSection();
-      template.addSection(section);
-      template.insertBlock(template.sections[0].columns[0].id, newBlock, 0);
+      const section = template.addSection(createSection());
+      template.insertBlock(section.columns[0].id, newBlock, 0);
     } else if (dropId.startsWith('drop-subcolumn-')) {
       // Format: drop-subcolumn-<subColumnId>-<index>
       const m = dropId.match(/^drop-subcolumn-(.+)-(\d+)$/);
@@ -531,7 +562,7 @@ function handleDrop(
         }
         // Walk the template to find the sub-column instance.
         let target: any = undefined;
-        for (const section of template.sections) {
+        for (const section of template.allSections) {
           for (const col of section.columns) {
             const sc = (col.subColumns ?? []).find?.((s: any) => s.id === subColumnId);
             if (sc) { target = sc; break; }
@@ -564,19 +595,4 @@ function handleDrop(
   }
 
   editorUI.selectBlock(newBlock.id);
-}
-
-function cloneSectionWithNewIds(section: any): SectionSnapshotIn {
-  return {
-    ...section,
-    id: nanoid(),
-    columns: section.columns.map((col: any) => ({
-      ...col,
-      id: nanoid(),
-      blocks: col.blocks.map((block: any) => ({
-        ...block,
-        id: nanoid(),
-      })),
-    })),
-  };
 }

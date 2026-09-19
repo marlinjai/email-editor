@@ -20,6 +20,7 @@ interface LeftSidebarProps {
   prebuiltRegistry?: PrebuiltTemplateRegistry;
   onAddSection: (columnCount: 1 | 2 | 3) => void;
   onAddPrebuilt: (template: PrebuiltTemplate) => void;
+  onAddWrapper: () => void;
 }
 
 const TABS = ['elements', 'layout', 'layers', 'settings'] as const;
@@ -29,6 +30,7 @@ export const LeftSidebar = observer(function LeftSidebar({
   prebuiltRegistry,
   onAddSection,
   onAddPrebuilt,
+  onAddWrapper,
 }: LeftSidebarProps) {
   const { editorUI } = useStore();
 
@@ -62,6 +64,7 @@ export const LeftSidebar = observer(function LeftSidebar({
             templates={prebuiltRegistry?.getAll() || []}
             onAddSection={onAddSection}
             onAddPrebuilt={onAddPrebuilt}
+            onAddWrapper={onAddWrapper}
           />
         )}
         {editorUI.activeTab === 'layers' && <LayersPanel />}

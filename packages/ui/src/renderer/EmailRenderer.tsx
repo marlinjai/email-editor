@@ -3,7 +3,9 @@ import React from 'react';
 import { observer } from 'mobx-react-lite';
 import clsx from 'clsx';
 import { useStore } from '../store';
+import { isWrapperInstance, type SectionInstance } from '@marlinjai/email-editor-core';
 import { SectionRenderer } from './SectionRenderer';
+import { WrapperRenderer } from './WrapperRenderer';
 
 interface EmailRendererProps {
   /** Additional class names */
@@ -53,13 +55,13 @@ export const EmailRenderer = observer(({ className }: EmailRendererProps) => {
     >
       {/* Email content */}
       <div className="email-content">
-        {template.sections.map((section, index) => (
-          <SectionRenderer
-            key={section.id}
-            section={section}
-            sectionIndex={index}
-          />
-        ))}
+        {template.sections.map((item, index) =>
+          isWrapperInstance(item) ? (
+            <WrapperRenderer key={item.id} wrapper={item} />
+          ) : (
+            <SectionRenderer key={item.id} section={item as SectionInstance} sectionIndex={index} />
+          )
+        )}
 
         {/* Empty state */}
         {template.sections.length === 0 && (
