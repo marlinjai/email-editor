@@ -146,6 +146,8 @@ test('templates: the editor saves, a concurrent save is caught, an image uploads
   const title = page.getByLabel('Template name');
   await expect(title).toHaveValue('Newsletter');
   await expect(page.locator('[data-block-id="txt-1"]')).toBeVisible();
+  // One Save only: the header's. The editor's toolbar must not add its own.
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1);
 
   await title.fill('Newsletter v2');
   await expect(page.getByText('Unsaved changes')).toBeVisible();

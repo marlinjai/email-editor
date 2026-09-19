@@ -259,7 +259,8 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
             key={editorKey}
             initialTemplate={toEditorInput(template)}
             onChange={onChange}
-            onSave={() => doSave(template.version)}
+            // No onSave: the header's Save and Cmd/Ctrl+S save here; passing it
+            // would render the editor toolbar's own Save as a second button.
             onRequestImage={onRequestImage}
             theme={editorTheme}
           />

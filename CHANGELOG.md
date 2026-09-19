@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   data is rewritten.
 - The compiler wrote only the padding sides that were set, so `{ top, bottom }`
   was read by MJML as vertical and horizontal padding; it now writes all four.
+- Dashboard: the template editor showed two Save buttons, the page header's and
+  the editor toolbar's own. The dashboard no longer passes `onSave` to the
+  editor, so only the header's Save remains; Cmd/Ctrl+S still saves.
 
 ## [0.1.0] - 2026-09-19
 
