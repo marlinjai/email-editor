@@ -996,7 +996,8 @@ MJML, and also export as MJML or as HTML". Branch `feat/mjml-import-export`.
   vendored: that repository declares no license, so the samples are written
   here instead.
 - **What does not map exactly, and how it degrades** (the mail never changes;
-  editability does): a wrapper around several sections, an `mj-hero` with
+  editability does; wrappers import as wrappers since "Editable wrappers"
+  below): a wrapper around several sections, an `mj-hero` with
   content, `mj-social` (the Social block draws its own icons), a hand-written
   `mj-table` (the Table block styles every cell), a section with conditional
   comments between columns, and `mj-raw` with `position` become Raw HTML blocks.
@@ -1032,6 +1033,95 @@ MJML, and also export as MJML or as HTML". Branch `feat/mjml-import-export`.
   entry instead.
 - **Landing page.** The editor line names MJML import and export in all five
   languages.
+
+### Editable wrappers (built 2026-09-19)
+
+Marlin decided (2026-09-19): "teach the editor to edit wrappers visually".
+Branch `feat/editor-wrappers`. Until then an MJML `mj-wrapper` around several
+sections (common in real templates) imported as one Raw HTML block: the mail
+was right, but nothing inside could be edited.
+
+- **Schema 1.1.** A document's top level is an ordered list of sections and
+  wrappers, `{ type: 'wrapper', sections: [...] }`, with every `mj-wrapper`
+  attribute MJML 4.18 documents: background colour, image, position, size and
+  repeat (plus a gradient, as sections have), `border` and each side's border,
+  `border-radius`, padding as the four-side object, `full-width`, `css-class`,
+  `gap` (px, applied between the sections; MJML 4.15 and later) and
+  `text-align`, and `extraAttributes` for the rest (`direction`,
+  `background-position-x/y`, per-side padding attributes). Wrappers never nest
+  and never sit inside a section; a wrapper may be empty (it keeps its styling,
+  and sections can move back in). The version is bumped so that a build which
+  only knows 1.0 refuses a wrapper cleanly with `NEWER_VERSION` instead of
+  failing validation. `migrateTemplate` takes 1.0 to 1.1 changing only the
+  version, with one exception: the 1.0 `isWrapper` flag (set by the first MJML
+  import for a wrapper around exactly one section) becomes a real wrapper with
+  the section's id and attributes around one plain section (id `<id>-inner`,
+  deterministic, so a stored document compiles the same every time). The flag
+  is gone from 1.1. Tests: all 35 prebuilt sections compile byte-identically
+  before and after the migration; an `isWrapper` document compiles to MJML's
+  own HTML for what the 1.0 compiler wrote, differing only in the inner
+  section's class.
+- **Store.** `WrapperModel` has the sections' snapshot boundary (filled
+  defaults recorded and dropped, padding mapped between the object and flat
+  fields); the template's top level is a union dispatched on `type`. Actions:
+  add, wrap a section, unwrap, move a section into, out of, between and within
+  wrappers, reorder wrappers, duplicate (every id inside is new), delete with or
+  without the sections. A 1.0 document opens as `migrateTemplate` takes it, so
+  the store always emits 1.1. `wrapper-store.test.ts` round-trips a wrapper with
+  every field deep-equal and runs every operation through undo and redo.
+- **Found and fixed on the way: redo never worked.** The snapshot listener ran
+  after `undo()` had finished and recorded the restored state as a new step,
+  which cut off the redo future, for every edit, not only wrappers. Also fixed:
+  the Image background mode could not be chosen before an image existed, and a
+  duplicated section kept its sub-columns' ids.
+- **Canvas and editing.** A wrapper draws its background, border, radius,
+  padding (MJML's `20px 0` when unset) and gap as the mail does, with a violet
+  ring and handle one level out from the sections' amber ones. Wrap in
+  container and Move out on the section toolbar, the section inspector and the
+  Layers panel; Add Container in the Layout tab; a section next to a container
+  can join it from the inspector without a drag. The Layers panel nests a
+  container's sections and drags them into, out of and between containers; its
+  collision rule picks the row under the pointer, and from the keyboard the row
+  whose top edge is nearest (rows differ a lot in height, so the centre rule
+  kept a tall row over its own place). The inspector edits every wrapper
+  attribute with the existing controls; the background image goes through the
+  host's `onRequestImage` (`blockType: 'wrapper'`). Deleting asks in a branded
+  dialog (keep the sections, delete everything, cancel). Delete works on
+  sections and containers from the keyboard (sections had no key before).
+- **MJML's rules for sections inside a wrapper**, checked against MJML 4.18's
+  output: a section's `full-width` has no visible effect there (it spans the
+  wrapper's content box either way), and inside a full-width wrapper MJML draws
+  sections at standard width (MJML's documentation). The section inspector
+  therefore offers Full Width only to switch it off, with the reason. Outlook
+  on Windows cannot show a section's background image inside a wrapper that has
+  one (no nested VML), so the inspector warns when both are set.
+- **Compiler and import.** The compiler emits `mj-wrapper` with its attributes
+  (quote-escaped) around its sections; `MJMLExporter` now compiles with the same
+  compiler instead of its own copy. The import maps `mj-wrapper` to a wrapper;
+  a child it cannot read as a section (a hero with content, `mj-raw`, a section
+  with conditional comments, a nested wrapper) stays inside, in place, as a
+  raw-only section whose Raw blocks compile back into the wrapper as `mj-raw`,
+  so nothing is dropped and the mail is unchanged. Tests compare the compiled
+  HTML with MJML's own rendering of the equivalent hand-written MJML (exact
+  after whitespace), and the corpus samples that use a wrapper
+  (`newsletter.mjml`, `unsupported.mjml`, the new `wrapper-cards.mjml`) import
+  it as a wrapper and still compile to equivalent HTML.
+- **Service, contract, SDK.** The contract's `DOCUMENT_SCHEMA_VERSIONS` is
+  `['1.0', '1.1']` (the SDK takes its types from it). The service keeps
+  storing a document exactly as sent, so a client on a 1.0 editor reads back a
+  document it can open, and brings it to 1.1 in every compile.
+- **End to end.** `apps/dashboard/test/e2e/wrappers.spec.ts` on the four
+  stateful-flow paths: forward (wrap two sections, one by a keyboard drag in
+  the Layers panel, style the container, a background image through the image
+  dialog, save, export MJML with `mj-wrapper`), backtrack (unwrap, undo and
+  redo, the delete dialog's choices, a revised value in the export), resume (a
+  reload keeps the container and its styles), re-entry (an MJML import with a
+  wrapper, edited visually and exported).
+- **Not built, by decision:** selecting several sections at once (the store has
+  one selection); a section is wrapped alone and its neighbours join by a drag
+  or the inspector's buttons. The other constructs an import still keeps as Raw
+  HTML (an `mj-hero` with content, `mj-social`, a hand-written `mj-table`) stay
+  a ROADMAP line.
 
 ## Legal shape
 

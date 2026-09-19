@@ -143,9 +143,9 @@ Without the hook, the image block's inspector shows a plain URL field. With it, 
 
 ```typescript
 interface EmailTemplate {
-  version: '1.0';
+  version: '1.0' | '1.1'; // migrateTemplate returns '1.1'
   metadata: TemplateMetadata;
-  sections: Section[];
+  sections: Array<Section | Wrapper>; // the top level, in order
 }
 
 interface TemplateMetadata {
@@ -174,13 +174,45 @@ interface Section {
   backgroundRepeat?: 'repeat' | 'no-repeat';
   backgroundSize?: string;
   fullWidth?: boolean;
-  isWrapper?: boolean;
   noStack?: boolean;
   hidden?: boolean;
   padding?: Spacing;
   columns: Column[];
 }
 ```
+
+### Wrapper
+
+A container around sections (MJML `mj-wrapper`), at the top level next to sections (schema 1.1). It never holds another wrapper and may be empty.
+
+```typescript
+interface Wrapper {
+  id: string;
+  type: 'wrapper';
+  hidden?: boolean;
+  backgroundColor?: string;
+  backgroundImage?: string; // background-url
+  backgroundGradient?: BackgroundGradient;
+  backgroundPosition?: string;
+  backgroundRepeat?: 'repeat' | 'no-repeat';
+  backgroundSize?: string;
+  border?: string; // all four sides
+  borderTop?: string;
+  borderRight?: string;
+  borderBottom?: string;
+  borderLeft?: string;
+  borderRadius?: string;
+  padding?: Spacing; // MJML's default when unset: 20px 0
+  fullWidth?: boolean;
+  cssClass?: string;
+  gap?: string; // px, between the sections inside
+  textAlign?: 'left' | 'center' | 'right';
+  extraAttributes?: Record<string, string>;
+  sections: Section[];
+}
+```
+
+`isWrapper(item)` tells a wrapper from a section, and `allSections(doc.sections)` lists every section in order, the ones inside wrappers included.
 
 ### Column
 
@@ -429,7 +461,7 @@ const prebuiltRegistry = createStandardPrebuiltRegistry();
 
 ### migrateTemplate(doc)
 
-Validates a stored or incoming document and returns it at the current schema version. Import it from `@marlinjai/email-editor-core`. Every document carries a schema `version` (today `"1.0"`, exported as `CURRENT_TEMPLATE_VERSION`); for `1.0` it returns the same object, validated. Run documents through it before compiling and when loading them from storage.
+Validates a stored or incoming document and returns it at the current schema version. Import it from `@marlinjai/email-editor-core`. Every document carries a schema `version` (today `"1.1"`, exported as `CURRENT_TEMPLATE_VERSION`; 1.1 added wrappers). For a `1.1` document it returns the same object, validated; a `1.0` document comes back as a new object with only the version changed (a 1.0 section flagged `isWrapper` becomes a wrapper around that section). Run documents through it before compiling and when loading them from storage.
 
 ```typescript
 import { migrateTemplate, isTemplateMigrationError } from '@marlinjai/email-editor-core';

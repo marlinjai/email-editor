@@ -74,6 +74,14 @@ from a newer editor, with `details.document_version`, `UNSUPPORTED_VERSION`,
 `MISSING_VERSION`) and the failing paths in `details.issues`. A document over
 `MAX_DOCUMENT_BYTES` is `payload_too_large`.
 
+**Schema versions.** The service accepts schema 1.0 and 1.1 (1.1 added
+wrappers, a container around sections, at the top level). It stores a document
+in the version it was sent in, and `schema_version` records that version, so a
+client on a 1.0 editor reads back a document it can open. Every compile (the
+editor's preview, an export, a test send, a send) brings the document to 1.1
+first, in `workspaceCompile`, because the compiler only knows 1.1; a 1.0
+document without the old `isWrapper` flag compiles to exactly the same mail.
+
 A document's `id` is optional (the contract's `TemplateDocument` and the core
 schema agree). The service stores a document exactly as sent: without an id it
 is saved, compiled and sent without one, and an id is kept verbatim; an id that

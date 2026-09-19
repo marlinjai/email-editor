@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Editable containers (MJML `mj-wrapper`): several sections under one
+  background (colour, gradient or image), border (all sides or each side),
+  corner radius and padding, with a `gap` between the sections, full width,
+  `css-class` and `text-align`. Add one from the Layout tab or wrap a section
+  (canvas toolbar, inspector, Layers panel); unwrap it; drag sections into, out
+  of and between containers in the Layers panel (pointer or keyboard), where a
+  container's sections are nested one level in. The canvas draws the container
+  as the mail does, with its own selection ring and handle; the inspector edits
+  every attribute, the background image through `onRequestImage`
+  (`blockType: 'wrapper'`). Deleting a container asks in the editor's own dialog
+  whether to keep its sections. Every container action is one undo step.
+- Schema 1.1: a document's top level is an ordered list of sections and
+  wrappers (`Wrapper`, `TopLevelItem`, `isWrapper()`, `allSections()` in the
+  core; `WrapperModel`, `createWrapper`, `isWrapperInstance` and the template's
+  `addWrapper`, `wrapSection`, `unwrap`, `moveSectionTo`, `removeWrapper`,
+  `duplicateWrapper` in the store). `migrateTemplate` takes a 1.0 document to
+  1.1 changing only the version, except that the 1.0 `isWrapper` flag becomes a
+  real wrapper; a 1.0 document without it compiles byte-identically.
+- The MJML import maps `mj-wrapper` to a wrapper instead of Raw HTML, with every
+  wrapper attribute as a field; children it cannot read as sections stay inside,
+  in place, as raw HTML.
+- Keyboard: Delete removes a selected section, and asks before removing a
+  selected container.
+
 - `importMjml` in `@marlinjai/email-editor-core/server`: reads an MJML document
   into the editor's document model. Nothing is dropped silently: what cannot
   become an editable block is kept as compiled HTML, with a warning carrying its
@@ -31,7 +55,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   desktop."), counting a column without a width as MJML does (100 divided by
   the number of columns).
 
+### Changed
+
+- Mail service: accepts schema 1.0 and 1.1, stores a document in the version it
+  was sent in, and brings it to 1.1 for every compile. The contract's
+  `DOCUMENT_SCHEMA_VERSIONS` is `['1.0', '1.1']`. New documents from the editor
+  and the dashboard start at 1.1.
+- `MJMLExporter` (server entry) compiles the store's snapshot with
+  `MJMLCompiler` instead of its own copy of the compiler, so both give the same
+  mail.
+- Inspector fields have labels tied to their inputs, and button groups say
+  which option is pressed.
+
 ### Fixed
+
+- Redo never worked: undo recorded the state it restored as a new history step,
+  which cut off the redo future.
+- The Image background mode of a section could not be chosen before an image
+  was set, so no background image could be added from the inspector.
+- Duplicating a section gave its sub-columns and their blocks the ids of the
+  originals; every id inside a copy is new now.
 
 - The editor now gives back exactly the document it was given. It dropped
   every `padding` object when it opened a document (and its own padding edits
