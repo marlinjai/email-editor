@@ -7,7 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-19
+
+The editor becomes Lumitra Mail: a multi-tenant mail service and marketing
+platform, deployed at https://mail.lumitra.co (API, hosted pages, landing page)
+and https://app.mail.lumitra.co (dashboard), with ŌPUNTIA's Studio as its first
+client. Packages are versioned 0.1.0; their first npm publish is a manual step
+(`scripts/first-publish.sh`).
+
 ### Added
+
+#### Lumitra Mail service (`apps/service`)
+- S0 foundation: workspaces, members and invitations, hashed and scoped API keys,
+  audit log, idempotency keys, typed error envelope; every route mounted from the
+  contract's route table; Postgres migrations applied at container start.
+- S1 templates: versioned templates with conflict-safe saves, compile to MJML and
+  HTML in a worker-thread pool, image assets in Storage Brain served from a stable
+  `/a/:id` address, and an optional per-workspace policy that allows only
+  service-hosted images and fonts.
+- S2 sending: SMTP and Resend providers with sealed credentials and per-provider
+  policies (the iCloud+ limits built in), contacts, topics and suppressions,
+  mailings with a state machine, a send worker (`FOR UPDATE SKIP LOCKED`, rolling
+  daily budget, minimum interval, retries, outcome-unknown never resent), a hosted
+  unsubscribe page in five languages with one-click unsubscribe (RFC 8058), and
+  signed webhooks with retries and an SSRF guard.
+- Bounces and complaints: hard SMTP rejections and Resend bounce and complaint
+  events suppress the address; a per-mailing and a per-provider circuit breaker
+  stop mass false suppression and revert exactly.
+- S4 platform: tags, typed contact properties, segments compiled to parameterised
+  SQL, resumable CSV imports, hosted signup forms with double opt-in, scheduling,
+  A/B tests, and open and click tracking that is off by default.
+- S5 billing: plans and limits with usage metering, Stripe Checkout and portal on
+  the shared account (fail-closed until configured), a signed Stripe webhook with
+  reconciliation, and an operator-only billing exemption.
+- Company erasure through auth-brain's `tenant.erased`.
+- Public landing page at `/` in five languages, `robots.txt` and sitemap.
+
+#### Dashboard (`apps/dashboard`)
+- Next.js 16 app at app.mail.lumitra.co, signed in through auth-brain with a second
+  factor and the `mail` app grant; every screen over the SDK, server-side only:
+  workspaces, members and invitations, API keys, providers, topics, webhooks,
+  templates with the editor, mailings with live progress, the sent archive,
+  contacts, suppressions, the audit log, the S4 marketing screens and billing.
+
+#### Typed client (`@marlinjai/mail-sdk` 0.1.0)
+- Built on the contract's route table: retries with a stable idempotency key,
+  typed errors, cursor pagination, response headers via `onResponse`, and webhook
+  verification for receivers.
+
+#### Editor packages (0.1.0)
+- React 19, Next 16 and Tailwind 4 hosts: a stylesheet scoped under `.ee-root`,
+  the `onRequestImage` hook, `migrateTemplate`, documents without an id, and a
+  checked Trusted Publishing release path for all six published packages.
+
+#### Earlier work in this release
+
 
 #### Mail service API contract (`@marlinjai/mail-contract` 0.1.0)
 - zod schemas and types for every v1 request, response and error of the mail
