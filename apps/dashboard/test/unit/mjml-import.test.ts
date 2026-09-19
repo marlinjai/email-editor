@@ -157,7 +157,8 @@ describe('helpers', () => {
 });
 
 const api = { templates: { importPreview: vi.fn(), import: vi.fn() } };
-vi.mock('@/lib/mail', () => ({ mail: vi.fn(async () => ({ api })) }));
+const uploadApi = { templates: { import: vi.fn() } };
+vi.mock('@/lib/mail', () => ({ mail: vi.fn(async () => ({ api })), mailForUpload: vi.fn(async () => ({ api: uploadApi })) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 const { previewImport, importTemplate } = await import('@/app/w/[ws]/templates/actions');
 
@@ -192,9 +193,21 @@ describe('server actions', () => {
 
   it('imports with the idempotency key of the draft', async () => {
     api.templates.import.mockResolvedValue({ template: { id: 't1' }, warnings: [], imported_assets: [] });
-    const r = await importTemplate('ws', { name: ' Autumn ', mjml: MJML, importRemoteAssets: true, idempotencyKey: 'key-9' });
+    const r = await importTemplate('ws', { name: ' Autumn ', mjml: MJML, importRemoteAssets: false, idempotencyKey: 'key-9' });
     expect(r.ok).toBe(true);
-    expect(api.templates.import).toHaveBeenCalledWith({ name: 'Autumn', mjml: MJML, import_remote_assets: true }, { idempotencyKey: 'key-9' });
+    expect(api.templates.import).toHaveBeenCalledWith({ name: 'Autumn', mjml: MJML, import_remote_assets: false }, { idempotencyKey: 'key-9' });
+    expect(uploadApi.templates.import).not.toHaveBeenCalled();
+  });
+
+  it('copying images uses the long-timeout client, so slow images are not cut off and retried', async () => {
+    uploadApi.templates.import.mockResolvedValue({ template: { id: 't2' }, warnings: [], imported_assets: [] });
+    const r = await importTemplate('ws', { name: 'Autumn', mjml: MJML, importRemoteAssets: true, idempotencyKey: 'key-10' });
+    expect(r.ok).toBe(true);
+    expect(uploadApi.templates.import).toHaveBeenCalledWith({ name: 'Autumn', mjml: MJML, import_remote_assets: true }, { idempotencyKey: 'key-10' });
+    expect(api.templates.import).not.toHaveBeenCalled();
+  });
+
+  it('refuses an import without a name', async () => {
     const unnamed = await importTemplate('ws', { name: ' ', mjml: MJML, importRemoteAssets: false, idempotencyKey: 'k' });
     expect(unnamed.ok).toBe(false);
     if (!unnamed.ok) expect(unnamed.error.fields?.name).toBe('Name the template');

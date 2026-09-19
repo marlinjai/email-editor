@@ -42,7 +42,10 @@ export const KNOWN_TAGS: ReadonlySet<string> = new Set(['mjml', ...Object.keys(C
 
 function normalize(node: RawNode): MjmlNode {
   const attributes: Record<string, string> = {};
-  for (const [k, v] of Object.entries(node.attributes ?? {})) attributes[k] = String(v);
+  // Values stay XML-escaped as written; a literal quote (legal inside a
+  // single-quoted attribute) is escaped too, since the compiler writes every
+  // value inside double quotes.
+  for (const [k, v] of Object.entries(node.attributes ?? {})) attributes[k] = String(v).replace(/"/g, '&quot;');
   return {
     tagName: node.tagName,
     attributes,
@@ -71,7 +74,7 @@ export function parseMjml(source: string): MjmlNode {
 /** A node back to MJML markup, attributes in source order. */
 export function serialize(node: MjmlNode): string {
   const attrs = Object.entries(node.attributes)
-    .map(([k, v]) => ` ${k}="${v.replace(/"/g, '&quot;')}"`)
+    .map(([k, v]) => ` ${k}="${v}"`)
     .join('');
   const inner = node.content !== undefined ? node.content : node.children.map(serialize).join('');
   if (inner === '' && node.children.length === 0 && node.content === undefined) return `<${node.tagName}${attrs} />`;

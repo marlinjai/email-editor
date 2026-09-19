@@ -147,10 +147,15 @@ describe('templates.import', () => {
     expect(reused.body.error.code).toBe('idempotency_key_reused');
   });
 
-  it('a failed import keeps the key free: the corrected retry with the same key creates the template', async () => {
+  it('a refused import is stored against its key: the corrected file needs a new key, and then imports', async () => {
     const bad = await h.call({ method: 'POST', path: '/v1/templates/import', key: A.key, body: { name: 'Fixed', mjml: '<mjml><mj-body>' }, idempotencyKey: 'import-fix-1' });
     expect(bad.status).toBe(422);
-    // A 4xx is stored against the key: the same key with a different body is refused, a new key works.
+    const replay = await h.call({ method: 'POST', path: '/v1/templates/import', key: A.key, body: { name: 'Fixed', mjml: '<mjml><mj-body>' }, idempotencyKey: 'import-fix-1' });
+    expect(replay.status).toBe(422);
+    expect(replay.headers.get('idempotent-replayed')).toBe('true');
+    const sameKey = await h.call({ method: 'POST', path: '/v1/templates/import', key: A.key, body: { name: 'Fixed', mjml: MJML }, idempotencyKey: 'import-fix-1' });
+    expect(sameKey.status).toBe(409);
+    expect(sameKey.body.error.code).toBe('idempotency_key_reused');
     const good = await h.call({ method: 'POST', path: '/v1/templates/import', key: A.key, body: { name: 'Fixed', mjml: MJML }, idempotencyKey: 'import-fix-2' });
     expect(good.status).toBe(201);
   });

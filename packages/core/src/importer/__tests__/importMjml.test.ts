@@ -124,6 +124,20 @@ describe('mapping', () => {
     expect(button).toMatchObject({ type: 'button', label: 'Go &gt;', href: 'https://example.org', extraAttributes: { 'font-size': '18px' } });
   });
 
+  it('a quote inside a single-quoted value cannot end the attribute, mapped or kept', () => {
+    const source = `<mjml><mj-body><mj-section><mj-column><mj-text font-family='Brand "Serif", serif'>Hi</mj-text><mj-button href="https://x.de" font-family='Brand "Sans"'>Go</mj-button></mj-column></mj-section></mj-body></mjml>`;
+    const { document } = importMjml(source);
+    const [text, button] = document.sections[0]!.columns[0]!.blocks as [TextBlock, ButtonBlock];
+    expect(text.fontFamily).toBe('Brand &quot;Serif&quot;, serif');
+    expect(button.extraAttributes).toEqual({ 'font-family': 'Brand &quot;Sans&quot;' });
+    const compiled = new MJMLCompiler().compile(document);
+    expect(compiled.mjml).toContain('font-family="Brand &quot;Serif&quot;, serif"');
+    expect(compiled.mjml).toContain('font-family="Brand &quot;Sans&quot;"');
+    expect(compiled.html).toContain('Hi');
+    expect(compiled.html).toContain('Go');
+    expect(importMjml(compiled.mjml).document).toEqual(document);
+  });
+
   it('columns without a width share the section evenly, as MJML does', () => {
     const { document } = importMjml(wrap('<mj-section><mj-column></mj-column><mj-column></mj-column><mj-column></mj-column></mj-section>'));
     expect(document.sections[0]!.columns.map((c) => c.width)).toEqual([100 / 3, 100 / 3, 100 / 3]);

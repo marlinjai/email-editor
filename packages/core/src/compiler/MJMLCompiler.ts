@@ -61,11 +61,13 @@ function finishAttributes(attrs: string[], classes: string[], extra?: ExtraAttri
   if (extra) {
     for (const [name, value] of Object.entries(extra)) {
       if (name === 'css-class') {
-        for (const c of value.split(/\s+/)) if (c && !allClasses.includes(c)) allClasses.push(c);
+        for (const c of value.replace(/"/g, '&quot;').split(/\s+/)) if (c && !allClasses.includes(c)) allClasses.push(c);
         continue;
       }
       if (taken.has(name)) continue;
-      out.push(`${name}="${value}"`);
+      // Values are kept as found, entities included; a literal quote (legal
+      // in a single-quoted source attribute) must not end this double-quoted one.
+      out.push(`${name}="${value.replace(/"/g, '&quot;')}"`);
     }
   }
   if (allClasses.length > 0) out.push(`css-class="${allClasses.join(' ')}"`);

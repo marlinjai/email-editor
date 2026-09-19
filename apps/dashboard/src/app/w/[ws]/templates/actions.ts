@@ -16,7 +16,7 @@ import {
 } from '@marlinjai/mail-sdk';
 import { act, DashboardRefusal, parseInput } from '@/lib/action';
 import { blankDocument } from '@/lib/documents';
-import { mail } from '@/lib/mail';
+import { mail, mailForUpload } from '@/lib/mail';
 import type { ActionResult } from '@/lib/result';
 
 const templatesPath = (ws: string) => `/w/${ws}/templates`;
@@ -213,7 +213,10 @@ export async function importTemplate(ws: string, input: z.input<typeof ImportInp
   if (!parsed.ok) return parsed;
   return act('templates.import', async () => {
     if (tooLargeMjml(parsed.data.mjml)) throw new DashboardRefusal('payload_too_large', TOO_LARGE);
-    const { api } = await mail(ws);
+    // Copying images means the service fetches up to 50 of them before it
+    // answers: the long-timeout client, so a slow one is not cut off at 10
+    // seconds and retried into "still being processed".
+    const { api } = parsed.data.importRemoteAssets ? await mailForUpload(ws) : await mail(ws);
     const result = await api.templates.import(
       { name: parsed.data.name, mjml: parsed.data.mjml, import_remote_assets: parsed.data.importRemoteAssets },
       { idempotencyKey: parsed.data.idempotencyKey },

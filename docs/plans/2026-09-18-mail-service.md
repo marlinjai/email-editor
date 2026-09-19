@@ -987,8 +987,17 @@ MJML, and also export as MJML or as HTML". Branch `feat/mjml-import-export`.
   comments between columns, and `mj-raw` with `position` become Raw HTML blocks.
   A component MJML does not know renders nothing in MJML either; its source is
   kept in a comment inside a Raw block (`unknown_component`). Pixel column widths
-  are kept as attributes (the editor's width control is in percent). The canvas
-  does not render document-wide defaults; the preview is the reference.
+  are kept as attributes (the editor's width control is in percent). Per-side
+  padding attributes (`padding-top` and friends) are kept as attributes too,
+  and MJML lets them win over the `padding` the inspector edits, so that side of
+  such an element does not respond to the inspector. The canvas does not render
+  document-wide defaults; the preview is the reference.
+- **Rendering change for existing mail.** With the padding fix, a document whose
+  padding sets only some sides (all 35 prebuilt sections, and any template
+  created through the API and not re-saved since) compiles to exactly those
+  sides with 0 elsewhere, as the canvas always showed, instead of MJML's
+  shorthand reading (`80px 80px` was 80 px on all four sides). Sent mailings keep
+  their stored HTML.
 - **Service and contract.** `templates.importPreview`, `templates.import`
   (idempotent, optional `import_remote_assets` through `assets.import`'s
   SSRF-guarded fetch), `templates.export` and `mailings.export` (the file, never
