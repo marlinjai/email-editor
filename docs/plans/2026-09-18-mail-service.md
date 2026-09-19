@@ -809,6 +809,91 @@ Defaults taken (each can be overturned later):
   was switched to `asset_policy: service_only` after the deploy; its only
   template (the base template) compiles without errors under it.
 
+### Bounces and complaints (built 2026-09-19, branch `feat/bounce-complaint-handling`)
+
+The plan said suppression of bounces and complaints is the service's, and the
+contract had `contact.bounced`, but nothing created a `bounced` or `complained`
+block: a permanent rejection only recorded `message.failed`. Now:
+
+- **Synchronous hard bounces.** When the receiving SMTP server rejects the
+  recipient while the message is handed over, the worker (and a test send)
+  blocks the address on every topic as `bounced`, with the failed message as
+  `source_message_id`, and emits `contact.bounced`, in the transaction that
+  archives the message. One pure function, `classifyRejection`
+  (`apps/service/src/transport/rejection.ts`, specified by its table test),
+  decides: enhanced status 5.1.x (bad mailbox or address, except 5.1.7 and
+  5.1.8, the sender's address, and any 5.1.x whose text names the sender or
+  the setup: "sender address", "from address", "not one of your addresses",
+  "relay", "authentication") and 5.2.1 (disabled mailbox) are hard bounces;
+  5.1.0 and 5.1.2 only when the text names the recipient's mailbox;
+  a classic 550, 551 or 553 without an enhanced code only when the text names
+  the recipient ("no such user", "user unknown"). RFC 5321's stock "mailbox
+  unavailable" is not enough: servers send it for policy blocks too.
+- **The sender's problem is not the recipient's.** 5.7.x (authentication,
+  relaying, content, reputation, rate), 530/534/535, and for Resend an HTTP
+  401 or 403, never block the recipient. They are counted on the provider
+  (`rejections: { count, last_error, last_at }`), which the provider card in
+  the dashboard shows. Mailbox full (5.2.2), size (5.3.4) and routing (5.4.x)
+  only fail the message.
+- **Resend events.** Each Resend provider has its own endpoint,
+  `POST /providers/:id/events/resend` (public, outside `/v1`, like the Stripe
+  webhook), verified with Svix's scheme (`svix-id`, `svix-timestamp`,
+  `svix-signature`, HMAC-SHA256 over `${id}.${timestamp}.${body}` with the
+  endpoint's `whsec_` secret, five minutes of tolerance), exactly once per
+  `svix-id` (`provider_events`, migration 0016). A `Permanent` `email.bounced`
+  blocks as `bounced`, `email.complained` as `complained`; transient and
+  undetermined bounces, `email.delivery_delayed` and every other type are
+  acknowledged and ignored. The message is found by Resend's email id, within
+  the provider and the workspace, and the address it went to is blocked. An
+  event for an unknown email younger than an hour (its own `created_at`)
+  answers 503 without recording anything, since it can outrun the worker's
+  recording of the send, and Resend redelivers it. An older one, or one without
+  a readable `created_at`, is only counted (`events.unmatched`) and logged: two workspaces or another system may
+  share one Resend account, and a wrong block costs a real person their mail
+  (decided in review, 2026-09-19). The contract already had `contact.bounced` with `reason: 'bounced' |
+  'complained'`, so complaints use it; no new event type.
+- **Registration.** Creating a Resend provider, and every successful verify
+  until it works, registers the endpoint at Resend (`POST /webhooks`) and
+  stores the returned signing secret sealed. A sending-only key cannot
+  (Resend answers `restricted_api_key`), and an instance without a public
+  https address cannot either: the provider then shows `events.status:
+  needs_secret`, the reason, and the URL to add at Resend by hand, and
+  `PUT /v1/providers/:id/events-secret` (`providers.setEventsSecret`)
+  stores the pasted secret. A new API key that belongs to another Resend
+  account (the registered endpoint is not found with it) registers anew there;
+  one from the same account keeps the endpoint. The old account's endpoint is
+  removed with the old key first. Deleting a provider, or erasing its
+  workspace, removes an endpoint the service registered itself (best effort).
+- **The bounce circuit breaker** (`apps/service/src/worker/breaker.ts`). A
+  broken provider or sender setup can make a server refuse every recipient
+  with an address code, and each false hard bounce would block a real person
+  for good. Within one run of a mailing (from its last entry into `sending`),
+  5 refusals in a row with the same reply, or more than 20 percent of the
+  first 50 messages refused, trip it: the run's bounce blocks are undone
+  (`contact.resubscribed` with source `bounce_reverted` for each), nothing
+  more is blocked in that run, the mailing is paused with a `pause_reason`,
+  and the provider shows `rejections.anomaly` with the sample reply. Resuming
+  (after fixing the provider) starts a new run, watched afresh; retry-failed
+  mails the addresses whose blocks were undone. A provider-wide breaker
+  (decided in the final review, 2026-09-19) covers one-to-one sends such as
+  ŌPUNTIA's "One person" and test sends: 5 refusals in a row with the same
+  reply from one provider within 24 hours undo those blocks, pause the
+  provider's sending mailings and halt the provider (no blocks, test sends and
+  mailing starts refused with `provider_anomaly`) until an admin clears the
+  anomaly (`providers.clearAnomaly`, a button on the provider card). Undoing is
+  exact: a hardened unsubscribe is restored, not deleted.
+- **Hardening an existing block.** An `unsubscribed` block the person could
+  lift themselves becomes `bounced` or `complained`, and a `bounced` block that
+  also draws a complaint becomes `complained`. A `manual` block is left alone.
+- **Known limit: asynchronous bounces over SMTP are not detected.** iCloud+
+  (and most SMTP servers) accept the message and report a bounce later as an
+  email to the sender's inbox. Reading it needs access to that inbox, which is
+  out of scope here; the provider card, the docs and the landing page say so
+  ("Over SMTP, addresses the server refuses outright are blocked"), and the
+  addresses have to be blocked by hand. ŌPUNTIA sends through iCloud+, so this
+  is the common case for the first client. A dated line on `ROADMAP.md` holds
+  the decision.
+
 ### The landing page at mail.lumitra.co (built 2026-09-19, branch `feat/mail-landing`)
 
 Approved by Marlin on 2026-09-18: the root of the service answered 404, while

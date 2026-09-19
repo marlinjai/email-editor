@@ -97,6 +97,13 @@ export const Mailing = z.object({
   ab_test: AbTestState.nullable(),
   started_at: Timestamp.nullable(),
   finished_at: Timestamp.nullable(),
+  /**
+   * Why the service paused the mailing itself, null when a person paused it or
+   * it is not paused. Today only the bounce circuit breaker does: too many
+   * recipients refused as dead addresses in one run (see the provider's
+   * `rejections.anomaly`). Resuming clears it and starts a new run.
+   */
+  pause_reason: z.string().nullable().default(null),
   created_at: Timestamp,
   updated_at: Timestamp,
 });

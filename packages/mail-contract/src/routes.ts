@@ -28,7 +28,7 @@ import {
   TemplateVersion,
   TemplateVersionParams,
 } from './templates';
-import { Provider, ProviderCreate, ProviderUpdate, ProviderUsage, ProviderVerifyResult } from './providers';
+import { Provider, ProviderCreate, ProviderEventsSecret, ProviderUpdate, ProviderUsage, ProviderVerifyResult } from './providers';
 import {
   Contact,
   ContactErased,
@@ -410,6 +410,25 @@ export const sendingRoutes = {
     path: '/v1/providers/:id/verify',
     params: IdParams,
     response: ProviderVerifyResult,
+    status: 200,
+    access: 'admin',
+    phase: 'S2',
+  },
+  'providers.setEventsSecret': {
+    method: 'PUT',
+    path: '/v1/providers/:id/events-secret',
+    params: IdParams,
+    body: ProviderEventsSecret,
+    response: Provider,
+    status: 200,
+    access: 'admin',
+    phase: 'S2',
+  },
+  'providers.clearAnomaly': {
+    method: 'POST',
+    path: '/v1/providers/:id/clear-anomaly',
+    params: IdParams,
+    response: Provider,
     status: 200,
     access: 'admin',
     phase: 'S2',

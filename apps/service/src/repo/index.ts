@@ -11,6 +11,7 @@ import { mailingsRepo } from './mailings.js';
 import { membersRepo } from './members.js';
 import { templatesRepo } from './templates.js';
 import { messagesRepo } from './messages.js';
+import { providerEventsRepo } from './provider-events.js';
 import { providerSendsRepo } from './provider-sends.js';
 import { providersRepo } from './providers.js';
 import { recipientsRepo } from './recipients.js';
@@ -59,6 +60,7 @@ export function repos(db: Db) {
     assets: assetsRepo(db),
     providers: providersRepo(db),
     providerSends: providerSendsRepo(db),
+    providerEvents: providerEventsRepo(db),
     topics: topicsRepo(db),
     contacts: contactsRepo(db),
     suppressions: suppressionsRepo(db),

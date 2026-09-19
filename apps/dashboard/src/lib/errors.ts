@@ -23,6 +23,8 @@ const MESSAGES: Record<ErrorCode, string> = {
   mailing_invalid_state: 'This mailing has moved on and that action no longer applies. The page has the current state.',
   idempotency_key_reused: 'This action was already submitted with different values. Reload and try again.',
   last_owner: 'A workspace needs at least one owner. Make someone else an owner first.',
+  provider_anomaly:
+    "This provider's bounce circuit breaker is open: too many recipients in a row were refused alike. Check the provider, then clear its anomaly under Settings, Providers.",
   payload_too_large: 'That is too large to upload or save.',
   compile_failed: 'The email does not compile. Fix the errors shown in the preview before sending.',
   missing_unsubscribe_url:

@@ -445,6 +445,62 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
 - **Suppressions.** Adding one is idempotent per address and topic; a new
   `unsubscribed` block unsubscribes the contact and emits `contact.unsubscribed`
   (source `api` or `dashboard`) in the same transaction. Lifting needs `admin`.
+- **Bounces and complaints** (`src/bounces.ts`). A permanent SMTP rejection
+  goes through `rejectionAction` (`src/transport/rejection.ts`): a hard bounce
+  (5.1.x except 5.1.7, 5.1.8 and any 5.1.x whose text names the sender or the
+  setup; 5.1.0 and 5.1.2 only when the text names the recipient's mailbox;
+  5.2.1; or a 550/551/553 whose text names the recipient) blocks the address on every topic as `bounced` with the message as
+  `source_message_id` and emits `contact.bounced`; the sender's problem (5.7.x,
+  530/534/535, a Resend 401/403, no transport) increments the provider's
+  `rejections_count` and keeps its `last_rejection`; anything else only fails
+  the message. All of it runs in the transaction that archives the message.
+  **The bounce circuit breaker** (`src/worker/breaker.ts`) guards against
+  false hard bounces from a broken provider or setup: within one run of a
+  mailing (a run starts at every entry into `sending`: send, resume,
+  retry-failed; `mailings.run_started_at`), when 5 refusals in a row share the
+  same reply (addresses stripped, `rejectionSignature`) or more than 20
+  percent of the first 50 messages are refusals, it deletes the run's
+  `bounced` blocks (emitting `contact.resubscribed` with source
+  `bounce_reverted` for each), blocks nothing more in that run, pauses the
+  mailing with `pause_reason`, records `rejections.anomaly` on the provider,
+  and audits `mailing.paused` as the system. Resuming starts a new run.
+  A **provider-wide** breaker covers what no run shows (one-to-one mailings,
+  test sends, streaks spread over mailings): the provider's last 5 messages
+  within 24 hours (and since the anomaly was last cleared) all refused alike.
+  It undoes those blocks, pauses the provider's sending mailings (skipping rows
+  a worker holds, which its next claim pauses), sets `breaker_open_at`, and
+  from then on the provider blocks nothing, and test sends, mailing starts,
+  resumes and retries answer `provider_anomaly` until an admin calls
+  `providers.clearAnomaly`. The run breaker is judged first, so a streak inside
+  one mailing pauses only that mailing. Undoing is exact: a block the bounce
+  created is deleted (with `contact.resubscribed`), one it hardened gets its
+  `replaced_reason` back, with no event.
+  Within 5.1.x, a phrase naming the mailbox ("user unknown", "recipient address
+  rejected", "no such user", "mailbox unavailable") beats the generic word
+  "relay" (Postfix's "relay recipient table"), while "Relay access denied" is
+  the sender's problem.
+  Resend providers also receive `email.bounced` (type `Permanent` only) and
+  `email.complained` at `POST /providers/:id/events/resend`
+  (`src/routes/provider-events.ts`), Svix-signed with the endpoint's secret
+  (sealed in `events_secret_sealed`), once per `svix-id` (`provider_events`,
+  pruned after 30 days). Only an event whose `email_id` is a message this
+  provider sent in this workspace acts, on the address that message went to.
+  An event for an unknown email created less than an hour ago (by the event's
+  own `created_at`; Svix signs every attempt afresh) answers 503 and records
+  nothing, so Resend redelivers it once the worker has recorded the send. An
+  older one, or one without a readable `created_at`, is acknowledged as
+  `unmatched`, counted (`events.unmatched`) and logged, never acted on: two workspaces, or another system, may share one Resend
+  account, and a wrong block costs a real person their mail. Create and verify register the endpoint at Resend
+  (`registerResendEvents`); when that fails (a sending-only key, no public
+  https address, Resend unreachable) `events.error` says why and
+  `providers.setEventsSecret` takes the secret pasted from Resend's
+  dashboard. A new key from another Resend account (the endpoint is not found
+  with it) removes the endpoint from the old account with the old key and
+  registers it anew; erasing a workspace removes the endpoints the service
+  registered for it, best effort. Bounces an SMTP server reports later by
+  email (iCloud+) are not detected. Tests: `test/unit/rejection.test.ts` (the
+  classification table), `test/unit/breaker.test.ts`,
+  `test/integration/bounces.test.ts`.
 - Tests: `test/integration/providers.test.ts` verifies against a real in-process
   SMTP server (`smtp-server`, self-signed TLS, so that one file sets
   `NODE_TLS_REJECT_UNAUTHORIZED=0`); `test/integration/contacts.test.ts` covers the

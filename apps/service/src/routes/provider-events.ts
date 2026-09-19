@@ -1,0 +1,187 @@
+import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
+import { z } from 'zod';
+import { suppressBounce } from '../bounces.js';
+import type { AppEnv } from '../context.js';
+import type { Sql } from '../db.js';
+import type { ProviderEventOutcome } from '../repo/provider-events.js';
+import { repos } from '../repo/index.js';
+import type { Sealer } from '../sealing.js';
+import { verifySvix } from '../provider-events/svix.js';
+
+/** Resend events are small; anything larger is not one. */
+const MAX_EVENT_BYTES = 256 * 1024;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The parts of a Resend event this service reads
+ * (https://resend.com/docs/webhooks/event-types). Lenient on purpose: Resend
+ * adds fields, and an event of a type this service does not act on is still
+ * acknowledged.
+ */
+const ResendEvent = z.object({
+  type: z.string().min(1).max(100),
+  /** When Resend created the event; the same on every delivery attempt, unlike `svix-timestamp`. */
+  created_at: z.string().optional(),
+  data: z
+    .object({
+      email_id: z.string().min(1).max(200).optional(),
+      bounce: z.object({ type: z.string().optional(), subType: z.string().optional(), message: z.string().optional() }).partial().optional(),
+    })
+    .passthrough(),
+});
+type ResendEvent = z.infer<typeof ResendEvent>;
+
+/** What an event asks for: a block with this reason, or nothing. */
+export function resendEventAction(event: ResendEvent): { reason: 'bounced' | 'complained'; diagnostic: string | null } | null {
+  if (event.type === 'email.complained') return { reason: 'complained', diagnostic: 'The recipient marked the message as spam.' };
+  if (event.type === 'email.bounced') {
+    const bounce = event.data.bounce;
+    // Only a permanent bounce is a hard bounce; a transient or undetermined one may deliver later.
+    if (bounce?.type !== 'Permanent') return null;
+    const detail = [bounce.subType, bounce.message].filter(Boolean).join(': ');
+    return { reason: 'bounced', diagnostic: detail || 'Permanent bounce reported by Resend.' };
+  }
+  return null;
+}
+
+export type ProviderEventsDeps = {
+  sealer: Sealer;
+  log: Pick<Console, 'error' | 'log'>;
+};
+
+const ACTOR = (type: string) => ({ type: 'system' as const, reason: `Resend ${type}` });
+
+/**
+ * How long an event naming an unknown email is retried: Resend can report a
+ * bounce before the worker has recorded the send's message id, and a redelivery
+ * a few seconds later finds it.
+ */
+export const UNMATCHED_RETRY_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Whether an event is young enough to be redelivered, by its own `created_at`
+ * (Svix signs each attempt afresh, so the header timestamp always looks new).
+ * A missing or unreadable `created_at` counts as old: acknowledged, never acted on.
+ */
+export function isYoungEvent(createdAt: string | undefined, now = Date.now()): boolean {
+  if (!createdAt) return false;
+  const at = Date.parse(createdAt);
+  if (Number.isNaN(at)) return false;
+  return now - at < UNMATCHED_RETRY_WINDOW_MS;
+}
+
+/** Unwinds the event's transaction without recording it, so a redelivery is processed afresh. */
+class NotYetMatched extends Error {}
+
+/**
+ * `POST /providers/:id/events/resend`: where Resend posts a provider's events.
+ * Public and outside /v1, like the Stripe webhook: Resend holds no API key, the
+ * signature is the credential.
+ *
+ * 1. The provider is found in any workspace by the id in the path; its
+ *    workspace is the only one the event may change (tenancy: the signature
+ *    checked with this provider's secret proves the event is this provider's).
+ * 2. Fail closed: without a stored signing secret it answers 503, so Resend
+ *    keeps the event and retries once the secret is set.
+ * 3. The Svix signature is checked over the raw body exactly as received, with
+ *    a five-minute timestamp tolerance: 400 when it fails.
+ * 4. Exactly once: `svix-id` is claimed in `provider_events` in the same
+ *    transaction as the block it causes. A retry or a replay changes nothing.
+ * 5. `email.bounced` of type Permanent blocks the address as `bounced`,
+ *    `email.complained` as `complained`, on every topic, and emits
+ *    `contact.bounced`. The message is found by Resend's email id, within this
+ *    provider and workspace; the address blocked is the one the message went
+ *    to. An event for an unknown email younger than an hour (by its own
+ *    `created_at`) answers 503 and records nothing, so Resend redelivers it once
+ *    the worker has recorded the send. An older one (another workspace or system
+ *    sharing the Resend account) is counted on the provider (`events.unmatched`)
+ *    and logged as `unmatched`, never acted on: a wrong block costs a real person
+ *    their mail. `email.delivery_delayed`, transient
+ *    bounces and every other type are acknowledged and ignored.
+ *
+ * A processing failure answers 500, so Resend retries on its schedule.
+ */
+export function providerEventRoutes(sql: Sql, deps: ProviderEventsDeps) {
+  const app = new Hono<AppEnv>();
+  const { sealer, log } = deps;
+  const tooLarge = bodyLimit({ maxSize: MAX_EVENT_BYTES, onError: (c) => c.json({ error: 'payload too large' }, 413) });
+
+  app.post('/providers/:id/events/resend', tooLarge, async (c) => {
+    const providerId = c.req.param('id');
+    const provider = UUID.test(providerId) ? await repos(sql).providers.getForEvents(providerId) : null;
+    if (!provider || provider.kind !== 'resend') return c.json({ error: 'no such provider' }, 404);
+    if (!provider.events_secret_sealed) {
+      log.error(`[provider-events] an event for provider ${provider.id} arrived, but no signing secret is stored for it`);
+      return c.json({ error: 'events are not set up for this provider' }, 503);
+    }
+
+    const raw = await c.req.text();
+    const headers = { id: c.req.header('svix-id'), timestamp: c.req.header('svix-timestamp'), signature: c.req.header('svix-signature') };
+    const verdict = verifySvix(sealer.open(provider.events_secret_sealed), headers, raw);
+    if (!verdict.ok) return c.json({ error: `invalid signature (${verdict.reason})` }, 400);
+    const externalId = headers.id!;
+    if (externalId.length > 200) return c.json({ error: 'invalid svix-id' }, 400);
+
+    let event: ResendEvent;
+    try {
+      event = ResendEvent.parse(JSON.parse(raw));
+    } catch {
+      return c.json({ error: 'not a Resend event' }, 400);
+    }
+    const action = resendEventAction(event);
+    const emailId = event.data.email_id ?? null;
+    const workspaceId = provider.workspace_id;
+
+    let result: { duplicate: boolean; outcome: ProviderEventOutcome | null };
+    try {
+      result = (await sql.begin(async (tx) => {
+      const r = repos(tx);
+      const claimed = await r.providerEvents.claim(workspaceId, { providerId: provider.id, externalId, type: event.type, providerMessageId: emailId });
+      if (!claimed) return { duplicate: true as const, outcome: await r.providerEvents.outcomeOf(provider.id, externalId) };
+      let outcome: ProviderEventOutcome = 'ignored';
+      if (action) {
+        const message = emailId ? await r.messages.byProviderMessageId(workspaceId, provider.id, emailId) : null;
+        if (message) {
+          outcome = await suppressBounce(tx, workspaceId, {
+            email: message.to,
+            reason: action.reason,
+            message: { id: message.id, contact_id: message.contact_id },
+            diagnostic: action.diagnostic,
+            actor: ACTOR(event.type),
+          });
+        } else if (isYoungEvent(event.created_at)) {
+          // The worker may not have recorded this send yet: roll back (the
+          // claim included) and let Resend redeliver.
+          throw new NotYetMatched();
+        } else {
+          // Not a message this provider sent through the service: another
+          // workspace or system may share the Resend account, and a wrong block
+          // costs a real person their mail. Counted and logged, never acted on.
+          outcome = 'unmatched';
+          await r.providers.countUnmatchedEvent(workspaceId, provider.id);
+          log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} names email ${emailId ?? '(none)'}, which this provider never sent; ignored`);
+        }
+        await r.providerEvents.setOutcome(workspaceId, provider.id, externalId, outcome);
+      }
+      return { duplicate: false as const, outcome };
+    })) as { duplicate: boolean; outcome: ProviderEventOutcome | null };
+    } catch (err) {
+      if (!(err instanceof NotYetMatched)) throw err;
+      log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} names email ${emailId}, not recorded yet; asking Resend to redeliver`);
+      c.header('retry-after', '60');
+      return c.json({ error: 'the email this event names is not recorded yet; retry' }, 503);
+    }
+
+    if (!result.duplicate) {
+      if (!action) log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} acknowledged, nothing to do`);
+      await repos(sql)
+        .providerEvents.prune(provider.id)
+        .catch((err) => log.error('[provider-events] pruning old event ids failed:', err));
+    }
+    return c.json({ ok: true, duplicate: result.duplicate, outcome: result.outcome });
+  });
+
+  return app;
+}

@@ -8,7 +8,14 @@ import { FormError } from '@/components/form-error';
 import { Badge, Button, describedBy, EmptyState, Field, Input, Mono, Notice, Panel, Section, Select, When } from '@/components/ui';
 import { useAction } from '@/components/use-action';
 import { formatCount, percent } from '@/lib/format';
-import { deleteProvider, saveProvider, verifyProvider, type ProviderFormInput } from '../actions';
+import {
+  clearProviderAnomaly,
+  deleteProvider,
+  saveProvider,
+  setProviderEventsSecret,
+  verifyProvider,
+  type ProviderFormInput,
+} from '../actions';
 
 type Item = { provider: Provider; usage: ProviderUsage | null };
 
@@ -291,6 +298,172 @@ function VerifyResult({ result }: { result: ProviderVerifyResult }) {
   );
 }
 
+/**
+ * How bounces and complaints reach the service for this provider. Hard bounces
+ * the receiving server reports while the message is handed over are detected
+ * for every kind; later ones only through Resend's events.
+ */
+function BounceHandling({ ws, provider: p, canAdmin }: { ws: string; provider: Provider; canAdmin: boolean }) {
+  const router = useRouter();
+  const save = useAction();
+  const [secret, setSecret] = useState('');
+  const [open, setOpen] = useState(false);
+  const idp = `p-${p.id}-events`;
+
+  if (p.kind === 'smtp') {
+    return (
+      <Notice tone="warn">
+        <span className="font-medium">Only immediate bounces are detected.</span>
+        <span className="mt-1 block text-[12.5px]">
+          An address the receiving server rejects while the message is handed over is blocked automatically. Bounces that arrive
+          later as an email in the sender&apos;s inbox{p.config.host === 'smtp.mail.me.com' ? ' (how iCloud+ reports almost all of them)' : ''}{' '}
+          are not read, so they are not detected: remove those addresses by hand under Suppressions.
+        </span>
+      </Notice>
+    );
+  }
+
+  const e = p.events;
+  return (
+    <div className="rounded-xl border border-line p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[13px] font-medium text-ink">Bounces and spam complaints</span>
+        <Badge tone={e.status === 'active' ? 'ok' : 'warn'}>
+          {e.status === 'active' ? (e.source === 'manual' ? 'Receiving (secret added by hand)' : 'Receiving') : 'Not set up'}
+        </Badge>
+      </div>
+      <p className="mt-1.5 text-[12.5px] text-muted">
+        {e.status === 'active'
+          ? 'Resend reports hard bounces and spam complaints here, and those addresses are blocked on every topic.'
+          : 'Until this is set up, only bounces Resend refuses at once are noticed; later bounces and spam complaints are missed.'}
+      </p>
+      {e.status !== 'active' && e.error ? <p className="mt-1.5 text-[12.5px] text-warn">{e.error}</p> : null}
+      {e.unmatched > 0 ? (
+        <p className="mt-1.5 text-[12.5px] text-muted">
+          {formatCount(e.unmatched)} {e.unmatched === 1 ? 'event' : 'events'} named an email this provider did not send through Lumitra
+          Mail (another app on the same Resend account). Those are counted and never block anyone.
+        </p>
+      ) : null}
+      {canAdmin && (e.status !== 'active' || open) ? (
+        <div className="mt-3 flex flex-col gap-3">
+          <p className="text-[12.5px] text-muted">
+            In Resend, add a webhook with this endpoint and the events <Mono>email.bounced</Mono> and <Mono>email.complained</Mono>, then paste
+            its signing secret. Verify tries to add it automatically, which works with a full-access API key.
+          </p>
+          <Field id={`${idp}-url`} label="Endpoint URL">
+            <Input id={`${idp}-url`} readOnly value={e.url} spellCheck={false} onFocus={(ev) => ev.currentTarget.select()} />
+          </Field>
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(ev) => {
+              ev.preventDefault();
+              void save.run(() => setProviderEventsSecret(ws, p.id, secret), () => {
+                setSecret('');
+                setOpen(false);
+                router.refresh();
+              });
+            }}
+          >
+            <Field id={`${idp}-secret`} label="Signing secret" error={save.fields.signing_secret} className="min-w-[260px] flex-1">
+              <Input
+                {...describedBy(`${idp}-secret`, save.fields.signing_secret)}
+                type="password"
+                value={secret}
+                onChange={(ev) => setSecret(ev.target.value)}
+                placeholder="whsec_..."
+                autoComplete="off"
+                spellCheck={false}
+                required
+              />
+            </Field>
+            <Button type="submit" variant="primary" busy={save.pending}>
+              Save secret
+            </Button>
+            {open ? (
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+            ) : null}
+          </form>
+          <FormError error={save.error && !save.error.fields ? save.error : null} />
+        </div>
+      ) : canAdmin ? (
+        <Button variant="ghost" className="mt-2" onClick={() => setOpen(true)}>
+          Replace signing secret
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The bounce circuit breaker tripped on one of this provider's mailings: too
+ * many recipients refused as dead addresses in one run, which points at the
+ * provider or the sender's setup. The run's blocks were undone.
+ */
+function BreakerAnomaly({ ws, provider: p, canAdmin }: { ws: string; provider: Provider; canAdmin: boolean }) {
+  const router = useRouter();
+  const clear = useAction();
+  const a = p.rejections.anomaly;
+  if (!a) return null;
+  return (
+    <Notice tone="danger">
+      <span className="font-medium">
+        {a.scope === 'provider' ? 'Bounce blocking is halted for this provider' : 'A mailing was paused'} <When at={a.at} />: too many
+        recipients were refused as unknown addresses.
+      </span>
+      <span className="mt-1 block text-[12.5px]">
+        {a.reason} The addresses were not blocked.{' '}
+        {a.blocking
+          ? "Until an admin clears this, test sends are refused and mailings through this provider don't start or resume. Check the provider's account and the sender's domain setup first."
+          : "Check this provider's account and the sender's domain setup, then resume the mailing."}
+        {a.mailing_id ? (
+          <>
+            {' '}
+            <a className="underline" href={`/w/${ws}/mailings/${a.mailing_id}`}>
+              Open the mailing
+            </a>
+            .
+          </>
+        ) : null}
+      </span>
+      {a.sample ? <span className="mt-1 block font-mono text-[12px] text-muted">{a.sample}</span> : null}
+      {canAdmin ? (
+        <span className="mt-2 flex flex-wrap items-center gap-2">
+          <Button busy={clear.pending} onClick={() => void clear.run(() => clearProviderAnomaly(ws, p.id), () => router.refresh())}>
+            {a.blocking ? 'Provider checked: clear and allow sending' : 'Dismiss'}
+          </Button>
+          {clear.error ? <FormError error={clear.error} /> : null}
+        </span>
+      ) : null}
+    </Notice>
+  );
+}
+
+/** Rejections the sender is at fault for (policy, relay, authentication), never a recipient's. */
+function Rejections({ provider: p }: { provider: Provider }) {
+  const r = p.rejections;
+  if (r.count === 0) return null;
+  return (
+    <Notice tone="danger">
+      <span className="font-medium">
+        {formatCount(r.count)} {r.count === 1 ? 'message was' : 'messages were'} refused because of the sender, not the recipient
+        {r.last_at ? (
+          <>
+            , last <When at={r.last_at} />
+          </>
+        ) : null}
+        .
+      </span>
+      <span className="mt-1 block text-[12.5px]">
+        Receiving servers or the provider rejected the sender (authentication, a blocklist, a content or rate policy). Recipients are not
+        blocked for this; check the sender&apos;s domain setup and the provider account.
+      </span>
+      {r.last_error ? <span className="mt-1 block font-mono text-[12px] text-muted">{r.last_error}</span> : null}
+    </Notice>
+  );
+}
+
 function ProviderCard({ ws, item, canAdmin }: { ws: string; item: Item; canAdmin: boolean }) {
   const router = useRouter();
   const { provider: p, usage } = item;
@@ -317,7 +490,16 @@ function ProviderCard({ ws, item, canAdmin }: { ws: string; item: Item; canAdmin
         </div>
         {canAdmin && !editing ? (
           <div className="flex gap-2">
-            <Button busy={verify.pending} onClick={() => void verify.run(() => verifyProvider(ws, p.id), setVerified)}>
+            <Button
+              busy={verify.pending}
+              onClick={() =>
+                void verify.run(() => verifyProvider(ws, p.id), (result) => {
+                  setVerified(result);
+                  // A verify may also have registered the Resend events endpoint.
+                  router.refresh();
+                })
+              }
+            >
               Verify
             </Button>
             <Button onClick={() => setEditing(true)}>Edit</Button>
@@ -349,6 +531,11 @@ function ProviderCard({ ws, item, canAdmin }: { ws: string; item: Item; canAdmin
       </div>
       <div aria-live="polite" className="mt-3 empty:hidden">
         {verify.error ? <FormError error={verify.error} /> : verified ? <VerifyResult result={verified} /> : null}
+      </div>
+      <div className="mt-3 flex flex-col gap-3">
+        <BreakerAnomaly ws={ws} provider={p} canAdmin={canAdmin} />
+        <Rejections provider={p} />
+        <BounceHandling ws={ws} provider={p} canAdmin={canAdmin} />
       </div>
       {editing ? (
         <div className="mt-5 border-t border-line pt-5">

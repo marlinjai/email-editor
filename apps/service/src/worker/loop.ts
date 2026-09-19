@@ -8,6 +8,7 @@ import type { RecipientRow } from '../repo/recipients.js';
 import { OutcomeUnknownSendError, PermanentSendError, SendError, TransientSendError } from '../transport/index.js';
 import type { UnsubscribeSigner } from '../unsubscribe.js';
 import { applyTracking, CLICK_PATH_PREFIX, OPEN_PATH_PREFIX, type TrackingTokens } from '../platform/tracking.js';
+import { handlePermanentRejection, providerPauseReasonIfOpen } from './breaker.js';
 import { composeMessage } from './compose.js';
 import { DEFAULT_PUBLIC_BASE_URL, unsubscribeUrl } from './merge.js';
 import { finishIfDrained, recordFailed, recordSent } from './settle.js';
@@ -239,6 +240,22 @@ export class SendWorker {
     const mailing = await r.mailings.lock(workspaceId, mailingId);
     if (!mailing || mailing.status !== 'sending') return { kind: 'none' };
     this.providerOf.set(mailingId, mailing.provider_id);
+    // The provider-wide bounce breaker is open: pause instead of sending (a
+    // mailing a tripping transaction could not lock is caught here).
+    const forBreaker = await r.providers.getForSend(workspaceId, mailing.provider_id);
+    const breakerPause = forBreaker ? providerPauseReasonIfOpen(forBreaker) : null;
+    if (breakerPause) {
+      if (await r.mailings.pauseWithReason(workspaceId, mailingId, breakerPause)) {
+        await r.audit.record(workspaceId, {
+          action: 'mailing.paused',
+          actor: { type: 'system', reason: 'bounce circuit breaker' },
+          targetType: 'mailing',
+          targetId: mailingId,
+          details: { reason: forBreaker!.anomaly_reason },
+        });
+      }
+      return { kind: 'none' };
+    }
     const recipient = await r.recipients.claimNext(workspaceId, mailingId);
     if (!recipient) return { kind: 'empty' };
 
@@ -348,7 +365,7 @@ export class SendWorker {
 
     await this.sql.begin(async (tx) => {
       const r = repos(tx);
-      await r.mailings.lock(workspaceId, mailing.id);
+      const locked = (await r.mailings.lock(workspaceId, mailing.id)) ?? mailing;
       if (outcome.ok) {
         const row = await recordSent(tx, workspaceId, { ...archive, outcome: 'sent', error: null, providerMessageId: outcome.providerMessageId }, eventCtx);
         await this.settle(tx, workspaceId, recipient.id, { status: 'sent', messageId: row.id });
@@ -369,6 +386,23 @@ export class SendWorker {
         const error = retryable ? `${outcome.error.message} (after ${recipient.attempts} attempts)` : outcome.error.message;
         const row = await recordFailed(tx, workspaceId, { ...archive, outcome: 'failed', error, providerMessageId: null }, { ...eventCtx, retryable });
         await this.settle(tx, workspaceId, recipient.id, { status: 'failed', messageId: row.id, error });
+        if (outcome.error instanceof PermanentSendError) {
+          // A hard bounce suppresses the address (unless the circuit breaker says
+          // the refusals are the provider's fault); the sender's own problem is
+          // counted on the provider.
+          const verdict = await handlePermanentRejection(tx, workspaceId, {
+            provider,
+            error: outcome.error,
+            handedOver: outcome.handedOver,
+            to: recipient.email,
+            message: row,
+            mailing: locked,
+          });
+          if (verdict === 'mailing_breaker_tripped') this.log.error(`[worker] bounce circuit breaker tripped on mailing ${mailing.id}; paused`);
+          if (verdict === 'provider_breaker_tripped') {
+            this.log.error(`[worker] bounce circuit breaker tripped on provider ${provider.id}; its sending mailings are paused`);
+          }
+        }
       } else {
         // Unknown outcome: it may have been delivered. Keep the budget spent, never retry.
         await this.settle(tx, workspaceId, recipient.id, {

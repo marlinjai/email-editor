@@ -10,11 +10,13 @@ export type SuppressionRow = {
   topic: string | null;
   source_message_id: string | null;
   note: string | null;
+  /** What a bounce or complaint replaced when it hardened this block (internal: the breaker restores it). */
+  replaced_reason: SuppressionReason | null;
   created_at: string;
 };
 
 const SELECT = (db0: Db) => db0`
-  SELECT s.id, s.email, s.reason, s.topic_id, t.slug AS topic, s.source_message_id, s.note, s.created_at
+  SELECT s.id, s.email, s.reason, s.topic_id, t.slug AS topic, s.source_message_id, s.note, s.replaced_reason, s.created_at
   FROM suppressions s LEFT JOIN topics t ON t.id = s.topic_id`;
 
 export function suppressionsRepo(db: Db) {
@@ -45,6 +47,59 @@ export function suppressionsRepo(db: Db) {
         WHERE s.workspace_id = ${workspaceId} AND s.email = ${email}
           AND s.topic_id IS NOT DISTINCT FROM ${input.topicId}::uuid`;
       return { suppression: rows[0]!, created: inserted.length > 0 };
+    },
+
+    /**
+     * Replaces the reason (and the message that caused it) of an existing
+     * block. Used only to harden a block: an `unsubscribed` block the person
+     * could lift themselves becomes `bounced` or `complained` once the address
+     * bounces or complains.
+     */
+    async harden(
+      workspaceId: string,
+      suppressionId: string,
+      input: { reason: 'bounced' | 'complained'; sourceMessageId: string | null },
+    ): Promise<SuppressionRow | null> {
+      // The first replaced reason is kept (unsubscribed, then bounced, then complained restores unsubscribed).
+      await db`
+        UPDATE suppressions SET reason = ${input.reason}, source_message_id = ${input.sourceMessageId},
+          replaced_reason = COALESCE(replaced_reason, reason),
+          replaced_source_message_id = CASE WHEN replaced_reason IS NULL THEN source_message_id ELSE replaced_source_message_id END
+        WHERE workspace_id = ${workspaceId} AND id = ${suppressionId}`;
+      const rows = await db<SuppressionRow[]>`${SELECT(db)} WHERE s.workspace_id = ${workspaceId} AND s.id = ${suppressionId}`;
+      return rows[0] ?? null;
+    },
+
+    /**
+     * The `bounced` blocks whose source message belongs to a mailing's run
+     * (sent since `runStartedAt`, all of them when it is null): what the bounce
+     * circuit breaker undoes when it trips.
+     */
+    async bouncedInRun(workspaceId: string, mailingId: string, runStartedAt: string | null): Promise<SuppressionRow[]> {
+      return db<SuppressionRow[]>`
+        ${SELECT(db)}
+        JOIN messages m ON m.workspace_id = s.workspace_id AND m.id = s.source_message_id
+        WHERE s.workspace_id = ${workspaceId} AND s.reason = 'bounced' AND m.mailing_id = ${mailingId}
+          AND m.is_test = false
+          ${runStartedAt === null ? db`` : db`AND m.created_at >= ${runStartedAt}`}
+        ORDER BY s.created_at, s.id`;
+    },
+
+    /** The `bounced` blocks made from these messages: what the provider-wide breaker undoes. */
+    async bouncedFromMessages(workspaceId: string, messageIds: readonly string[]): Promise<SuppressionRow[]> {
+      if (messageIds.length === 0) return [];
+      return db<SuppressionRow[]>`
+        ${SELECT(db)}
+        WHERE s.workspace_id = ${workspaceId} AND s.reason = 'bounced' AND s.source_message_id = ANY(${messageIds as string[]}::uuid[])
+        ORDER BY s.created_at, s.id`;
+    },
+
+    /** Puts back what a bounce replaced when it hardened this block. */
+    async restoreReplaced(workspaceId: string, suppressionId: string): Promise<void> {
+      await db`
+        UPDATE suppressions SET reason = replaced_reason, source_message_id = replaced_source_message_id,
+          replaced_reason = NULL, replaced_source_message_id = NULL
+        WHERE workspace_id = ${workspaceId} AND id = ${suppressionId} AND replaced_reason IS NOT NULL`;
     },
 
     async get(workspaceId: string, suppressionId: string): Promise<SuppressionRow | null> {

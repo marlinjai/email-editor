@@ -1,3 +1,4 @@
+import { assertProviderOpen } from '../worker/breaker.js';
 import {
   canTransition,
   EDITABLE_MAILING_STATUSES,
@@ -64,6 +65,7 @@ export function toMailingSummary(row: MailingRow, counts: MailingCounts): Mailin
     ab_test: row.ab_test,
     started_at: row.started_at,
     finished_at: row.finished_at,
+    pause_reason: row.status === 'paused' ? row.pause_reason : null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -369,6 +371,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     await body(c, 'mailings.resume');
     const mailing = await withLocked(access, id, async (r, _tx, row) => {
       if (!canTransition(row.status, 'resume')) invalidState(row, 'resume');
+      await assertProviderOpen(_tx, access.workspaceId, row.provider_id);
       const moved = await r.mailings.transition(access.workspaceId, id, ['paused'], 'sending');
       await audit(r, access, 'mailing.resumed', id);
       return moved!;
@@ -411,6 +414,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     const input = await body(c, 'mailings.retryFailed');
     const mailing = await withLocked(access, id, async (r, _tx, row) => {
       if (!canTransition(row.status, 'retry-failed')) invalidState(row, 'retry-failed');
+      await assertProviderOpen(_tx, access.workspaceId, row.provider_id);
       const requeued = await r.recipients.requeueFailed(access.workspaceId, id, input.include_outcome_unknown === true);
       if (requeued === 0) {
         throw new ApiError(

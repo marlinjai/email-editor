@@ -4,6 +4,8 @@ import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { ApiError } from '../api-error.js';
 import { AssetStorageUnavailable, type AssetStorage } from '../assets/storage.js';
+import type { Sealer } from '../sealing.js';
+import { unregisterResendEvents } from './providers.js';
 import type { AppEnv } from '../context.js';
 import type { Sql } from '../db.js';
 import { repos } from '../repo/index.js';
@@ -48,7 +50,15 @@ export function verifyErasureSignature(rawBody: string, header: string | undefin
 
 export function erasureRoutes(
   sql: Sql,
-  deps: { secret: string | undefined; storage: AssetStorage; log: Pick<Console, 'error' | 'log'> },
+  deps: {
+    secret: string | undefined;
+    storage: AssetStorage;
+    log: Pick<Console, 'error' | 'log'>;
+    /** Opens the Resend API keys to unregister the events endpoints the service registered. */
+    sealer: Sealer;
+    /** The HTTP client those unregistrations go through. */
+    fetch: typeof fetch;
+  },
 ) {
   const app = new Hono<AppEnv>();
   app.post(
@@ -96,6 +106,8 @@ export function erasureRoutes(
       }
       const tenantId = event.tenant_id;
 
+      /** The Resend events endpoints the service registered for the erased workspaces. */
+      const endpoints: Array<{ provider_id: string; webhook_id: string; secret_sealed: string | null }> = [];
       const erase = () => sql.begin(async (tx) => {
         const r = repos(tx);
         // Locking the workspace rows also blocks a concurrent upload from adding
@@ -103,6 +115,7 @@ export function erasureRoutes(
         // the file list read below is complete.
         const workspaceIds = await r.erasure.workspaceIdsForCompany(tenantId);
         for (const workspaceId of workspaceIds) {
+          endpoints.push(...(await r.providers.automaticEventEndpoints(workspaceId)));
           for (const fileId of await r.erasure.storageFileIds(workspaceId)) {
             // Throws AssetStorageUnavailable on anything but "already gone": the
             // transaction rolls back and auth-brain redelivers.
@@ -124,6 +137,16 @@ export function erasureRoutes(
         throw err;
       }
       deps.log.log(`[erasure] event ${event.event_id}: erased ${erased} workspace(s) of company ${tenantId}`);
+      // Best effort, after the erasure committed: Resend would otherwise keep
+      // posting to endpoints whose provider is gone (they answer 404).
+      for (const e of endpoints) {
+        if (!e.secret_sealed) continue;
+        try {
+          await unregisterResendEvents({ fetch: deps.fetch, verifyTimeoutMs: 10_000, log: deps.log }, e.webhook_id, deps.sealer.open(e.secret_sealed));
+        } catch (err) {
+          deps.log.error(`[erasure] could not unregister Resend events endpoint ${e.webhook_id} of provider ${e.provider_id}:`, err);
+        }
+      }
       return c.json({ ok: true, replayed: false, workspaces_erased: erased });
     },
   );

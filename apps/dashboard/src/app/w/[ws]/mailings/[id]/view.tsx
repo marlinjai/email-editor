@@ -167,6 +167,14 @@ export function MailingView({
         <section className="mb-6 rounded-xl border border-line bg-panel p-5" aria-label="Progress">
           <ProgressRail counts={mailing.counts} live={controls.live} />
           {pollError ? <p role="alert" className="mt-2 text-[12.5px] text-warn">Live updates paused: {pollError} Retrying.</p> : null}
+          {mailing.status === 'paused' && mailing.pause_reason ? (
+            <div className="mt-3">
+              <Notice tone="danger">
+                <span className="font-medium">Paused by the service, not by a person.</span>
+                <span className="mt-1 block text-[12.5px]">{mailing.pause_reason}</span>
+              </Notice>
+            </div>
+          ) : null}
           {mailing.status === 'partially_failed' ? (
             <div className="mt-3">
               <Notice tone="danger">Some recipients failed. Look at their errors below, then retry them once the cause is fixed.</Notice>

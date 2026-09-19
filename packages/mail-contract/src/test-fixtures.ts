@@ -55,6 +55,7 @@ export const smtpProvider = {
   from_email: 'hello@example.com',
   reply_to: null,
   policy: { daily_recipient_budget: 800, min_interval_ms: 3000, max_recipients_per_message: 1 },
+  rejections: { count: 0, last_error: null, last_at: null, anomaly: null },
   created_at: TS,
   updated_at: TS,
 };

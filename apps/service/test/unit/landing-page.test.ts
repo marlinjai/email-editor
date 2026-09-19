@@ -55,15 +55,26 @@ describe('translations', () => {
     expect(joined('es')).not.toMatch(/\b(tú|te has)\b/i);
   });
 
-  // Bounce handling and open/click webhooks are not built yet, and the images
-  // are on Cloudflare R2, so no locale may claim either or say the whole
-  // service is hosted in the EU. Each language's own words are checked.
+  // Bounce handling differs by provider: with Resend, later bounces and spam
+  // complaints are reported; over SMTP only a refusal during the send is seen
+  // (iCloud+ reports almost every bounce later, by email). Each locale must say
+  // exactly that, pinned word for word so the claim cannot drift back to an
+  // unqualified one; open/click webhooks are not built yet, and the images are
+  // on Cloudflare R2, so no locale may claim either or say the whole service is
+  // hosted in the EU.
+  const BOUNCE_CLAIM: Record<PageLocale, string> = {
+    en: 'With Resend, hard bounces and spam complaints are blocked automatically. Over SMTP, addresses the server refuses outright are blocked.',
+    de: 'Mit Resend werden unzustellbare Adressen und Spam-Beschwerden automatisch gesperrt. Über SMTP werden Adressen gesperrt, die der Server sofort ablehnt.',
+    it: 'Con Resend, gli indirizzi inesistenti e le segnalazioni di spam vengono bloccati automaticamente. Via SMTP vengono bloccati gli indirizzi che il server rifiuta subito.',
+    fr: 'Avec Resend, les adresses inexistantes et les plaintes pour spam sont bloquées automatiquement. Via SMTP, les adresses que le serveur refuse d’emblée sont bloquées.',
+    es: 'Con Resend, las direcciones inexistentes y las quejas por spam se bloquean automáticamente. Por SMTP se bloquean las direcciones que el servidor rechaza de inmediato.',
+  };
   const BOUNCE_WORDS: Record<PageLocale, RegExp> = {
     en: /bounce|complaint/i,
-    de: /bounce|rückläufer|beschwerde|zurückkommt/i,
-    it: /bounce|rimbalz|reclam|segnalazion/i,
-    fr: /bounce|rebond|plainte/i,
-    es: /bounce|rebot|queja/i,
+    de: /unzustellbar|beschwerde|rückläufer/i,
+    it: /inesistent|segnalazion|rimbalz|reclam/i,
+    fr: /inexistant|plainte|rebond/i,
+    es: /inexistent|queja|rebot/i,
   };
   const OPEN_CLICK_WORDS: Record<PageLocale, RegExp> = {
     en: /\bopen|\bclick/i,
@@ -76,7 +87,9 @@ describe('translations', () => {
   it.each(PAGE_LOCALES)('%s claims only what the service does today', (locale) => {
     const messages = LANDING_MESSAGES[locale];
     const all = Object.values(messages).join(' ');
-    expect(all).not.toMatch(BOUNCE_WORDS[locale]);
+    expect(messages.f_unsub_text.endsWith(` ${BOUNCE_CLAIM[locale]}`)).toBe(true);
+    // Bounces and complaints are claimed nowhere else.
+    expect(all.replace(BOUNCE_CLAIM[locale], '')).not.toMatch(BOUNCE_WORDS[locale]);
     expect(messages.f_webhooks_text).not.toMatch(OPEN_CLICK_WORDS[locale]);
     expect(messages.app_text).not.toMatch(OPEN_CLICK_WORDS[locale]);
     expect(all).not.toMatch(/\b(EU|UE)\b|hosted in the EU/);

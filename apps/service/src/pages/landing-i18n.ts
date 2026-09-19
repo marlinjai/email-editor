@@ -53,7 +53,7 @@ const en = {
   f_editor_text: 'Drag blocks into place, preview on desktop and mobile, and get HTML that holds up in real inboxes.',
   f_unsub_title: 'Unsubscribe built in',
   f_unsub_text:
-    'Every mail has one-click unsubscribe and a hosted page where people pick their topics. An unsubscribe takes effect straight away, for that topic or for everything from that sender, as the person chooses.',
+    'Every mail has one-click unsubscribe and a hosted page where people pick their topics. An unsubscribe takes effect straight away, for that topic or for everything from that sender, as the person chooses. With Resend, hard bounces and spam complaints are blocked automatically. Over SMTP, addresses the server refuses outright are blocked.',
   f_webhooks_title: 'Webhooks',
   f_webhooks_text: 'Signed events when a message is sent or fails, when someone subscribes, unsubscribes or resubscribes, and when a mailing or an import moves along. Your app always knows what happened.',
   f_signup_title: 'Signup form with double opt-in',
@@ -141,7 +141,7 @@ const de: LandingMessages = {
   f_editor_text: 'Blöcke per Drag-and-drop anordnen, auf Desktop und Mobil prüfen und HTML bekommen, das in echten Postfächern hält.',
   f_unsub_title: 'Abmeldung eingebaut',
   f_unsub_text:
-    'Jede Mail hat eine Abmeldung mit einem Klick und eine gehostete Seite, auf der Empfänger ihre Themen wählen. Eine Abmeldung wirkt sofort, für dieses Thema oder für alles von diesem Absender, ganz wie der Empfänger es wählt.',
+    'Jede Mail hat eine Abmeldung mit einem Klick und eine gehostete Seite, auf der Empfänger ihre Themen wählen. Eine Abmeldung wirkt sofort, für dieses Thema oder für alles von diesem Absender, ganz wie der Empfänger es wählt. Mit Resend werden unzustellbare Adressen und Spam-Beschwerden automatisch gesperrt. Über SMTP werden Adressen gesperrt, die der Server sofort ablehnt.',
   f_webhooks_title: 'Webhooks',
   f_webhooks_text:
     'Signierte Ereignisse, wenn eine Mail verschickt wird oder fehlschlägt, wenn sich jemand anmeldet, abmeldet oder wieder anmeldet und wenn ein Versand oder ein Import vorankommt. Ihre App weiß immer, was passiert ist.',
@@ -228,7 +228,7 @@ const it: LandingMessages = {
   f_editor_text: 'Trascini i blocchi, controlli l’anteprima su desktop e mobile e ottenga HTML che regge nelle caselle reali.',
   f_unsub_title: 'Disiscrizione integrata',
   f_unsub_text:
-    'Ogni mail ha la disiscrizione con un clic e una pagina ospitata dove le persone scelgono i loro argomenti. Una disiscrizione vale subito, per quell’argomento o per tutto ciò che arriva da quel mittente, come sceglie la persona.',
+    'Ogni mail ha la disiscrizione con un clic e una pagina ospitata dove le persone scelgono i loro argomenti. Una disiscrizione vale subito, per quell’argomento o per tutto ciò che arriva da quel mittente, come sceglie la persona. Con Resend, gli indirizzi inesistenti e le segnalazioni di spam vengono bloccati automaticamente. Via SMTP vengono bloccati gli indirizzi che il server rifiuta subito.',
   f_webhooks_title: 'Webhook',
   f_webhooks_text: 'Eventi firmati quando un messaggio viene inviato o fallisce, quando qualcuno si iscrive, si disiscrive o si iscrive di nuovo, e quando un invio o un’importazione va avanti. La Sua app sa sempre cosa è successo.',
   f_signup_title: 'Modulo di iscrizione con doppio opt-in',
@@ -314,7 +314,7 @@ const fr: LandingMessages = {
   f_editor_text: 'Placez les blocs par glisser-déposer, prévisualisez sur ordinateur et mobile, et obtenez un HTML qui tient dans les vraies boîtes de réception.',
   f_unsub_title: 'Désabonnement intégré',
   f_unsub_text:
-    'Chaque e-mail propose le désabonnement en un clic et une page hébergée où chacun choisit ses sujets. Un désabonnement prend effet immédiatement, pour ce sujet ou pour tout ce qui vient de cet expéditeur, selon le choix de la personne.',
+    'Chaque e-mail propose le désabonnement en un clic et une page hébergée où chacun choisit ses sujets. Un désabonnement prend effet immédiatement, pour ce sujet ou pour tout ce qui vient de cet expéditeur, selon le choix de la personne. Avec Resend, les adresses inexistantes et les plaintes pour spam sont bloquées automatiquement. Via SMTP, les adresses que le serveur refuse d’emblée sont bloquées.',
   f_webhooks_title: 'Webhooks',
   f_webhooks_text:
     'Des événements signés quand un message est envoyé ou échoue, quand quelqu’un s’inscrit, se désabonne ou se réabonne, et quand un envoi ou un import avance. Votre application sait toujours ce qui s’est passé.',
@@ -401,7 +401,7 @@ const es: LandingMessages = {
   f_editor_text: 'Arrastre bloques, previsualice en escritorio y móvil, y obtenga HTML que aguanta en bandejas de entrada reales.',
   f_unsub_title: 'Baja integrada',
   f_unsub_text:
-    'Cada correo tiene baja con un clic y una página alojada donde cada persona elige sus temas. Una baja surte efecto al momento, para ese tema o para todo lo que llega de ese remitente, según elija la persona.',
+    'Cada correo tiene baja con un clic y una página alojada donde cada persona elige sus temas. Una baja surte efecto al momento, para ese tema o para todo lo que llega de ese remitente, según elija la persona. Con Resend, las direcciones inexistentes y las quejas por spam se bloquean automáticamente. Por SMTP se bloquean las direcciones que el servidor rechaza de inmediato.',
   f_webhooks_title: 'Webhooks',
   f_webhooks_text:
     'Eventos firmados cuando un mensaje se envía o falla, cuando alguien se suscribe, se da de baja o vuelve a suscribirse, y cuando un envío o una importación avanza. Su aplicación sabe siempre qué ha pasado.',

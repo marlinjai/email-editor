@@ -133,6 +133,52 @@ is a human's decision.
 A mailing's `metadata` (up to 20 string values) is echoed in every message webhook,
 so a client can file an event (who sent it, what kind of mailing) without a lookup.
 
+## Bounces and complaints
+
+The service blocks an address on every topic when it hard-bounces or its owner
+marks a message as spam, whatever the client sends. The block is a suppression
+with `reason` `bounced` or `complained` and `source_message_id` naming the
+message, when known, and it emits `contact.bounced` (`reason` tells which).
+`suppressions.list` filters by `reason`. Lifting such a block by hand
+(`suppressions.delete`, `admin`) lets the next mailing reach the address again;
+if it bounces again, it is blocked again.
+
+- **Every provider:** a hard bounce the receiving server reports while the
+  message is handed over (SMTP enhanced status 5.1.x or 5.2.1, or a 550, 551 or
+  553 whose text names the recipient). A rejection that is the sender's problem
+  (5.7.x: authentication, relaying, content, reputation, rate) never blocks the
+  recipient; it is counted on the provider as `rejections` (`count`,
+  `last_error`, `last_at`). A 5.1.x reply that names the sender or the setup
+  counts as the sender's problem too.
+- **The bounce circuit breaker:** when, in one run of a mailing, 5 recipients
+  in a row are refused with the same reply, or more than 20 percent of the
+  first 50 are refused, the refusals are more likely the provider's fault than
+  the list's. The service undoes that run's `bounced` blocks (emitting
+  `contact.resubscribed` with `source: 'bounce_reverted'` for each), pauses the
+  mailing with a `pause_reason`, and sets the provider's
+  `rejections.anomaly`. Fix the provider, then resume; the resumed run is
+  watched afresh. Across a provider's sends (one-to-one mailings and test sends
+  included), 5 refusals in a row with the same reply within 24 hours halt the
+  provider (`anomaly.scope: 'provider'`, `blocking: true`): no blocks, and test
+  sends, sends, resumes and retries answer `provider_anomaly` (409) until an
+  admin calls `providers.clearAnomaly` (`POST /v1/providers/:id/clear-anomaly`).
+  A block a bounce hardened (an unsubscribe) is restored, not lifted.
+- **Resend:** also bounces and spam complaints reported afterwards, through
+  Resend's webhooks. A Resend provider's `events` says where they arrive (`url`)
+  and whether the service can verify them (`status`: `active` or
+  `needs_secret`). Creating or verifying the provider registers the endpoint at
+  Resend when the API key allows it; with a sending-only key, add a webhook at
+  Resend for that URL with the events `email.bounced` and `email.complained`,
+  and store its signing secret with `providers.setEventsSecret`
+  (`PUT /v1/providers/:id/events-secret`, `{ signing_secret: "whsec_..." }`).
+  Only an event for a message the service sent through that provider acts.
+  An event for an unknown email is asked to be redelivered (503) during its
+  first hour, in case the send is not recorded yet; after that it is counted
+  in `events.unmatched` and never blocks anyone.
+- **Not detected:** bounces that an SMTP server reports later as an email to
+  the sender's inbox. That is how iCloud+ reports almost all of them, so with an
+  iCloud+ provider, addresses that bounce later have to be blocked by hand.
+
 ## Compile
 
 `POST /v1/templates/:id/compile` and `POST /v1/compile` both return
