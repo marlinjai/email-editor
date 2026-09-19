@@ -29,6 +29,12 @@ Decisions and operator steps that remain after the mail service plan was built
       person's member rows, and what happens to a workspace whose last owner is
       erased); today the service acknowledges it as a no-op and is subscribed only to
       `tenant.erased` (2026-09-18)
+- [ ] Decide whether the editor's model should grow to hold what an MJML import
+      keeps as Raw HTML today (the mail is unchanged, it is only not editable as
+      blocks): a wrapper around several sections (common in real templates), an
+      `mj-hero` with content, `mj-social` with MJML's own icons, a hand-written
+      `mj-table`. Each needs a schema field, a canvas renderer and an inspector
+      (2026-09-19)
 - [ ] Decide whether hosts may add new block types (not only redefine the 14
       standard ones): it needs an open block type in the store and schema, a
       renderer hook for the canvas and a compile hook the server can trust.
