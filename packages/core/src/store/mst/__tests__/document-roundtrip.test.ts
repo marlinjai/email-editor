@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getSnapshot } from 'mobx-state-tree';
 import { createRootStore } from '../RootStore';
 import { validateTemplate } from '../../../schema/validation';
+import { MJMLCompiler } from '../../../compiler/MJMLCompiler';
 import type { Block, Column, EmailTemplate, Section } from '../../../schema/types';
 
 /*
@@ -173,6 +174,22 @@ describe('the store gives back exactly the document it was given', () => {
     store.template.sections[0]!.columns[0]!.setWidth(50);
     const out = JSON.parse(JSON.stringify(getSnapshot(store.template))) as EmailTemplate;
     expect(out.sections[0]!.columns.map((c) => c.width)).toEqual([50, undefined, undefined]);
+  });
+
+  it('a width-less column next to a set one holds what MJML gives it (100 / columns), so the canvas shows the mail', () => {
+    const input: EmailTemplate = {
+      id: 'd',
+      version: '1.0',
+      metadata: {},
+      sections: [{ id: 's', type: 'section', columns: [{ id: 'a', width: 60, blocks: [] }, { id: 'b', blocks: [] }] }],
+    };
+    const store = createRootStore({ template: input as never });
+    expect(store.template.sections[0]!.columns.map((c) => c.width)).toEqual([60, 50]);
+    expect(JSON.parse(JSON.stringify(getSnapshot(store.template)))).toEqual(input);
+    // MJML itself: a column without a width is 100 / columns, whatever the others say.
+    const html = new MJMLCompiler().compile(input).html;
+    expect(html).toContain('mj-column-per-60');
+    expect(html).toContain('mj-column-per-50');
   });
 
   it('an empty metadata stays empty: no title, dates or theme colours appear on their own', () => {

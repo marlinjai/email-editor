@@ -34,7 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never reached the compiled mail), made every column without a width 100%
   wide, gave an untitled document the title "Untitled Template", added the
   fields of every block type to each block, and turned ISO date strings into
-  numbers.
+  numbers. The corrected output applies to documents that pass through the
+  editor's store from now on. Templates saved through the old editor keep the
+  width 100 and the title it wrote into them, and compile as before; no stored
+  data is rewritten.
 - The compiler wrote only the padding sides that were set, so `{ top, bottom }`
   was read by MJML as vertical and horizontal padding; it now writes all four.
 
