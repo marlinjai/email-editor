@@ -50,7 +50,8 @@ const en = {
   f_provider_text:
     'Connect SMTP (an iCloud+ mailbox or your host’s mail server) or a Resend key. The send queue follows each provider’s limits, so a mailbox never gets pushed past its daily cap.',
   f_editor_title: 'A visual editor',
-  f_editor_text: 'Drag blocks into place, preview on desktop and mobile, and get HTML that holds up in real inboxes.',
+  f_editor_text:
+    'Drag blocks into place, preview on desktop and mobile, and get HTML that holds up in real inboxes. Import your existing MJML, export as MJML or HTML.',
   f_unsub_title: 'Unsubscribe built in',
   f_unsub_text:
     'Every mail has one-click unsubscribe and a hosted page where people pick their topics. An unsubscribe takes effect straight away, for that topic or for everything from that sender, as the person chooses. With Resend, hard bounces and spam complaints are blocked automatically. Over SMTP, addresses the server refuses outright are blocked.',
@@ -138,7 +139,8 @@ const de: LandingMessages = {
   f_provider_text:
     'Verbinden Sie SMTP (ein iCloud+-Postfach oder den Mailserver Ihres Hosters) oder einen Resend-Schlüssel. Die Versandwarteschlange hält sich an die Limits jedes Anbieters, damit ein Postfach nie über sein Tageslimit gedrückt wird.',
   f_editor_title: 'Ein visueller Editor',
-  f_editor_text: 'Blöcke per Drag-and-drop anordnen, auf Desktop und Mobil prüfen und HTML bekommen, das in echten Postfächern hält.',
+  f_editor_text:
+    'Blöcke per Drag-and-drop anordnen, auf Desktop und Mobil prüfen und HTML bekommen, das in echten Postfächern hält. Importieren Sie Ihr vorhandenes MJML, exportieren Sie als MJML oder HTML.',
   f_unsub_title: 'Abmeldung eingebaut',
   f_unsub_text:
     'Jede Mail hat eine Abmeldung mit einem Klick und eine gehostete Seite, auf der Empfänger ihre Themen wählen. Eine Abmeldung wirkt sofort, für dieses Thema oder für alles von diesem Absender, ganz wie der Empfänger es wählt. Mit Resend werden unzustellbare Adressen und Spam-Beschwerden automatisch gesperrt. Über SMTP werden Adressen gesperrt, die der Server sofort ablehnt.',
@@ -225,7 +227,8 @@ const it: LandingMessages = {
   f_provider_text:
     'Colleghi SMTP (una casella iCloud+ o il server di posta del Suo hosting) o una chiave Resend. La coda di invio rispetta i limiti di ogni provider, così una casella non supera mai il suo limite giornaliero.',
   f_editor_title: 'Un editor visuale',
-  f_editor_text: 'Trascini i blocchi, controlli l’anteprima su desktop e mobile e ottenga HTML che regge nelle caselle reali.',
+  f_editor_text:
+    'Trascini i blocchi, controlli l’anteprima su desktop e mobile e ottenga HTML che regge nelle caselle reali. Importi il Suo MJML esistente, esporti in MJML o HTML.',
   f_unsub_title: 'Disiscrizione integrata',
   f_unsub_text:
     'Ogni mail ha la disiscrizione con un clic e una pagina ospitata dove le persone scelgono i loro argomenti. Una disiscrizione vale subito, per quell’argomento o per tutto ciò che arriva da quel mittente, come sceglie la persona. Con Resend, gli indirizzi inesistenti e le segnalazioni di spam vengono bloccati automaticamente. Via SMTP vengono bloccati gli indirizzi che il server rifiuta subito.',
@@ -311,7 +314,8 @@ const fr: LandingMessages = {
   f_provider_text:
     'Connectez SMTP (une boîte iCloud+ ou le serveur de messagerie de votre hébergeur) ou une clé Resend. La file d’envoi respecte les limites de chaque fournisseur, pour qu’une boîte ne dépasse jamais son plafond quotidien.',
   f_editor_title: 'Un éditeur visuel',
-  f_editor_text: 'Placez les blocs par glisser-déposer, prévisualisez sur ordinateur et mobile, et obtenez un HTML qui tient dans les vraies boîtes de réception.',
+  f_editor_text:
+    'Placez les blocs par glisser-déposer, prévisualisez sur ordinateur et mobile, et obtenez un HTML qui tient dans les vraies boîtes de réception. Importez votre MJML existant, exportez en MJML ou en HTML.',
   f_unsub_title: 'Désabonnement intégré',
   f_unsub_text:
     'Chaque e-mail propose le désabonnement en un clic et une page hébergée où chacun choisit ses sujets. Un désabonnement prend effet immédiatement, pour ce sujet ou pour tout ce qui vient de cet expéditeur, selon le choix de la personne. Avec Resend, les adresses inexistantes et les plaintes pour spam sont bloquées automatiquement. Via SMTP, les adresses que le serveur refuse d’emblée sont bloquées.',
@@ -398,7 +402,8 @@ const es: LandingMessages = {
   f_provider_text:
     'Conecte SMTP (un buzón de iCloud+ o el servidor de correo de su hosting) o una clave de Resend. La cola de envío respeta los límites de cada proveedor, para que un buzón nunca supere su tope diario.',
   f_editor_title: 'Un editor visual',
-  f_editor_text: 'Arrastre bloques, previsualice en escritorio y móvil, y obtenga HTML que aguanta en bandejas de entrada reales.',
+  f_editor_text:
+    'Arrastre bloques, previsualice en escritorio y móvil, y obtenga HTML que aguanta en bandejas de entrada reales. Importe su MJML existente, exporte como MJML o HTML.',
   f_unsub_title: 'Baja integrada',
   f_unsub_text:
     'Cada correo tiene baja con un clic y una página alojada donde cada persona elige sus temas. Una baja surte efecto al momento, para ese tema o para todo lo que llega de ese remitente, según elija la persona. Con Resend, las direcciones inexistentes y las quejas por spam se bloquean automáticamente. Por SMTP se bloquean las direcciones que el servidor rechaza de inmediato.',
