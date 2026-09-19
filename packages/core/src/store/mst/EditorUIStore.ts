@@ -4,7 +4,7 @@ import { types, Instance, SnapshotIn } from 'mobx-state-tree';
 /**
  * Selection types in the editor
  */
-export type SelectionType = 'block' | 'section' | 'column' | null;
+export type SelectionType = 'block' | 'section' | 'column' | 'subColumn' | 'wrapper' | null;
 
 /**
  * Active sidebar tab
@@ -66,6 +66,8 @@ export const EditorUIStore = types
     selectedSectionId: types.maybe(types.string),
     selectedColumnId: types.maybe(types.string),
     selectedSubColumnId: types.maybe(types.string),
+    /** A wrapper (container around sections), one level out from sections. */
+    selectedWrapperId: types.maybe(types.string),
 
     // === Panel State ===
     activeTab: types.optional(
@@ -88,6 +90,10 @@ export const EditorUIStore = types
     hoverSectionId: undefined as string | undefined,
     hoverColumnId: undefined as string | undefined,
     hoverSubColumnId: undefined as string | undefined,
+    hoverWrapperId: undefined as string | undefined,
+
+    /** The wrapper whose delete the editor is asking about (keep its sections, or delete everything). */
+    pendingWrapperDeleteId: undefined as string | undefined,
 
     // Drag state
     isDragging: false,
@@ -113,6 +119,7 @@ export const EditorUIStore = types
       self.selectedSectionId = undefined;
       self.selectedColumnId = undefined;
       self.selectedSubColumnId = undefined;
+      self.selectedWrapperId = undefined;
     },
 
     /**
@@ -123,6 +130,7 @@ export const EditorUIStore = types
       self.selectedBlockId = undefined;
       self.selectedColumnId = undefined;
       self.selectedSubColumnId = undefined;
+      self.selectedWrapperId = undefined;
     },
 
     /**
@@ -133,6 +141,7 @@ export const EditorUIStore = types
       self.selectedBlockId = undefined;
       self.selectedSectionId = undefined;
       self.selectedSubColumnId = undefined;
+      self.selectedWrapperId = undefined;
     },
 
     /**
@@ -144,6 +153,19 @@ export const EditorUIStore = types
       self.selectedBlockId = undefined;
       self.selectedSectionId = undefined;
       self.selectedColumnId = undefined;
+      self.selectedWrapperId = undefined;
+    },
+
+    /**
+     * Select a wrapper (the container around sections).
+     * Mutually exclusive with the other selection levels.
+     */
+    selectWrapper(wrapperId: string | null) {
+      self.selectedWrapperId = wrapperId || undefined;
+      self.selectedBlockId = undefined;
+      self.selectedSectionId = undefined;
+      self.selectedColumnId = undefined;
+      self.selectedSubColumnId = undefined;
     },
 
     /**
@@ -154,6 +176,7 @@ export const EditorUIStore = types
       self.selectedSectionId = undefined;
       self.selectedColumnId = undefined;
       self.selectedSubColumnId = undefined;
+      self.selectedWrapperId = undefined;
     },
 
     // === Hover Actions ===
@@ -187,6 +210,24 @@ export const EditorUIStore = types
     },
 
     /**
+     * Set hover wrapper
+     */
+    setHoverWrapper(wrapperId: string | undefined) {
+      self.hoverWrapperId = wrapperId;
+    },
+
+    // === Wrapper delete dialog ===
+
+    /** Ask whether to keep a wrapper's sections or delete everything (the editor shows its own dialog). */
+    requestWrapperDelete(wrapperId: string) {
+      self.pendingWrapperDeleteId = wrapperId;
+    },
+
+    cancelWrapperDelete() {
+      self.pendingWrapperDeleteId = undefined;
+    },
+
+    /**
      * Clear all hover states
      */
     clearHover() {
@@ -194,6 +235,7 @@ export const EditorUIStore = types
       self.hoverSectionId = undefined;
       self.hoverColumnId = undefined;
       self.hoverSubColumnId = undefined;
+      self.hoverWrapperId = undefined;
     },
 
     // === Drag Actions ===
@@ -378,6 +420,8 @@ export const EditorUIStore = types
       if (self.selectedBlockId) return 'block';
       if (self.selectedSectionId) return 'section';
       if (self.selectedColumnId) return 'column';
+      if (self.selectedSubColumnId) return 'subColumn';
+      if (self.selectedWrapperId) return 'wrapper';
       return null;
     },
 
@@ -385,7 +429,7 @@ export const EditorUIStore = types
      * Check if anything is selected
      */
     get hasSelection(): boolean {
-      return !!(self.selectedBlockId || self.selectedSectionId || self.selectedColumnId);
+      return !!(self.selectedBlockId || self.selectedSectionId || self.selectedColumnId || self.selectedSubColumnId || self.selectedWrapperId);
     },
 
     /**
@@ -407,6 +451,13 @@ export const EditorUIStore = types
      */
     isColumnSelected(columnId: string): boolean {
       return self.selectedColumnId === columnId;
+    },
+
+    /**
+     * Check if a specific wrapper is selected
+     */
+    isWrapperSelected(wrapperId: string): boolean {
+      return self.selectedWrapperId === wrapperId;
     },
 
     /**

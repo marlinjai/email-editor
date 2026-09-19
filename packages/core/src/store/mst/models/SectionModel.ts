@@ -6,13 +6,14 @@ import { BlockInstance } from './BlockModel';
 import { paddingIn, paddingOut } from './spacingSnapshot';
 import { SECTION_DEFAULTS, dropFilled, fillColumnWidths, fillDefaults, type Filled } from './filledDefaults';
 import type { CSSProperties } from '../types';
-import type { BackgroundGradient } from '../../..';
-import { buildGradientCSS } from '../../..';
+import type { BackgroundGradient } from '../../../schema/gradient';
+import { buildGradientCSS } from '../../../schema/gradient';
 
 /**
  * SectionModel - A section in the email template
  *
- * Sections are the top-level structural elements that contain columns.
+ * Sections are the structural elements that contain columns, at the top
+ * level of a document or inside a wrapper (`WrapperModel`).
  * Each section maps to an <mj-section> in MJML.
  */
 const SectionModelBase = types
@@ -41,7 +42,6 @@ const SectionModelBase = types
 
     // Layout
     fullWidth: types.optional(types.boolean, false),
-    isWrapper: types.optional(types.boolean, false),
     noStack: types.optional(types.boolean, false), // mj-group behavior
 
     // Visibility
@@ -57,9 +57,10 @@ const SectionModelBase = types
     columns: types.array(ColumnModel),
 
     /**
-     * Emit the section's raw blocks straight into mj-body instead of wrapping
-     * them in an mj-section (set by the MJML import for markup that sat
-     * directly in mj-body). Ignored once the section holds any other block.
+     * Emit the section's raw blocks straight into its parent (mj-body or
+     * mj-wrapper) instead of wrapping them in an mj-section (set by the MJML
+     * import for markup that sat there). Ignored once the section holds any
+     * other block.
      */
     bodyRaw: types.maybe(types.boolean),
 
@@ -165,7 +166,6 @@ const SectionModelBase = types
       backgroundRepeat?: 'repeat' | 'no-repeat';
       backgroundSize?: string;
       fullWidth?: boolean;
-      isWrapper?: boolean;
       noStack?: boolean;
       paddingTop?: string;
       paddingRight?: string;

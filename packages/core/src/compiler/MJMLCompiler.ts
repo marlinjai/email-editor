@@ -151,6 +151,14 @@ export class MJMLCompiler {
   }
 
   /**
+   * The MJML markup for a document, without compiling it to HTML.
+   */
+  toMJML(template: EmailTemplate): string {
+    this.needsSubColumnStyles = false;
+    return this.templateToMJML(template);
+  }
+
+  /**
    * Convert template to MJML markup
    */
   private templateToMJML(template: EmailTemplate): string {

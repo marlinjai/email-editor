@@ -3,6 +3,7 @@ import { getSnapshot } from 'mobx-state-tree';
 import { createRootStore } from '../RootStore';
 import { validateTemplate } from '../../../schema/validation';
 import { MJMLCompiler } from '../../../compiler/MJMLCompiler';
+import { migrateTemplate } from '../../../schema/migrate';
 import type { Block, Column, EmailTemplate, Section } from '../../../schema/types';
 
 /*
@@ -81,7 +82,6 @@ const FULL_SECTION: Section = {
   backgroundRepeat: 'no-repeat',
   backgroundSize: 'cover',
   fullWidth: true,
-  isWrapper: true,
   noStack: true,
   hidden: false,
   padding: pad,
@@ -117,7 +117,7 @@ const MINIMAL_BLOCKS: Block[] = [
 function doc(sections: Section[]): EmailTemplate {
   return {
     id: 'doc-1',
-    version: '1.0',
+    version: '1.1',
     metadata: {
       title: 'T',
       subject: 'S',
@@ -149,7 +149,7 @@ describe('the store gives back exactly the document it was given', () => {
 
   for (const block of MINIMAL_BLOCKS) {
     it(`${block.type}, only its required fields: deep-equal (no other type's fields, no defaults added)`, () => {
-      const input: EmailTemplate = { id: 'd', version: '1.0', metadata: {}, sections: inColumn([block]) };
+      const input: EmailTemplate = { id: 'd', version: '1.1', metadata: {}, sections: inColumn([block]) };
       expect(roundTrip(input)).toEqual(input);
     });
   }
@@ -162,7 +162,7 @@ describe('the store gives back exactly the document it was given', () => {
   it('columns without a width stay without one (MJML shares the section evenly), and so does the compiled mail', () => {
     const input: EmailTemplate = {
       id: 'd',
-      version: '1.0',
+      version: '1.1',
       metadata: {},
       sections: [{ id: 's', type: 'section', columns: [{ id: 'a', blocks: [] }, { id: 'b', blocks: [] }, { id: 'c', blocks: [] }] }],
     };
@@ -179,7 +179,7 @@ describe('the store gives back exactly the document it was given', () => {
   it('a width-less column next to a set one holds what MJML gives it (100 / columns), so the canvas shows the mail', () => {
     const input: EmailTemplate = {
       id: 'd',
-      version: '1.0',
+      version: '1.1',
       metadata: {},
       sections: [{ id: 's', type: 'section', columns: [{ id: 'a', width: 60, blocks: [] }, { id: 'b', blocks: [] }] }],
     };
@@ -193,12 +193,12 @@ describe('the store gives back exactly the document it was given', () => {
   });
 
   it('an empty metadata stays empty: no title, dates or theme colours appear on their own', () => {
-    const input: EmailTemplate = { id: 'd', version: '1.0', metadata: {}, sections: [] };
+    const input: EmailTemplate = { id: 'd', version: '1.1', metadata: {}, sections: [] };
     expect(roundTrip(input)).toEqual(input);
   });
 
   it('dates written as ISO strings come back as written; an edit writes a new one', () => {
-    const input: EmailTemplate = { id: 'd', version: '1.0', metadata: { createdAt: '2026-09-01T10:00:00.000Z', updatedAt: '2026-09-02T10:00:00.000Z' }, sections: [] };
+    const input: EmailTemplate = { id: 'd', version: '1.1', metadata: { createdAt: '2026-09-01T10:00:00.000Z', updatedAt: '2026-09-02T10:00:00.000Z' }, sections: [] };
     expect(roundTrip(input)).toEqual(input);
     const store = createRootStore({ template: input as never });
     store.template.updateMetadata({ title: 'New' });
@@ -209,11 +209,17 @@ describe('the store gives back exactly the document it was given', () => {
   });
 
   it('a document without an id gets one, and nothing else changes', () => {
-    const input: EmailTemplate = { version: '1.0', metadata: {}, sections: inColumn(MINIMAL_BLOCKS) };
+    const input: EmailTemplate = { version: '1.1', metadata: {}, sections: inColumn(MINIMAL_BLOCKS) };
     const out = roundTrip(input);
     expect(typeof out.id).toBe('string');
     const { id: _id, ...rest } = out;
     expect(rest).toEqual(input);
+  });
+
+  it('a schema 1.0 document opens as 1.1, exactly as migrateTemplate takes it there', () => {
+    const legacy = { ...doc([FULL_SECTION]), version: '1.0' } as unknown as EmailTemplate;
+    expect(roundTrip(legacy)).toEqual(migrateTemplate(structuredClone(legacy)));
+    expect(roundTrip(legacy).version).toBe('1.1');
   });
 
   it('the whole editor: every block type in one document, and undo and redo in between, still deep-equal', () => {

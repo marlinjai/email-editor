@@ -11,7 +11,7 @@ import type { EmailTemplate } from '../../../schema/types';
 // hit), keep an id it was given, and hand back a stable id once it assigned one.
 function documentWithoutId(): EmailTemplate {
   return {
-    version: '1.0',
+    version: '1.1',
     metadata: { title: 'No id', subject: 'Hello' },
     sections: [
       {

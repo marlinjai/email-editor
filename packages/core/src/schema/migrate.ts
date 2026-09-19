@@ -178,9 +178,9 @@ export function migrateV1_0ToV1_1(doc: V1_0Document): EmailTemplate {
   const ids = new Set<string>();
   for (const s of doc.sections) {
     ids.add(s.id);
-    for (const c of s.columns) {
+    for (const c of s.columns ?? []) {
       ids.add(c.id);
-      for (const b of c.blocks) ids.add(b.id);
+      for (const b of c.blocks ?? []) ids.add(b.id);
     }
   }
   const freshId = (base: string) => {
