@@ -1,6 +1,7 @@
 import { assertProviderOpen } from '../worker/breaker.js';
 import {
   missingRequiredMergeFields,
+  testGroupSize,
   type AbTestState,
   type AuditActor,
   type TemplateDocument,
@@ -74,9 +75,6 @@ export async function prepareStart(compile: Compile, pool: Repos, workspaceId: s
 }
 
 /** How many recipients the test group gets: the fraction, at least one per variant, at most everyone. */
-export function testGroupSize(total: number, fraction: number, variants: number): number {
-  return Math.min(total, Math.max(variants, Math.ceil(total * fraction)));
-}
 
 export async function applyStart(
   tx: Db,

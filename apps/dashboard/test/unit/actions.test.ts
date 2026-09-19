@@ -19,7 +19,7 @@ const api = {
   members: { list: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn() },
   invites: { create: vi.fn(), revoke: vi.fn(), accept: vi.fn() },
   templates: { update: vi.fn(), get: vi.fn(), version: vi.fn() },
-  mailings: { addRecipients: vi.fn(), create: vi.fn(), test: vi.fn(), retryFailed: vi.fn(), pause: vi.fn() },
+  mailings: { addRecipients: vi.fn(), create: vi.fn(), test: vi.fn(), send: vi.fn(), retryFailed: vi.fn(), pause: vi.fn() },
   providers: { create: vi.fn(), update: vi.fn(), setEventsSecret: vi.fn(), clearAnomaly: vi.fn() },
   assets: { upload: vi.fn() },
 };
@@ -33,7 +33,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 const { createWorkspace } = await import('@/app/workspaces/actions');
 const { saveTemplate, restoreVersion, uploadImage } = await import('@/app/w/[ws]/templates/actions');
-const { addRecipients, createMailing, sendTest, retryFailed, controlMailing } = await import('@/app/w/[ws]/mailings/actions');
+const { addRecipients, createMailing, sendTest, sendMailing, retryFailed, controlMailing } = await import('@/app/w/[ws]/mailings/actions');
 const { inviteMember, revokeInvite, saveProvider, setProviderEventsSecret, clearProviderAnomaly } = await import('@/app/w/[ws]/settings/actions');
 const { acceptInvite } = await import('@/app/invite/[token]/actions');
 
@@ -157,6 +157,47 @@ describe('mailings', () => {
     expect(api.mailings.retryFailed).toHaveBeenLastCalledWith('m1', {});
     await retryFailed('ws', 'm1', true);
     expect(api.mailings.retryFailed).toHaveBeenLastCalledWith('m1', { include_outcome_unknown: true });
+  });
+
+  it('brings the usage warning header of a send and a test back to the screen', async () => {
+    const warn = (opts: { onResponse?: (m: unknown) => void } | undefined) =>
+      opts?.onResponse?.({ status: 200, requestId: 'r', headers: new Headers(), usageWarnings: [{ metric: 'messages', used: 900, limit: 1000 }] });
+    api.mailings.send.mockImplementation(async (_id: string, opts?: { onResponse?: (m: unknown) => void }) => {
+      warn(opts);
+      return { id: 'm1', status: 'sending' };
+    });
+    const sent = await sendMailing('ws', 'm1');
+    expect(sent).toEqual({ ok: true, data: { mailing: { id: 'm1', status: 'sending' }, usageWarnings: [{ metric: 'messages', used: 900, limit: 1000 }] } });
+
+    api.mailings.test.mockImplementation(async (_id: string, _body: unknown, opts?: { onResponse?: (m: unknown) => void }) => {
+      warn(opts);
+      return { message_id: 'x' };
+    });
+    const tested = await sendTest('ws', 'm1', { to: 'me@example.com', firstName: '' });
+    expect(tested.ok && tested.data.usageWarnings).toEqual([{ metric: 'messages', used: 900, limit: 1000 }]);
+
+    // No header, no warning.
+    api.mailings.send.mockResolvedValue({ id: 'm1', status: 'sending' });
+    const quiet = await sendMailing('ws', 'm1');
+    expect(quiet.ok && quiet.data.usageWarnings).toEqual([]);
+  });
+
+  it('shows a plan limit in the service words, with its numbers kept for the screen', async () => {
+    api.mailings.send.mockRejectedValue(
+      new MailApiError({
+        code: 'plan_limit_reached',
+        status: 429,
+        message: 'The Free plan allows 1000 messages. Upgrade the plan or remove some first.',
+        details: { metric: 'messages', used: 1000, limit: 1000, plan: 'free' },
+      }),
+    );
+    const r = await sendMailing('ws', 'm1');
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.code).toBe('plan_limit_reached');
+      expect(r.error.message).toBe('The Free plan allows 1000 messages. Upgrade the plan or remove some first.');
+      expect(r.error.details).toMatchObject({ metric: 'messages', limit: 1000 });
+    }
   });
 
   it('reports an unreachable service on a test send', async () => {

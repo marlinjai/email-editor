@@ -5,9 +5,10 @@ import { FormError } from '@/components/form-error';
 import { useSaved } from '@/components/saved';
 import { Button, describedBy, Field, Input, Mono, Select } from '@/components/ui';
 import { useAction } from '@/components/use-action';
-import { updateGeneral } from './actions';
+import { PlanGate } from '@/components/plan-gate';
+import { saveTracking, updateGeneral } from './actions';
 
-type General = { name: string; slug: string; locales: string[]; defaultLocale: string; trackingEnabled: boolean; assetPolicy: 'any' | 'service_only' };
+type General = { name: string; slug: string; locales: string[]; defaultLocale: string; assetPolicy: 'any' | 'service_only' };
 
 export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: General; canEdit: boolean }) {
   const { run, pending, error, fields } = useAction();
@@ -15,7 +16,6 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
   const [name, setName] = useState(initial.name);
   const [localesText, setLocalesText] = useState(initial.locales.join(', '));
   const [defaultLocale, setDefaultLocale] = useState(initial.defaultLocale);
-  const [tracking, setTracking] = useState(initial.trackingEnabled);
   const [assetPolicy, setAssetPolicy] = useState(initial.assetPolicy);
   const locales = [
     ...new Set(
@@ -31,7 +31,7 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
       className="flex max-w-[560px] flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
-        void run(() => updateGeneral(ws, { name, locales, defaultLocale, trackingEnabled: tracking, assetPolicy }), saved.mark);
+        void run(() => updateGeneral(ws, { name, locales, defaultLocale, assetPolicy }), saved.mark);
       }}
     >
       <fieldset disabled={!canEdit} className="contents">
@@ -102,25 +102,6 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
             </label>
           ))}
         </fieldset>
-        <div className="flex items-start gap-3 rounded-xl border border-line bg-panel p-4">
-          <input
-            id="g-tracking"
-            type="checkbox"
-            checked={tracking}
-            onChange={(e) => setTracking(e.target.checked)}
-            className="mt-0.5 size-4 accent-[var(--gold)]"
-            aria-describedby="g-tracking-hint"
-          />
-          <div>
-            <label htmlFor="g-tracking" className="text-[13.5px] font-medium text-ink">
-              Open and click tracking
-            </label>
-            <p id="g-tracking-hint" className="mt-0.5 text-[12.5px] text-muted">
-              Off by default. Turn it on only if your privacy policy says you track opens and clicks; the setting applies once campaign
-              analytics ship.
-            </p>
-          </div>
-        </div>
       </fieldset>
       <FormError error={error} />
       {canEdit ? (
@@ -133,6 +114,82 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
       ) : (
         <p className="text-[12.5px] text-faint">Only an admin or owner can change these settings.</p>
       )}
+    </form>
+  );
+}
+
+/**
+ * Open and click tracking, saved on its own: it is a privacy decision with a
+ * plan behind it (Free has no tracking), not one more field of the workspace.
+ */
+export function TrackingForm({
+  ws,
+  initial,
+  canEdit,
+  plan,
+}: {
+  ws: string;
+  initial: { opens: boolean; clicks: boolean };
+  canEdit: boolean;
+  /** Null when the plan could not be read: the service still refuses what the plan lacks. */
+  plan: { name: string; included: boolean } | null;
+}) {
+  const { run, pending, error } = useAction();
+  const saved = useSaved();
+  const [opens, setOpens] = useState(initial.opens);
+  const [clicks, setClicks] = useState(initial.clicks);
+  const changed = opens !== initial.opens || clicks !== initial.clicks;
+  // Without tracking in the plan, it can only be turned off (after a downgrade), never on.
+  const gated = plan !== null && !plan.included;
+  const offOnly = (current: boolean, was: boolean) => gated && !was && !current;
+  const box = (id: string, label: string, hint: string, checked: boolean, set: (v: boolean) => void) => (
+    <div className="flex items-start gap-3">
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        disabled={offOnly(checked, id === 'tr-opens' ? initial.opens : initial.clicks)}
+        onChange={(e) => set(e.target.checked)}
+        className="mt-0.5 size-4 accent-[var(--gold)]"
+        aria-describedby={`${id}-hint`}
+      />
+      <div>
+        <label htmlFor={id} className="text-[13.5px] font-medium text-ink">
+          {label}
+        </label>
+        <p id={`${id}-hint`} className="mt-0.5 text-[12.5px] text-muted">
+          {hint}
+        </p>
+      </div>
+    </div>
+  );
+  return (
+    <form
+      className="flex max-w-[560px] flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void run(() => saveTracking(ws, { opens, clicks }), saved.mark);
+      }}
+    >
+      <fieldset disabled={!canEdit} className="flex flex-col gap-3 rounded-xl border border-line bg-panel p-4">
+        <legend className="px-1 text-[13.5px] font-medium text-ink">Open and click tracking</legend>
+        <p className="text-[12.5px] text-muted">
+          Off by default. Turn it on only if your privacy policy says you track opens and clicks. A mailing keeps the tracking it started
+          with.
+        </p>
+        {box('tr-opens', 'Track opens', 'A one-pixel image in each mail. Apple Mail Privacy Protection opens are counted apart.', opens, setOpens)}
+        {box('tr-clicks', 'Track clicks', 'Links go through this service first, then on to where they point.', clicks, setClicks)}
+        {gated ? <PlanGate ws={ws} planName={plan.name} feature="open and click tracking" /> : null}
+      </fieldset>
+      <FormError error={error} />
+      {canEdit ? (
+        <div className="flex items-center gap-3">
+          <Button type="submit" busy={pending} disabled={!changed}>
+            Save tracking
+          </Button>
+          {saved.node}
+        </div>
+      ) : null}
     </form>
   );
 }

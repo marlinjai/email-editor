@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import type { MemberRole } from '@marlinjai/mail-contract';
+import type { MemberRole, UsageWarning } from '@marlinjai/mail-contract';
 import { can, ROLE_LABELS } from '@/lib/roles';
+import { billingPath, usageWarningSummary } from '@/lib/usage';
 import { BrandMark } from './brand';
 import {
   IconArchive,
@@ -127,17 +128,44 @@ function WorkspaceSwitcher({ current, workspaces }: { current: WorkspaceItem; wo
   );
 }
 
+/**
+ * The plan's usage warning, above every page of the workspace until the usage
+ * falls back or the plan changes. Hidden on the Billing screen, which shows
+ * the same numbers in full.
+ */
+function UsageBanner({ ws, warnings, pathname }: { ws: string; warnings: UsageWarning[]; pathname: string }) {
+  const summary = usageWarningSummary(warnings);
+  if (!summary || pathname === billingPath(ws)) return null;
+  const reached = summary.level === 'reached';
+  return (
+    <div
+      role="status"
+      data-testid="usage-banner"
+      className={`mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border px-3.5 py-2.5 text-[13px] ${
+        reached ? 'border-[rgba(255,138,128,0.3)] bg-danger-wash text-ink' : 'border-[rgba(240,192,90,0.22)] bg-warn-wash text-ink'
+      }`}
+    >
+      <p>{summary.text}</p>
+      <Link href={billingPath(ws)} className="shrink-0 font-medium underline decoration-line-strong underline-offset-2 hover:decoration-ink">
+        Plans and usage
+      </Link>
+    </div>
+  );
+}
+
 export function Shell({
   current,
   workspaces,
   email,
   signOutHref,
+  usageWarnings = [],
   children,
 }: {
   current: WorkspaceItem;
   workspaces: WorkspaceItem[];
   email: string;
   signOutHref: string;
+  usageWarnings?: UsageWarning[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -237,6 +265,7 @@ export function Shell({
           {sidebar}
         </dialog>
         <main id="main" className="mx-auto w-full max-w-[1200px] flex-1 px-5 py-8 sm:px-8">
+          <UsageBanner ws={current.id} warnings={usageWarnings} pathname={pathname} />
           {children}
         </main>
       </div>

@@ -79,7 +79,14 @@ export default async function MailingsPage({ params, searchParams }: { params: P
                     <Td className={`tabular text-right ${m.counts.failed > 0 ? 'text-danger' : 'text-muted'}`}>{formatCount(m.counts.failed)}</Td>
                     <Td className="tabular text-right text-muted">{formatCount(m.counts.skipped)}</Td>
                     <Td>
-                      <When at={m.finished_at ?? m.started_at ?? m.updated_at} />
+                      {m.status === 'scheduled' && m.scheduled_at ? (
+                        <span className="text-[12.5px]">
+                          <span className="text-faint">for </span>
+                          <When at={m.scheduled_at} />
+                        </span>
+                      ) : (
+                        <When at={m.finished_at ?? m.started_at ?? m.updated_at} />
+                      )}
                     </Td>
                   </tr>
                 );

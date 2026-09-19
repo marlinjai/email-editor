@@ -2,7 +2,7 @@
 title: Lumitra Mail dashboard (apps/dashboard)
 type: readme
 date: 2026-09-18
-summary: How the dashboard at app.mail.lumitra.co is built, signs people in, reaches the mail service, is tested and deployed; phase S3 of docs/plans/2026-09-18-mail-service.md.
+summary: How the dashboard at app.mail.lumitra.co is built, signs people in, reaches the mail service, is tested and deployed; phase S3 of docs/plans/2026-09-18-mail-service.md and its follow-up for the S4 platform and S5 billing screens.
 ---
 
 # Lumitra Mail dashboard
@@ -41,6 +41,22 @@ and its binding "Service architecture" section: `docs/plans/2026-09-18-mail-serv
 - **Mailings** follow the contract's `MAILING_TRANSITIONS` for their controls
   (`src/lib/mailing-status.ts`) and poll for live counts while the worker can still
   move them; a reload resumes from the service's state.
+- **Plans and usage** (Settings, Billing): the plan, a bar per counted metric and
+  the plan catalogue, with Stripe Checkout and the Stripe portal. Until Stripe is
+  configured on the service (it answers `billing_not_configured`), the screen says
+  billing is not yet available and nothing can be bought. A `plan_limit_reached`
+  refusal anywhere links to this screen, and a banner above every workspace page
+  (from `billing.usage`), as well as a notice right after a send or a test (from
+  the response's `x-mail-usage-warning`, read through the SDK's `onResponse`),
+  warns when messages or contacts pass 80 percent of the plan.
+- **The contacts area** (`/w/<id>/contacts/...`): contacts with their tags,
+  segments with a builder for the whole filter tree and a live count, tags, CSV
+  imports (upload, mapping, a dry run, commit of exactly that dry run, cancel;
+  the page follows the service's worker and resumes after a reload), signup forms
+  with double opt-in and their embed code, and typed properties.
+- **Mailings** also take an audience from a segment, can be scheduled, carry an
+  A/B test of subjects and content (picked by opens, clicks or by hand), and show
+  their analytics once they started. Tracking is its own form on Settings.
 - **Rendered email** (template previews, the mailing preview, archived messages) is
   shown in an `<iframe sandbox="">` with `srcDoc`: no scripts, no same-origin, no
   navigation.
@@ -107,10 +123,16 @@ The end-to-end stack (`test/e2e/stack.ts`): Postgres 17 (Testcontainers, or
 `TEST_DATABASE_URL` in CI), the mail service as a subprocess of its built
 `dist/main.js` with its real send worker, an SMTP sink with TLS the worker delivers
 to, and a Storage Brain stand-in for image uploads. A control server lets a test
-slow the sink, make it refuse addresses, and restart the service mid-send. The
-mailing flow is covered on the four paths of the stateful-flow standard: forward,
-backtrack and revise, resume (a reload and a service restart mid-send), and re-entry
-(retry the failed, duplicate, a cancelled mailing is read-only).
+slow the sink, make it refuse addresses, restart the service mid-send, and put a
+workspace on a plan (an operator's database action, as for a design partner).
+`dashboard.spec.ts` covers the S3 screens and the mailing flow on the four paths of
+the stateful-flow standard: forward, backtrack and revise, resume (a reload and a
+service restart mid-send), and re-entry (retry the failed, duplicate, a cancelled
+mailing is read-only). `platform.spec.ts` runs in a workspace of its own: billing on
+Free and as a design partner, plan limit refusals, the usage warnings, tags,
+properties, segments, a signup form confirmed by a visitor, and the import,
+scheduling and A/B flows on the same four paths (the import's resume includes a
+service restart during its commit).
 
 ## Deploy
 

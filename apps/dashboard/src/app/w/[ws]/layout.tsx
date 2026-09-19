@@ -1,6 +1,8 @@
 import { Shell } from '@/components/shell';
 import { ErrorPanel, LinkButton } from '@/components/ui';
+import { act } from '@/lib/action';
 import { auth } from '@/lib/auth';
+import { mail } from '@/lib/mail';
 import { requireViewer } from '@/lib/viewer';
 import { workspaceContext } from '@/lib/workspace';
 
@@ -38,8 +40,14 @@ export default async function WorkspaceLayout({ children, params }: { children: 
     );
   }
 
+  // The plan's warnings for the banner (read access, so every member sees
+  // them). Advisory: when usage cannot be read the page still renders, and
+  // the failure is logged by `act`.
+  const usage = await act('billing.usage', async () => (await mail(ws)).api.billing.usage());
+
   return (
     <Shell
+      usageWarnings={usage.ok ? usage.data.warnings : []}
       current={{ id: ctx.data.workspace.id, name: ctx.data.workspace.name, role: ctx.data.role }}
       workspaces={ctx.data.memberships.map((w) => ({ id: w.id, name: w.name, role: w.role }))}
       email={viewer.email}

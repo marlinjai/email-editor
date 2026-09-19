@@ -22,14 +22,10 @@
       (refused with `conflict` while a mailing uses the topic, which the schema
       already enforces) once a client needs to remove a topic; S2 ships without
       it [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
-- [ ] Mail dashboard: once #21 is merged and `https://app.mail.lumitra.co/api/health`
-      serves its commit, merge auth-brain#142 (shows the `mail` card and subscribes
-      the service to `tenant.erased`); registering the erasure before
-      `/internal/erasure` is deployed would hold every company erasure waiting. The
-      first deploy creates the GHCR package `email-editor-dashboard` private; make it
-      public in its settings (the API cannot), as the service's is. Marlin's
-      own sign-in needs a second factor enrolled at auth.lumitra.co (the dashboard
-      requires it) [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+- [ ] Mail dashboard: Marlin enrolls a second factor at auth.lumitra.co for his
+      own sign-in to app.mail.lumitra.co, which requires one (#21 is deployed,
+      auth-brain#142 merged, the GHCR package public)
+      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
 - [ ] Mail service: decide whether to detect bounces that SMTP providers report
       later by email (iCloud+ reports almost all of them that way), which needs
       read access to the sender's inbox (IMAP, the Internet Message Access
@@ -40,11 +36,6 @@
       person's member rows, and what happens to a workspace whose last owner is
       erased); today the service acknowledges it as a no-op and is subscribed only to
       `tenant.erased` [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
-- [ ] Mail service: dashboard screens for the S4 platform features (tags and
-      properties, segments with the count preview, the CSV import's mapping,
-      dry run and report, signup forms and their embed, scheduling, A/B tests,
-      tracking settings and campaign analytics), over the API S4 ships; built
-      once the S3 dashboard has landed [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 - [ ] Decide whether hosts may add new block types (not only redefine the 14
       standard ones): it needs an open block type in the store and schema, a
       renderer hook for the canvas and a compile hook the server can trust.
@@ -64,9 +55,6 @@
       prod; rerun the setup command with `--live` and destinations in prod
       only; redeploy; then one real checkout, a plan switch in the portal and a
       cancellation, refunded [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
-- [ ] Mail service dashboard: the billing screens (plan, usage with the 80
-      percent warning, checkout, the portal) over `billing.*`, after S3 lands
-      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
 - [ ] Lumitra Mail privacy notice (needs Marlin's legal review): lumitra.co/datenschutz
       covers the landing page but defers product-specific processing to a notice on
       the product's own domain, and Mail has none. Write `mail.lumitra.co/privacy`

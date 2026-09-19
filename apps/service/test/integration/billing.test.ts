@@ -91,6 +91,21 @@ describe('plans and the free tier', () => {
     const free = res.body.data[0];
     expect(free).toMatchObject({ monthly_price_cents: 0, features: { ab_testing: false, tracking: false } });
     expect(free.limits.monthly_messages).toBe(1000);
+    // With Stripe and both Prices configured, everything listed can be bought.
+    expect(res.body.data.map((p: any) => p.sellable)).toEqual([true, true, true]);
+  });
+
+  it('marks a paid plan not sellable when checkout would refuse it', async () => {
+    const w = await freeWorkspace();
+    const noStripe = appOver(h);
+    const none = await noStripe.call({ path: '/v1/billing/plans', key: w.key });
+    expect(none.body.data.map((p: any) => [p.id, p.sellable])).toEqual([['free', true], ['starter', false], ['growth', false]]);
+    const partly = appOver(h, {
+      billing: { ...TEST_BILLING_CONFIG, prices: { starter: PRICE_STARTER } },
+      stripe: createStripeApi(TEST_BILLING_CONFIG.secretKey, { fetch: stripe.fetch }),
+    });
+    const some = await partly.call({ path: '/v1/billing/plans', key: w.key });
+    expect(some.body.data.map((p: any) => [p.id, p.sellable])).toEqual([['free', true], ['starter', true], ['growth', false]]);
   });
 
   it('a new workspace is on the free plan for the calendar month, exempt from nothing', async () => {

@@ -87,3 +87,15 @@ export const RETRYABLE_ERRORS: readonly ErrorCode[] = [
   'internal_error',
   'service_unavailable',
 ];
+
+/**
+ * `details.reason` of a `service_unavailable` from `billing.checkout` and
+ * `billing.portal` while Stripe is not configured on the instance: a lasting
+ * configuration state, not an outage, so retrying does not help.
+ */
+export const BILLING_NOT_CONFIGURED_REASON = 'billing_not_configured';
+
+/** Whether a refusal may be retried unchanged: a RETRYABLE_ERRORS code, unless its reason is a lasting configuration state. */
+export function isRetryableError(code: ErrorCode, details?: Record<string, unknown>): boolean {
+  return RETRYABLE_ERRORS.includes(code) && details?.reason !== BILLING_NOT_CONFIGURED_REASON;
+}

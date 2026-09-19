@@ -32,7 +32,9 @@ export function Button({
   ...rest
 }: ComponentProps<'button'> & { variant?: ButtonVariant; busy?: boolean }) {
   return (
-    <button {...rest} disabled={disabled || busy} aria-busy={busy || undefined} className={buttonClass(variant, className)}>
+    // `button` unless the caller says `submit`: inside a form, a bare <button>
+    // submits it, so an "Add", "Remove" or "Delete" there would also save.
+    <button type="button" {...rest} disabled={disabled || busy} aria-busy={busy || undefined} className={buttonClass(variant, className)}>
       {busy ? <Spinner /> : null}
       {children}
     </button>
@@ -60,19 +62,28 @@ export function Spinner({ label }: { label?: string }) {
 }
 
 const CONTROL =
-  'w-full rounded-lg bg-panel-2 border border-line-strong px-3 h-9 text-[13.5px] text-ink placeholder:text-faint transition-colors duration-150 hover:border-[rgba(255,255,255,0.26)] focus:border-gold focus:outline-none focus-visible:outline-2 focus-visible:outline-gold aria-[invalid=true]:border-danger disabled:opacity-50';
+  'rounded-lg bg-panel-2 border border-line-strong px-3 h-9 text-[13.5px] text-ink placeholder:text-faint transition-colors duration-150 hover:border-[rgba(255,255,255,0.26)] focus:border-gold focus:outline-none focus-visible:outline-2 focus-visible:outline-gold aria-[invalid=true]:border-danger disabled:opacity-50';
+
+/**
+ * A control fills its container unless the caller gives it a width: both
+ * classes on one element would leave the winner to the stylesheet's order.
+ */
+function control(className: string): string {
+  const sized = /(^|\s)(w-|min-w-|flex-1\b|basis-)/.test(className);
+  return `${CONTROL} ${sized ? '' : 'w-full'} ${className}`;
+}
 
 export function Input({ className = '', ...rest }: ComponentProps<'input'>) {
-  return <input {...rest} className={`${CONTROL} ${className}`} />;
+  return <input {...rest} className={control(className)} />;
 }
 
 export function Textarea({ className = '', ...rest }: ComponentProps<'textarea'>) {
-  return <textarea {...rest} className={`${CONTROL} h-auto py-2 leading-relaxed ${className}`} />;
+  return <textarea {...rest} className={control(`h-auto py-2 leading-relaxed ${className}`)} />;
 }
 
 export function Select({ className = '', children, ...rest }: ComponentProps<'select'>) {
   return (
-    <select {...rest} className={`${CONTROL} select-chevron appearance-none pr-8 ${className}`}>
+    <select {...rest} className={control(`select-chevron appearance-none pr-8 ${className}`)}>
       {children}
     </select>
   );

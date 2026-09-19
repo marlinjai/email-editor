@@ -218,6 +218,9 @@ error `code` is in the contract's `RETRYABLE_ERRORS` (`rate_limited`,
 including `daily_budget_exhausted` and `plan_limit_reached` even though both
 are HTTP 429, is never retried: retrying them would not help, since the
 condition they report does not clear on its own within the request's lifetime.
+For the same reason a `service_unavailable` whose `details.reason` is
+`billing_not_configured` (checkout or the portal while Stripe is not set up) is
+answered at once; the contract's `isRetryableError` holds the rule.
 
 - Exponential backoff with full jitter, capped at 8 seconds between attempts.
 - `Retry-After` (seconds or a Hypertext Transfer Protocol (HTTP) date) is
@@ -231,6 +234,28 @@ condition they report does not clear on its own within the request's lifetime.
   configurable on `createMailClient`.
 - A caller-provided `AbortSignal` (also in the last `opts` argument) is never
   itself retried: an abort you asked for propagates immediately.
+
+## Response headers: usage warnings
+
+A successful call's headers are available through `onResponse` in the last
+`opts` argument. It receives the status, the request id, the raw `Headers`,
+and `usageWarnings`: the `x-mail-usage-warning` header (sent on
+`mailings.send` and `mailings.test` once the workspace is at 80 percent of a
+plan limit) already parsed into `{ metric, used, limit }` entries.
+
+```ts
+let warnings: UsageWarningHeaderEntry[] = [];
+await mail.mailings.send(mailingId, { onResponse: (meta) => (warnings = meta.usageWarnings) });
+if (warnings.length > 0) {
+  // e.g. "messages: 8200 of 10000 this period"; show it before the next send
+}
+```
+
+`onResponse` runs once the body has parsed and validated, just before the call
+returns; it is not called for a failed call (a `MailApiError` carries its own
+status and request id). A limit that is already exceeded fails the call
+with `plan_limit_reached` (HTTP 429), whose `details` name the `metric`, the
+`used` count, the `limit` and the `plan`.
 
 ## Health check
 

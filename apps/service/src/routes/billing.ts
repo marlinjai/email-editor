@@ -1,4 +1,4 @@
-import { IDEMPOTENCY_KEY_HEADER, type Subscription } from '@marlinjai/mail-contract';
+import { BILLING_NOT_CONFIGURED_REASON, IDEMPOTENCY_KEY_HEADER, type Subscription } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { ApiError } from '../api-error.js';
 import { actorOf, type AppEnv } from '../context.js';
@@ -6,7 +6,7 @@ import type { Sql } from '../db.js';
 import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
 import type { BillingRow } from '../repo/billing.js';
-import { checkoutPriceId, LISTED_PLANS, type BillingConfig } from '../billing/plans.js';
+import { checkoutPriceId, LISTED_PLANS, type BillingConfig, type PaidPlanId } from '../billing/plans.js';
 import { StripeRequestError, type StripeApi } from '../billing/stripe.js';
 import { reconcileWorkspace } from '../billing/sync.js';
 import { computeUsage, periodOf } from '../billing/usage.js';
@@ -22,7 +22,7 @@ export type BillingRouteDeps = MountDeps & {
 };
 
 function notConfigured(what: string): never {
-  throw new ApiError('service_unavailable', `Billing is not configured on this instance (${what}).`, { reason: 'billing_not_configured' });
+  throw new ApiError('service_unavailable', `Billing is not configured on this instance (${what}).`, { reason: BILLING_NOT_CONFIGURED_REASON });
 }
 
 /** A Stripe failure, as the API answers it: never Stripe's own message, which may name internals. */
@@ -67,7 +67,13 @@ export function billingRoutes(sql: Sql, deps: BillingRouteDeps) {
   const staleAfterMs = deps.staleAfterMs ?? 60 * 60_000;
 
   mount(app, 'billing.plans', deps, async (c) => {
-    return c.json({ data: [...LISTED_PLANS] });
+    // Sellable exactly when checkout would go through: the same test as the landing page's.
+    return c.json({
+      data: LISTED_PLANS.map((plan) => ({
+        ...plan,
+        sellable: !plan.monthly_price_cents || checkoutPriceId(config, stripe, plan.id as PaidPlanId) !== null,
+      })),
+    });
   });
 
   mount(app, 'billing.subscription', deps, async (c) => {

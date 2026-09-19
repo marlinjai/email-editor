@@ -46,6 +46,15 @@ export const Plan = z.object({
 });
 export type Plan = z.infer<typeof Plan>;
 
+/**
+ * A plan as `billing.plans` lists it. `sellable`: checkout can sell it on this
+ * instance right now (Stripe is configured and holds the plan's Price); the free
+ * plan is always true. The landing page uses the same signal, so no screen offers
+ * a plan that `billing.checkout` would refuse with `billing_not_configured`.
+ */
+export const CatalogPlan = Plan.extend({ sellable: z.boolean() });
+export type CatalogPlan = z.infer<typeof CatalogPlan>;
+
 export const Subscription = z.object({
   workspace_id: Id,
   plan: PlanId,
@@ -113,3 +122,30 @@ export type PortalSession = z.infer<typeof PortalSession>;
  * `<metric>=<used>/<limit>`, e.g. `messages=8200/10000`.
  */
 export const USAGE_WARNING_HEADER = 'x-mail-usage-warning';
+
+/** One `<metric>=<used>/<limit>` entry of the USAGE_WARNING_HEADER. */
+export type UsageWarningHeaderEntry = { metric: UsageMetric; used: number; limit: number };
+
+/** Builds the USAGE_WARNING_HEADER value from a usage's warnings, or null when there are none. */
+export function formatUsageWarningHeader(warnings: ReadonlyArray<Pick<UsageWarning, 'metric' | 'used' | 'limit'>>): string | null {
+  if (warnings.length === 0) return null;
+  return warnings.map((w) => `${w.metric}=${w.used}/${w.limit}`).join(',');
+}
+
+/**
+ * Reads a USAGE_WARNING_HEADER value back. Entries that do not parse (an
+ * unknown metric, a malformed count) are skipped rather than failing the
+ * whole response: the header is advisory, the call itself succeeded.
+ */
+export function parseUsageWarningHeader(value: string | null | undefined): UsageWarningHeaderEntry[] {
+  if (!value) return [];
+  const out: UsageWarningHeaderEntry[] = [];
+  for (const part of value.split(',')) {
+    const match = /^\s*([a-z_]+)=(\d+)\/(\d+)\s*$/.exec(part);
+    if (!match) continue;
+    const metric = UsageMetric.safeParse(match[1]);
+    if (!metric.success) continue;
+    out.push({ metric: metric.data, used: Number(match[2]), limit: Number(match[3]) });
+  }
+  return out;
+}

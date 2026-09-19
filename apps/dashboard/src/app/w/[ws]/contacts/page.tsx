@@ -17,7 +17,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
     <>
       <PageHeader
         title="Contacts"
-        description="Created when your application sends them, or when a mailing adds an address. Your application stays the system of record for the person."
+        description="Created by your application through the API, by an import, by a signup form, or when a mailing adds an address."
       />
       <form role="search" action={base} className="mb-4 flex items-end gap-2">
         <Field id="c-search" label="Find by address">
@@ -29,7 +29,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
         <ErrorPanel title="Contacts could not be loaded" message={list.error.message} requestId={list.error.requestId} />
       ) : list.data.data.length === 0 ? (
         <EmptyState title={q ? 'No contact with that address' : 'No contacts yet'}>
-          {q ? 'Search matches the whole address.' : 'Contacts appear when your application upserts them through the API or when you add recipients to a mailing.'}
+          {q ? 'Search matches the whole address.' : 'Contacts appear when your application upserts them through the API, when you import a CSV file, when someone confirms a signup form, or when you add recipients to a mailing.'}
         </EmptyState>
       ) : (
         <>
@@ -38,6 +38,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
               <tr>
                 <Th>Contact</Th>
                 <Th>Topics</Th>
+                <Th>Tags</Th>
                 <Th>External id</Th>
                 <Th>Updated</Th>
               </tr>
@@ -54,6 +55,11 @@ export default async function ContactsPage({ params, searchParams }: { params: P
                   <Td>
                     <span className="flex flex-wrap gap-1">
                       {c.topics.length === 0 ? <span className="text-faint">none</span> : c.topics.map((t) => <Badge key={t}>{t}</Badge>)}
+                    </span>
+                  </Td>
+                  <Td>
+                    <span className="flex flex-wrap gap-1">
+                      {c.tags.length === 0 ? <span className="text-faint">none</span> : c.tags.map((t) => <Badge key={t} tone="gold">{t}</Badge>)}
                     </span>
                   </Td>
                   <Td className="font-mono text-[12px] text-muted">{c.external_id ?? ''}</Td>

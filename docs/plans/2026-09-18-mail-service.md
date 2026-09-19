@@ -712,6 +712,86 @@ Defaults taken in S5 (each can be overturned later):
 11. **The suites of earlier phases seed design-partner workspaces**, so they stay
     about their own features; the billing suites seed free ones.
 
+### S3 follow-up: the dashboard for S4 and S5 (built 2026-09-19, #30, branch `feat/s4-dashboard`)
+
+The screens over the platform features (S4) and billing (S5), and the response
+headers in the SDK:
+
+- **SDK (software development kit):** `RequestOpts.onResponse` hands a successful
+  call's status, request id, raw `Headers` and the parsed `x-mail-usage-warning`
+  to the caller. The contract gains `formatUsageWarningHeader` and
+  `parseUsageWarningHeader` (the service now writes the header with the first)
+  and `HOSTED_PAGE_LOCALES` (the languages of the hosted pages, which a signup
+  form's translations may use).
+- **Billing** (Settings, Billing, every member sees it): the plan and the
+  subscription's status, a usage bar per metric (80 percent and reached marked
+  in colour and in words for screen readers), the plan catalogue with Stripe
+  Checkout for Starter and Growth and the Stripe portal for a paying workspace.
+  While the service answers `billing_not_configured` (no Stripe key yet) the
+  screen says "Billing is not available yet", that nothing was charged and that
+  the current plan's limits apply, and every buy button reads "Not yet
+  available". A design partner sees the exemption and no plans.
+- **Plan limits:** a `plan_limit_reached` refusal shows the service's sentence
+  (which names the plan, the limit and what to do) with a link to Billing,
+  wherever a form shows an error.
+- **Usage warning:** a banner above every workspace page from `billing.usage`,
+  and a notice right after a send or a test from that response's
+  `x-mail-usage-warning`. Both cover messages and contacts only: members,
+  providers and webhook endpoints change only when an admin adds one, and a Free
+  workspace sits at "1 of 1 providers" from its first provider on.
+- **Contacts area** with sub-tabs: contacts (now with their tags, and a tag
+  editor on the contact), segments (a builder for the whole filter tree, and,
+  or, not and nested groups up to the service's depth, with the count and a
+  sample following the filter on screen), tags, imports (upload, mapping from
+  the suggested one with topics, tags, overwrite and the consent statement, the
+  dry run and its rows, commit of exactly that dry run, cancel), signup forms
+  (double opt-in, languages, confirmation mail and redirect, embedding sites,
+  and the embed code) and typed properties.
+- **Mailings:** an audience from a segment, scheduling (schedule, move,
+  unschedule, send now), the A/B test (subjects and content from a template, the
+  test share, the winner by opens, clicks or by hand, the pick) and the
+  analytics (unique opens and clicks, Apple Mail privacy opens and machine
+  events apart, unsubscribes, bounces, complaints, per variant and per link).
+  Tracking moved to its own form on Settings (`tracking.update`).
+- **Limits of the platform:** the proxy and server actions now take bodies up to
+  52 MB (a 50 MB CSV import plus multipart overhead; the proxy's default was
+  10 MB), and the import upload goes through a client with a 120 second timeout
+  and one retry. Both limits are global in Next.js; an upload route outside the
+  proxy could carry the large limit alone but would skip the auth-brain gate, so
+  the global limit is kept and the trade-off is written down in `next.config.ts`.
+- **Contract additions from the review:** `billing.plans` lists each plan as a
+  `CatalogPlan` with `sellable` (checkout can sell it now, the landing page's
+  signal), so no screen offers a plan checkout would refuse; `keep_document` on
+  an A/B variant keeps the content it has, so a test can change without sending
+  documents again; `testGroupSize` (the service's split, which the pick's
+  confirmation states); `BILLING_NOT_CONFIGURED_REASON` and `isRetryableError`,
+  under which the SDK no longer retries `billing_not_configured`.
+- **Tests:** vitest for the new actions and for the segment builder's model
+  (every contract filter shape round-trips); a second Playwright spec
+  (`platform.spec.ts`) in its own workspace covers billing on Free and as a
+  design partner, the plan limit refusals and their link, the banner and the
+  header warning, and the import, scheduling and A/B flows on all four paths of
+  the stateful-flow standard, including a service restart during an import's
+  commit and a commit stopped by the contact limit. The e2e control server can
+  put a workspace on a plan, as an operator does for a design partner.
+
+Defaults taken (each can be overturned later):
+
+1. **The usage warning interrupts for messages and contacts only**; the Billing
+   screen shows all five metrics.
+2. **Times to schedule are entered in the browser's time zone** (named under the
+   field) and sent as an absolute time; shown times stay Europe/Berlin (S3
+   default 7).
+3. **An A/B variant's own content is a template's current version**, chosen per
+   variant; without one the variant differs in the subject only. Changing a test
+   re-chooses the content, since a variant keeps only its copy.
+4. **Checkout and the portal return to the Billing screen**, which says so once
+   (the address loses its query) and, after a checkout, waits up to a minute for
+   Stripe's webhook to change the plan, asking every 3 seconds.
+5. **Features the plan lacks are off up front** (tracking, A/B tests), with the
+   reason and a link to Billing; tracking already on can still be turned off
+   after a downgrade. Counted limits are met on saving, with the same link.
+
 ### First-client findings: document ids and the asset policy (built 2026-09-18, #28)
 
 ŌPUNTIA, the first client, found two gaps; #28 (merged as `62cf0c1`) closed both:
