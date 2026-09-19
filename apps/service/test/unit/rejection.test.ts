@@ -14,6 +14,9 @@ const TABLE: Array<[number | null, string, RejectionClass]> = [
   [550, '550 5.2.1 The email account that you tried to reach is disabled.', 'recipient'],
   [null, 'every recipient was rejected: 550 5.1.1 <gone@example.com>: user unknown', 'recipient'],
   [550, '550 #5.1.0 Address rejected.', 'unknown'],
+  // 5.1.2 is usually DNS, and 5.1.0 says nothing specific: only a specific recipient phrase counts.
+  [550, '550 5.1.2 <x@example.invalid>: Recipient address rejected: Domain not found', 'unknown'],
+  [550, '550 5.1.0 Recipient address rejected: Mailbox unavailable', 'unknown'],
   [550, '550 5.1.0 <gone@example.com>: Recipient address rejected: User unknown', 'recipient'],
   // Classic replies without an enhanced code: only when the text names the recipient.
   [550, '550 No such user here', 'recipient'],

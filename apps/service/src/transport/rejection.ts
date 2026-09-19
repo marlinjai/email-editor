@@ -97,12 +97,14 @@ export function classifyRejection(code: number | null, text: string): RejectionC
   if (e && e.cls === 5) {
     if (e.subject === 1) {
       if (e.detail === 7 || e.detail === 8 || SETUP_TEXT.test(text)) return 'sender';
-      // A phrase naming the mailbox wins over the generic "relay".
+      // 5.1.0 (other address status) and 5.1.2 (bad destination system, often a
+      // DNS failure) do not say the mailbox is gone: only a specific recipient
+      // phrase can, never the broad mailbox wording ("Recipient address
+      // rejected: Domain not found" stays unknown).
+      if (e.detail === 0 || e.detail === 2) return RECIPIENT_TEXT.test(text) ? 'recipient' : 'unknown';
+      // Otherwise a phrase naming the mailbox wins over the generic "relay".
       if (MAILBOX_TEXT.test(text)) return 'recipient';
       if (RELAY_TEXT.test(text)) return 'sender';
-      // 5.1.0 (other address status) and 5.1.2 (bad destination system) do not
-      // say the mailbox is gone: only the text can.
-      if (e.detail === 0 || e.detail === 2) return 'unknown';
       return 'recipient';
     }
     if (e.subject === 2 && e.detail === 1) return SETUP_TEXT.test(text) ? 'sender' : 'recipient';
