@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 import type { Mailing, MailingAnalytics, RecipientBatchResult, Segment, TemplateSummary } from '@marlinjai/mail-contract';
 import { ConfirmDialog, Dialog } from '@/components/dialog';
+import { PlanGate } from '@/components/plan-gate';
 import { FormError } from '@/components/form-error';
 import { Badge, Button, describedBy, Field, Input, Mono, Notice, Select, Table, Td, Th, When } from '@/components/ui';
 import { useAction } from '@/components/use-action';
@@ -172,6 +173,7 @@ export function AbTestSection({
   trackingOn,
   canWrite,
   editable,
+  plan,
   onChange,
 }: {
   ws: string;
@@ -180,6 +182,8 @@ export function AbTestSection({
   trackingOn: boolean;
   canWrite: boolean;
   editable: boolean;
+  /** Null when the plan could not be read: the service still refuses what the plan lacks. */
+  plan: { name: string; included: boolean } | null;
   onChange: (m: Mailing) => void;
 }) {
   const ab = mailing.ab_test;
@@ -276,10 +280,16 @@ export function AbTestSection({
     return <p className="text-[13px] text-muted">{ab ? '' : 'This mailing was sent without an A/B test.'}</p>;
   }
   if (!editing) {
+    const gated = plan !== null && !plan.included;
     return (
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="text-[13px] text-muted">Send two to five versions of the subject or content to a share of the recipients first, then the best one to the rest.</p>
-        <Button onClick={() => setEditing(true)}>Set up an A/B test</Button>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-[13px] text-muted">Send two to five versions of the subject or content to a share of the recipients first, then the best one to the rest.</p>
+          <Button onClick={() => setEditing(true)} disabled={gated}>
+            Set up an A/B test
+          </Button>
+        </div>
+        {gated ? <PlanGate ws={ws} planName={plan.name} feature="A/B tests" /> : null}
       </div>
     );
   }

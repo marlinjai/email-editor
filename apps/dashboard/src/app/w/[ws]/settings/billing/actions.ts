@@ -1,5 +1,6 @@
 'use server';
 
+import type { Subscription } from '@marlinjai/mail-sdk';
 import { act, DashboardRefusal } from '@/lib/action';
 import { auth } from '@/lib/auth';
 import { mail } from '@/lib/mail';
@@ -51,4 +52,9 @@ function assertStripeUrl(url: string): { url: string } {
     throw new DashboardRefusal('internal_error', 'The billing page address the service returned is not a Stripe page. Nothing was charged.');
   }
   return { url };
+}
+
+/** The subscription as Stripe's webhook has left it, for the screen that waits for an upgrade to be confirmed. */
+export async function getSubscription(ws: string): Promise<ActionResult<Subscription>> {
+  return act('billing.subscription', async () => (await mail(ws)).api.billing.subscription());
 }

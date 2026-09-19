@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { USAGE_METRICS, type Plan, type PlanId, type Subscription, type Usage, type UsageMetric } from '@marlinjai/mail-contract';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { USAGE_METRICS, type CatalogPlan, type Plan, type PlanId, type Subscription, type Usage, type UsageMetric } from '@marlinjai/mail-contract';
 import { FormError } from '@/components/form-error';
-import { Badge, Button, Notice, Panel, Section, When, type Tone } from '@/components/ui';
+import { Badge, Button, Notice, Panel, Section, Spinner, When, type Tone } from '@/components/ui';
 import { useAction } from '@/components/use-action';
 import { isBillingNotConfigured } from '@/lib/errors';
 import { formatCount, percent } from '@/lib/format';
 import type { ActionError } from '@/lib/result';
 import { formatPrice, METRIC_LABELS, PLAN_NAMES, usageLevel } from '@/lib/usage';
-import { openPortal, startCheckout } from './actions';
+import { getSubscription, openPortal, startCheckout } from './actions';
 
 const STATUS: Record<Subscription['status'], { label: string; tone: Tone }> = {
   active: { label: 'Active', tone: 'ok' },
@@ -80,18 +81,61 @@ export function BillingView({
   returned,
 }: {
   ws: string;
-  plans: Plan[];
+  plans: CatalogPlan[];
   usage: Usage;
   subscription: Subscription | null;
   canAdmin: boolean;
   returned: 'success' | 'cancelled' | null;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const checkout = useAction();
   const portal = useAction();
   const [busyPlan, setBusyPlan] = useState<PlanId | null>(null);
   const error: ActionError | null = checkout.error ?? portal.error;
-  // Once the service says Stripe is not set up, every buy and manage button says so too.
-  const unavailable = error !== null && isBillingNotConfigured(error.code, error.details);
+  // Known up front from the catalogue (`sellable`, the same signal checkout
+  // uses), and also learned from a refusal: a 503 billing_not_configured after
+  // the page loaded (the configuration changed) disables every button too.
+  const refused = error !== null && isBillingNotConfigured(error.code, error.details);
+  const billingLive = !refused && plans.some((p) => p.monthly_price_cents && p.sellable);
+  const canBuy = (plan: CatalogPlan) => !refused && plan.sellable;
+
+  // Back from Stripe: the notice shows once, and the address loses its query so
+  // a reload or a bookmark does not show it again.
+  const [back] = useState(returned);
+  useEffect(() => {
+    if (returned) router.replace(pathname, { scroll: false });
+  }, [returned, pathname, router]);
+
+  // After a checkout, the plan changes when Stripe's webhook reaches the
+  // service, usually within seconds. Until then the screen says the upgrade is
+  // being confirmed and asks for the subscription every 3 seconds, for a minute.
+  const [confirm, setConfirm] = useState<'waiting' | 'confirmed' | 'late' | null>(back === 'success' && canAdmin ? 'waiting' : null);
+  const [confirmedPlan, setConfirmedPlan] = useState<PlanId | null>(null);
+  useEffect(() => {
+    if (confirm !== 'waiting') return;
+    const startPlan = usage.plan;
+    let tries = 0;
+    let stopped = false;
+    const timer = setInterval(async () => {
+      tries += 1;
+      const r = await getSubscription(ws).catch(() => null);
+      if (stopped) return;
+      if (r?.ok && r.data.plan !== startPlan) {
+        clearInterval(timer);
+        setConfirmedPlan(r.data.plan);
+        setConfirm('confirmed');
+        router.refresh();
+      } else if (tries >= 20) {
+        clearInterval(timer);
+        setConfirm('late');
+      }
+    }, 3_000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [confirm, ws, usage.plan, router]);
 
   const current = plans.find((p) => p.id === usage.plan);
   const currentName = current?.name ?? PLAN_NAMES[usage.plan];
@@ -108,17 +152,27 @@ export function BillingView({
 
   return (
     <div className="flex flex-col">
-      {returned === 'success' ? (
-        <div className="mb-6">
-          <Notice tone="ok">
-            Thank you. Stripe has the payment; the new plan shows here as soon as Stripe confirms it, usually within a minute.{' '}
-            <a href="?" className="font-medium text-ink underline decoration-line-strong underline-offset-2">
-              Reload
-            </a>
-          </Notice>
+      {back === 'success' ? (
+        <div className="mb-6" role="status" aria-live="polite" data-testid="checkout-return">
+          {confirm === 'confirmed' ? (
+            <Notice tone="ok">Thank you. Your plan is now {PLAN_NAMES[confirmedPlan ?? usage.plan]}.</Notice>
+          ) : confirm === 'late' ? (
+            <Notice tone="warn">
+              Stripe has taken the payment but has not confirmed the new plan to us yet. It usually does within minutes; reload this page
+              later. Nothing more to do on your side.
+            </Notice>
+          ) : confirm === 'waiting' ? (
+            <Notice tone="gold">
+              <span className="flex items-center gap-2">
+                <Spinner /> Thank you. Your upgrade is being confirmed with Stripe; this takes a few seconds.
+              </span>
+            </Notice>
+          ) : (
+            <Notice tone="ok">Thank you. The new plan shows here once Stripe has confirmed it.</Notice>
+          )}
         </div>
-      ) : returned === 'cancelled' ? (
-        <div className="mb-6">
+      ) : back === 'cancelled' ? (
+        <div className="mb-6" role="status" data-testid="checkout-return">
           <Notice>Checkout was cancelled. Nothing was charged, and the plan is unchanged.</Notice>
         </div>
       ) : null}
@@ -147,14 +201,14 @@ export function BillingView({
           ) : null}
         </div>
         {canAdmin && paying && !exempt ? (
-          <Button onClick={manage} busy={portal.pending} disabled={unavailable}>
-            Manage billing
+          <Button onClick={manage} busy={portal.pending} disabled={!billingLive}>
+            {billingLive ? 'Manage billing' : 'Billing portal not yet available'}
           </Button>
         ) : null}
       </Panel>
 
       <div className="mt-3">
-        <FormError error={unavailable ? null : error} />
+        <FormError error={refused ? null : error} />
       </div>
 
       <Section
@@ -182,7 +236,7 @@ export function BillingView({
               : 'Only an admin or owner of the workspace can change the plan.'
           }
         >
-          {unavailable ? (
+          {!billingLive ? (
             <div className="mb-4" role="status" data-testid="billing-unavailable">
               <Notice tone="warn">
                 <span className="font-medium text-ink">Billing is not available yet.</span> Paid plans cannot be bought here until payments are
@@ -218,18 +272,21 @@ export function BillingView({
                     </ul>
                     {canAdmin && !isCurrent ? (
                       paying ? (
-                        <Button onClick={manage} busy={portal.pending} disabled={unavailable}>
-                          {unavailable ? 'Not yet available' : 'Change in billing portal'}
+                        <Button onClick={manage} busy={portal.pending} disabled={!billingLive}>
+                          {billingLive ? 'Change in billing portal' : 'Not yet available'}
                         </Button>
                       ) : paid ? (
-                        <Button
-                          variant={plan.id === 'starter' ? 'primary' : 'secondary'}
-                          busy={busyPlan === plan.id}
-                          disabled={unavailable || busyPlan !== null}
-                          onClick={() => buy(plan.id)}
-                        >
-                          {unavailable ? 'Not yet available' : `Upgrade to ${plan.name}`}
-                        </Button>
+                        <>
+                          <Button
+                            variant={plan.id === 'starter' ? 'primary' : 'secondary'}
+                            busy={busyPlan === plan.id}
+                            disabled={!canBuy(plan) || busyPlan !== null}
+                            onClick={() => buy(plan.id)}
+                          >
+                            {canBuy(plan) ? `Upgrade to ${plan.name}` : 'Not yet available'}
+                          </Button>
+                          {billingLive && !canBuy(plan) ? <p className="text-[12px] text-faint">This plan cannot be bought here yet.</p> : null}
+                        </>
                       ) : null
                     ) : null}
                   </Panel>

@@ -46,6 +46,15 @@ export const Plan = z.object({
 });
 export type Plan = z.infer<typeof Plan>;
 
+/**
+ * A plan as `billing.plans` lists it. `sellable`: checkout can sell it on this
+ * instance right now (Stripe is configured and holds the plan's Price); the free
+ * plan is always true. The landing page uses the same signal, so no screen offers
+ * a plan that `billing.checkout` would refuse with `billing_not_configured`.
+ */
+export const CatalogPlan = Plan.extend({ sellable: z.boolean() });
+export type CatalogPlan = z.infer<typeof CatalogPlan>;
+
 export const Subscription = z.object({
   workspace_id: Id,
   plan: PlanId,

@@ -6,7 +6,7 @@ import type { Sql } from '../db.js';
 import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
 import type { BillingRow } from '../repo/billing.js';
-import { checkoutPriceId, LISTED_PLANS, type BillingConfig } from '../billing/plans.js';
+import { checkoutPriceId, LISTED_PLANS, type BillingConfig, type PaidPlanId } from '../billing/plans.js';
 import { StripeRequestError, type StripeApi } from '../billing/stripe.js';
 import { reconcileWorkspace } from '../billing/sync.js';
 import { computeUsage, periodOf } from '../billing/usage.js';
@@ -67,7 +67,13 @@ export function billingRoutes(sql: Sql, deps: BillingRouteDeps) {
   const staleAfterMs = deps.staleAfterMs ?? 60 * 60_000;
 
   mount(app, 'billing.plans', deps, async (c) => {
-    return c.json({ data: [...LISTED_PLANS] });
+    // Sellable exactly when checkout would go through: the same test as the landing page's.
+    return c.json({
+      data: LISTED_PLANS.map((plan) => ({
+        ...plan,
+        sellable: !plan.monthly_price_cents || checkoutPriceId(config, stripe, plan.id as PaidPlanId) !== null,
+      })),
+    });
   });
 
   mount(app, 'billing.subscription', deps, async (c) => {

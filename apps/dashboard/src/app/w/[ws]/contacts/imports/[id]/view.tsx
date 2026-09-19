@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   IMPORT_ROW_OUTCOMES,
   IMPORT_TERMINAL_STATUSES,
@@ -85,8 +85,10 @@ function Report({ report, verb }: { report: ImportReport; verb: 'would' | 'did' 
 
 /**
  * The rows of the dry run or the commit, a page at a time, filterable by
- * outcome. Keyed by the dry run or commit it shows, so it starts over when
- * that changes and keeps its filter and pages across refreshes otherwise.
+ * outcome. Keyed by the dry run or commit it shows (and by whether the server
+ * sent a first page), so it starts over when that changes and keeps its filter
+ * and pages across refreshes otherwise. Mounted without a first page (a dry
+ * run or commit that just finished on this page), it loads one itself.
  */
 function Rows({ ws, job, initial }: { ws: string; job: ImportJob; initial: Page<ImportRow> | null }) {
   const [outcome, setOutcome] = useState<ImportRowOutcome | ''>('');
@@ -102,6 +104,12 @@ function Rows({ ws, job, initial }: { ws: string; job: ImportJob; initial: Page<
         setCursor(page.next_cursor);
       },
     );
+  const [loadedOnMount, setLoadedOnMount] = useState(initial !== null);
+  useEffect(() => {
+    if (loadedOnMount) return;
+    setLoadedOnMount(true);
+    loadRows('', null);
+  }, [loadedOnMount]);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -129,7 +137,7 @@ function Rows({ ws, job, initial }: { ws: string; job: ImportJob; initial: Page<
       </div>
       <FormError error={load.error} />
       {rows.length === 0 ? (
-        <p className="text-[13px] text-muted">No rows here.</p>
+        <p className="text-[13px] text-muted">{load.pending ? 'Loading rows.' : 'No rows here.'}</p>
       ) : (
         <Table label="Rows of the file">
           <thead>
@@ -306,11 +314,17 @@ function MappingForm({ ws, job, lookups, onCancel, onMapped }: { ws: string; job
 export function ImportView({ ws, initial, lookups, rows, canWrite }: { ws: string; initial: ImportJob; lookups: Lookups; rows: Page<ImportRow> | null; canWrite: boolean }) {
   const router = useRouter();
   const [job, setJob] = useState(initial);
+  // The status last seen, outside React state: a change of it reloads the
+  // server-rendered parts, which must not happen inside a state updater.
+  const lastStatus = useRef(initial.status);
   const [remapping, setRemapping] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
   const commit = useAction();
-  useEffect(() => setJob(initial), [initial]);
+  useEffect(() => {
+    lastStatus.current = initial.status;
+    setJob(initial);
+  }, [initial]);
 
   const running = job.status === 'validating' || job.status === 'committing';
   const terminal = IMPORT_TERMINAL_STATUSES.includes(job.status);
@@ -328,10 +342,10 @@ export function ImportView({ ws, initial, lookups, rows, canWrite }: { ws: strin
         return;
       }
       setPollError(null);
-      setJob((prev) => {
-        if (prev.status !== r.data.status) router.refresh();
-        return r.data;
-      });
+      const changed = lastStatus.current !== r.data.status;
+      lastStatus.current = r.data.status;
+      setJob(r.data);
+      if (changed) router.refresh();
     }, POLL_MS);
     return () => {
       stopped = true;
@@ -461,7 +475,7 @@ export function ImportView({ ws, initial, lookups, rows, canWrite }: { ws: strin
 
       {!running && !remapping && (job.status === 'validated' || terminal) && (job.dry_run || job.result) ? (
         <Section title="Rows">
-          <Rows key={`${job.status}-${job.mapping_version}`} ws={ws} job={job} initial={rows} />
+          <Rows key={`${job.status}-${job.mapping_version}-${rows ? 'page' : 'none'}`} ws={ws} job={job} initial={rows} />
         </Section>
       ) : null}
 

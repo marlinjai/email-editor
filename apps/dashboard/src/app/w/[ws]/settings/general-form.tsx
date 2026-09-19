@@ -5,6 +5,7 @@ import { FormError } from '@/components/form-error';
 import { useSaved } from '@/components/saved';
 import { Button, describedBy, Field, Input, Mono, Select } from '@/components/ui';
 import { useAction } from '@/components/use-action';
+import { PlanGate } from '@/components/plan-gate';
 import { saveTracking, updateGeneral } from './actions';
 
 type General = { name: string; slug: string; locales: string[]; defaultLocale: string; assetPolicy: 'any' | 'service_only' };
@@ -121,18 +122,33 @@ export function GeneralForm({ ws, initial, canEdit }: { ws: string; initial: Gen
  * Open and click tracking, saved on its own: it is a privacy decision with a
  * plan behind it (Free has no tracking), not one more field of the workspace.
  */
-export function TrackingForm({ ws, initial, canEdit }: { ws: string; initial: { opens: boolean; clicks: boolean }; canEdit: boolean }) {
+export function TrackingForm({
+  ws,
+  initial,
+  canEdit,
+  plan,
+}: {
+  ws: string;
+  initial: { opens: boolean; clicks: boolean };
+  canEdit: boolean;
+  /** Null when the plan could not be read: the service still refuses what the plan lacks. */
+  plan: { name: string; included: boolean } | null;
+}) {
   const { run, pending, error } = useAction();
   const saved = useSaved();
   const [opens, setOpens] = useState(initial.opens);
   const [clicks, setClicks] = useState(initial.clicks);
   const changed = opens !== initial.opens || clicks !== initial.clicks;
+  // Without tracking in the plan, it can only be turned off (after a downgrade), never on.
+  const gated = plan !== null && !plan.included;
+  const offOnly = (current: boolean, was: boolean) => gated && !was && !current;
   const box = (id: string, label: string, hint: string, checked: boolean, set: (v: boolean) => void) => (
     <div className="flex items-start gap-3">
       <input
         id={id}
         type="checkbox"
         checked={checked}
+        disabled={offOnly(checked, id === 'tr-opens' ? initial.opens : initial.clicks)}
         onChange={(e) => set(e.target.checked)}
         className="mt-0.5 size-4 accent-[var(--gold)]"
         aria-describedby={`${id}-hint`}
@@ -163,6 +179,7 @@ export function TrackingForm({ ws, initial, canEdit }: { ws: string; initial: { 
         </p>
         {box('tr-opens', 'Track opens', 'A one-pixel image in each mail. Apple Mail Privacy Protection opens are counted apart.', opens, setOpens)}
         {box('tr-clicks', 'Track clicks', 'Links go through this service first, then on to where they point.', clicks, setClicks)}
+        {gated ? <PlanGate ws={ws} planName={plan.name} feature="open and click tracking" /> : null}
       </fieldset>
       <FormError error={error} />
       {canEdit ? (

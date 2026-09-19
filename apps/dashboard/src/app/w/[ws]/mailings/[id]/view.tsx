@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CompileResult, Mailing, MessageSummary, Page, Provider, Recipient, RecipientStatus, Segment, TemplateSummary, Topic } from '@marlinjai/mail-contract';
 import { CompileMessages, EmailPreview } from '@/components/email-preview';
 import { FormError } from '@/components/form-error';
@@ -64,6 +64,7 @@ export function MailingView({
   compiled,
   lastTest,
   outcomeUnknown,
+  abPlan,
 }: {
   ws: string;
   initial: Mailing;
@@ -75,11 +76,16 @@ export function MailingView({
   compiled: ActionResult<CompileResult>;
   lastTest: MessageSummary | null;
   outcomeUnknown: number;
+  abPlan: { name: string; included: boolean } | null;
 }) {
   const router = useRouter();
   const [mailing, setMailing] = useState(initial);
+  const lastStatus = useRef(initial.status);
   const [pollError, setPollError] = useState<string | null>(null);
-  useEffect(() => setMailing(initial), [initial]);
+  useEffect(() => {
+    lastStatus.current = initial.status;
+    setMailing(initial);
+  }, [initial]);
   const controls = mailingControls(mailing.status);
   const status = MAILING_STATUS_LABEL[mailing.status];
   const base = `/w/${ws}/mailings/${mailing.id}`;
@@ -97,11 +103,12 @@ export function MailingView({
         return;
       }
       setPollError(null);
-      setMailing((prev) => {
-        // A status change reloads the rest of the page (recipients, controls).
-        if (prev.status !== r.data.status) router.refresh();
-        return r.data;
-      });
+      // A status change reloads the rest of the page (recipients, controls),
+      // outside the state updater.
+      const changed = lastStatus.current !== r.data.status;
+      lastStatus.current = r.data.status;
+      setMailing(r.data);
+      if (changed) router.refresh();
     }, POLL_MS);
     return () => {
       stopped = true;
@@ -220,6 +227,7 @@ export function MailingView({
           trackingOn={lookups.ok ? lookups.data.trackingOn : false}
           canWrite={canWrite}
           editable={controls.editable}
+          plan={abPlan}
           onChange={onChange}
         />
       </Section>

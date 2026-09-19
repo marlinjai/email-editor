@@ -155,10 +155,10 @@ export function mailingPlatformRoutes(sql: Sql, deps: MailingPlatformDeps) {
           throw err;
         }
       }
-      return { key: v.key, subject: v.subject ?? null, document };
+      return { key: v.key, subject: v.subject ?? null, document, keep: v.keep_document === true, index: i };
     });
-    const state: AbTestState = {
-      variants: variants.map((v) => ({ key: v.key, subject: v.subject, has_document: v.document !== null })),
+    const stateOf = (resolved: ReadonlyArray<{ key: string; subject: string | null; document: Record<string, unknown> | null }>): AbTestState => ({
+      variants: resolved.map((v) => ({ key: v.key, subject: v.subject, has_document: v.document !== null })),
       test_fraction: input.test_fraction,
       winner_metric: input.winner_metric,
       decide_after_minutes: input.decide_after_minutes ?? null,
@@ -167,7 +167,7 @@ export function mailingPlatformRoutes(sql: Sql, deps: MailingPlatformDeps) {
       winner: null,
       decided_by: null,
       decided_at: null,
-    };
+    });
     const mailing = await withLocked(access, id, async (r, tx, row) => {
       if (!EDITABLE_MAILING_STATUSES.includes(row.status)) {
         throw new ApiError('mailing_invalid_state', `The A/B test of a ${row.status} mailing can no longer change.`, {
@@ -175,8 +175,21 @@ export function mailingPlatformRoutes(sql: Sql, deps: MailingPlatformDeps) {
         });
       }
       await assertFeature(tx, access.workspaceId, 'ab_testing');
+      // `keep_document` takes the document the variant has now, under the lock.
+      const current = variants.some((v) => v.keep) ? await r.mailingPlatform.variants(access.workspaceId, id) : [];
+      const resolved = variants.map((v) => {
+        if (!v.keep) return { key: v.key, subject: v.subject, document: v.document };
+        const kept = current.find((c) => c.key === v.key)?.document ?? null;
+        if (!kept) {
+          throw new ApiError('validation_failed', `Variant ${v.key} has no content of its own to keep.`, {
+            issues: [{ path: ['variants', v.index, 'keep_document'], message: 'this variant has no document of its own' }],
+          });
+        }
+        return { key: v.key, subject: v.subject, document: kept as Record<string, unknown> };
+      });
+      const state = stateOf(resolved);
       await requireMetricTracking(tx, access.workspaceId, state);
-      await r.mailingPlatform.replaceVariants(access.workspaceId, id, variants);
+      await r.mailingPlatform.replaceVariants(access.workspaceId, id, resolved);
       await r.mailingPlatform.setAbTest(access.workspaceId, id, state);
       await r.audit.record(access.workspaceId, {
         action: 'mailing.ab_test_updated',
