@@ -103,7 +103,7 @@ describe('templates: documents are validated before they are stored', () => {
 
   it('rejects the same on save and on inline compile, and stores nothing', async () => {
     const t = await create('Guarded');
-    const newer = { ...helloDocument(), version: '1.1' };
+    const newer = { ...helloDocument(), version: '1.2' };
     const saved = await save(t.id, { base_version: 1, document: newer });
     expect(saved.body.error.details.reason).toBe('NEWER_VERSION');
     expect((await h.call({ path: `/v1/templates/${t.id}`, key: W.key })).body.version).toBe(1);

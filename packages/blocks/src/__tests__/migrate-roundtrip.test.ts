@@ -14,7 +14,7 @@ describe('migrateTemplate on documents the editor produces', () => {
 
   it('accepts a document holding every standard block type', () => {
     const store = createRootStore();
-    const columnId = store.template.sections[0].columns[0].id;
+    const columnId = store.template.allSections[0]!.columns[0]!.id;
     const registry = createStandardBlockRegistry();
     const definitions = registry.getAll();
     expect(definitions.length).toBe(14);
@@ -36,5 +36,20 @@ describe('migrateTemplate on documents the editor produces', () => {
     prebuilt.forEach((template) => store.template.addSection(template.section as never));
     const snapshot = JSON.parse(JSON.stringify(getSnapshot(store.template)));
     expect(() => migrateTemplate(snapshot)).not.toThrow();
+  });
+
+  it('accepts a document with containers the editor built (wrap, style, move, add, empty)', () => {
+    const store = createRootStore();
+    const prebuilt = createStandardPrebuiltRegistry().getAll().slice(0, 3);
+    prebuilt.forEach((template) => store.template.addSection(template.section as never));
+    const [first, second] = store.template.allSections;
+    const wrapper = store.template.wrapSection(first!.id)!;
+    wrapper.updateProperties({ backgroundColor: '#ffffff', borderTop: '4px solid #0b6e4f', borderRadius: '8px', gap: '12px', paddingTop: '24px', textAlign: 'left', cssClass: 'card' });
+    store.template.moveSectionTo(second!.id, { wrapperId: wrapper.id, index: 1 });
+    store.template.addWrapper();
+    store.template.addWrapper({ id: 'empty', type: 'wrapper', sections: [] });
+    const snapshot = JSON.parse(JSON.stringify(getSnapshot(store.template)));
+    expect(snapshot.version).toBe('1.1');
+    expect(migrateTemplate(snapshot)).toBe(snapshot);
   });
 });

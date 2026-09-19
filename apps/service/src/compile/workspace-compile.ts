@@ -1,5 +1,6 @@
 import type { AssetPolicy, CompileMessage, CompileResult } from '@marlinjai/mail-contract';
 import { ApiError } from '../api-error.js';
+import { validateDocument } from '../documents.js';
 import type { Repos } from '../repo/index.js';
 import { applyAssetPolicy, remoteAssetErrors } from './asset-policy.js';
 import type { Compiler } from './pool.js';
@@ -9,7 +10,9 @@ import type { Compiler } from './pool.js';
  * Under `service_only` MJML's automatic Google Fonts imports are left out and
  * every address outside the service's host becomes a compile error, so the
  * editor's preview, a test send and a send all refuse the same documents.
- * Every compile site goes through this, never through the pool directly.
+ * Every compile site goes through this, never through the pool directly, and
+ * the document is brought to the current schema version here (the compiler
+ * knows only that one), so a stored 1.0 document compiles as it always did.
  */
 export type WorkspaceCompile = {
   compile(workspaceId: string, document: unknown): Promise<CompileResult>;
@@ -25,8 +28,9 @@ export function workspaceCompile(pool: Repos, compiler: Compiler, publicBaseUrl:
   };
   return {
     async compile(workspaceId, document) {
+      const current = validateDocument(document);
       const policy = await policyOf(workspaceId);
-      const result = await compiler.compile(document, { webFonts: policy !== 'service_only' });
+      const result = await compiler.compile(current, { webFonts: policy !== 'service_only' });
       return applyAssetPolicy(result, policy, publicBaseUrl);
     },
     async check(workspaceId, html) {

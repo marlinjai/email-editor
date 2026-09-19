@@ -14,7 +14,7 @@ import {
 } from '@marlinjai/mail-contract';
 import { Hono, type Context } from 'hono';
 import { ApiError } from '../api-error.js';
-import { validateDocument } from '../documents.js';
+import { acceptDocument, validateDocument } from '../documents.js';
 import { actorOf, type AppEnv, type WorkspaceAccess } from '../context.js';
 import type { Db, Sql } from '../db.js';
 import { emitEvent } from '../events.js';
@@ -185,8 +185,8 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
       if (!loaded) throw new ApiError('not_found', 'No such template in this workspace.');
       document = loaded;
     }
-    // The editor core's full schema, not only the contract's envelope.
-    const validated = validateDocument(document);
+    // The editor core's full schema, not only the contract's envelope; stored as sent.
+    const validated = acceptDocument(document);
     const mailing = await sql.begin(async (tx) => {
       const r = repos(tx);
       const topic = await resolveTopic(r, access.workspaceId, input.topic);
@@ -225,7 +225,7 @@ export function mailingRoutes(sql: Sql, deps: MailingRouteDeps) {
     const access = c.get('access');
     const id = mailingId(c, 'mailings.get');
     const input = await body(c, 'mailings.update');
-    const document = input.document === undefined ? undefined : validateDocument(input.document);
+    const document = input.document === undefined ? undefined : acceptDocument(input.document);
     const mailing = await withLocked(access, id, async (r, _tx, row) => {
       if (!EDITABLE_MAILING_STATUSES.includes(row.status)) {
         throw new ApiError('mailing_invalid_state', `A ${row.status} mailing can no longer be changed.`, {

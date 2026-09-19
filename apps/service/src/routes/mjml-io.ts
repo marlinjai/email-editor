@@ -15,7 +15,7 @@ import type { MjmlImporter } from '../compile/pool.js';
 import type { WorkspaceCompile } from '../compile/workspace-compile.js';
 import { actorLabel, actorOf, type AppEnv } from '../context.js';
 import type { Sql } from '../db.js';
-import { schemaVersionOf, validateDocument } from '../documents.js';
+import { acceptDocument, schemaVersionOf, validateDocument } from '../documents.js';
 import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
 import { checkBody, params, query, rawJson, rowId } from '../validate.js';
@@ -155,7 +155,7 @@ export function mjmlIoRoutes(sql: Sql, deps: MjmlIoDeps) {
       importedAssets = copied.imported;
       warnings.push(...copied.warnings);
     }
-    const stored = validateDocument(document);
+    const stored = acceptDocument(document);
     const template = await sql.begin(async (tx) => {
       const r = repos(tx);
       const created = await r.templates.create(access.workspaceId, {

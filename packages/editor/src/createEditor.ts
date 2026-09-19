@@ -3,7 +3,7 @@
 
 import { createRoot, Root } from 'react-dom/client';
 import { createElement } from 'react';
-import { withTemplateId, type EmailTemplate, type TemplateSnapshotIn, type TemplateSnapshotOut } from '@marlinjai/email-editor-core';
+import { CURRENT_TEMPLATE_VERSION, withTemplateId, type EmailTemplate, type TemplateSnapshotIn, type TemplateSnapshotOut } from '@marlinjai/email-editor-core';
 import { createStandardBlockRegistry, createStandardPrebuiltRegistry } from '@marlinjai/email-editor-blocks';
 import { EmailEditor } from '@marlinjai/email-editor-ui';
 import type { EditorOptions, EditorInstance } from './types';
@@ -13,7 +13,7 @@ import { assertSupportedBlocks } from './blocks';
 /** What the editor opens when the host passes no document. */
 function emptyTemplate(): EmailTemplate {
   return {
-    version: '1.0',
+    version: CURRENT_TEMPLATE_VERSION,
     metadata: { title: 'New Email', subject: '', previewText: '' },
     sections: [],
   };
