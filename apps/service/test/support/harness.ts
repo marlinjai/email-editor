@@ -36,7 +36,8 @@ export type Call = {
   headers?: Record<string, string>;
 };
 
-export type Result = { status: number; body: Json; headers: Headers };
+/** `body` is the parsed JSON (empty for a non-JSON answer, such as an exported file); `text` the raw body. */
+export type Result = { status: number; body: Json; headers: Headers; text: string };
 
 /**
  * The provider routes' HTTP client in tests unless a test passes its own: never
@@ -96,7 +97,8 @@ export async function startHarness(
     if (typeof body === 'string' && headers['content-type'] === undefined) headers['content-type'] = 'application/json';
     const res = await app.request(c.path, { method: c.method ?? 'GET', headers, body });
     const text = await res.text();
-    return { status: res.status, body: text ? JSON.parse(text) : {}, headers: res.headers };
+    const json = /json/i.test(res.headers.get('content-type') ?? 'application/json');
+    return { status: res.status, body: text && json ? JSON.parse(text) : {}, headers: res.headers, text };
   }
 
   /**

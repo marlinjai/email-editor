@@ -1,5 +1,5 @@
 import { Worker } from 'node:worker_threads';
-import type { CompileMessage, CompileResult } from '@marlinjai/mail-contract';
+import type { CompileMessage, CompileResult, ImportWarning, MjmlImportRefusal, TemplateDocument } from '@marlinjai/mail-contract';
 import { ApiError } from '../api-error.js';
 
 /**
@@ -28,6 +28,28 @@ export interface Compiler {
   compile(document: unknown, options?: CompileOptions): Promise<CompileResult>;
 }
 
+/** An MJML source read into an editor document (the core's `importMjml`), off the request thread. */
+export type ImportedMjml = { document: TemplateDocument; warnings: ImportWarning[] };
+
+export interface MjmlImporter {
+  /**
+   * Rejects with `invalid_mjml` (422, `details.reason`, `line`, `column`) when
+   * the MJML cannot be imported, `too_complex` when it misses the deadline.
+   */
+  importMjml(mjml: string): Promise<ImportedMjml>;
+}
+
+type ImportFailure = { code: MjmlImportRefusal | 'too_large'; message: string; line?: number; column?: number };
+
+/** The typed refusal for MJML the core could not import. */
+export function importRefusal(failure: ImportFailure): ApiError {
+  if (failure.code === 'too_large') return new ApiError('payload_too_large', failure.message);
+  const details: Record<string, unknown> = { reason: failure.code };
+  if (failure.line !== undefined) details.line = failure.line;
+  if (failure.column !== undefined) details.column = failure.column;
+  return new ApiError('invalid_mjml', failure.message, details);
+}
+
 export type CompilePoolOptions = {
   /** The worker script: src/compile-worker.js, or dist/compile-worker.js when built. */
   workerUrl: URL;
@@ -41,15 +63,15 @@ export type CompilePoolOptions = {
 };
 
 type RawResult = { mjml: string; html: string; errors: string[] };
-type Reply = { id: number; ok: true; result: RawResult } | { id: number; ok: false; error: string } | { ready: true };
+type Reply =
+  | { id: number; ok: true; result: unknown }
+  | { id: number; ok: false; error?: string; importError?: ImportFailure }
+  | { ready: true };
 
-type Job = {
-  id: number;
-  document: unknown;
-  options: CompileOptions;
-  resolve: (r: CompileResult) => void;
-  reject: (e: unknown) => void;
-};
+type Job = { id: number; reject: (e: unknown) => void } & (
+  | { kind: 'compile'; document: unknown; options: CompileOptions; resolve: (r: CompileResult) => void }
+  | { kind: 'import'; mjml: string; resolve: (r: ImportedMjml) => void }
+);
 
 type Slot = {
   worker: Worker;
@@ -75,7 +97,7 @@ export function toCompileResult(raw: RawResult): CompileResult {
   return { mjml: raw.mjml, html: raw.html, warnings: [], errors: raw.errors.map(toCompileMessage) };
 }
 
-export class CompilePool implements Compiler {
+export class CompilePool implements Compiler, MjmlImporter {
   private readonly slots: Slot[] = [];
   private readonly queue: Job[] = [];
   private nextId = 1;
@@ -87,19 +109,33 @@ export class CompilePool implements Compiler {
   }
 
   compile(document: unknown, options: CompileOptions = {}): Promise<CompileResult> {
-    if (this.closed) return Promise.reject(new ApiError('service_unavailable', 'The service is shutting down.'));
-    const busy = this.slots.every((s) => s.job !== null || !s.ready);
-    if (busy && this.queue.length >= this.options.maxQueue) {
-      return Promise.reject(
-        new ApiError('service_unavailable', 'Too many compilations are waiting. Retry in a few seconds.', {
-          queued: this.queue.length,
-        }),
-      );
-    }
+    const refused = this.refusal();
+    if (refused) return Promise.reject(refused);
     return new Promise<CompileResult>((resolve, reject) => {
-      this.queue.push({ id: this.nextId++, document, options, resolve, reject });
+      this.queue.push({ id: this.nextId++, kind: 'compile', document, options, resolve, reject });
       this.dispatch();
     });
+  }
+
+  importMjml(mjml: string): Promise<ImportedMjml> {
+    const refused = this.refusal();
+    if (refused) return Promise.reject(refused);
+    return new Promise<ImportedMjml>((resolve, reject) => {
+      this.queue.push({ id: this.nextId++, kind: 'import', mjml, resolve, reject });
+      this.dispatch();
+    });
+  }
+
+  /** Why a new job cannot be queued right now, if it cannot. */
+  private refusal(): ApiError | null {
+    if (this.closed) return new ApiError('service_unavailable', 'The service is shutting down.');
+    const busy = this.slots.every((s) => s.job !== null || !s.ready);
+    if (busy && this.queue.length >= this.options.maxQueue) {
+      return new ApiError('service_unavailable', 'Too many compilations are waiting. Retry in a few seconds.', {
+        queued: this.queue.length,
+      });
+    }
+    return null;
   }
 
   /** Jobs waiting for a worker, and workers busy with one. For tests and logs. */
@@ -142,8 +178,14 @@ export class CompilePool implements Compiler {
       if (slot.timer) clearTimeout(slot.timer);
       slot.timer = null;
       slot.job = null;
-      if (reply.ok) job.resolve(toCompileResult(reply.result));
-      else job.reject(new Error(`compile worker failed: ${reply.error}`));
+      if (reply.ok) {
+        if (job.kind === 'compile') job.resolve(toCompileResult(reply.result as RawResult));
+        else job.resolve(reply.result as ImportedMjml);
+      } else if (reply.importError && job.kind === 'import') {
+        job.reject(importRefusal(reply.importError));
+      } else {
+        job.reject(new Error(`compile worker failed: ${reply.error}`));
+      }
       this.dispatch();
     });
 
@@ -172,7 +214,11 @@ export class CompilePool implements Compiler {
       const job = this.queue.shift()!;
       slot.job = job;
       slot.timer = setTimeout(() => this.timeOut(slot, job), this.options.timeoutMs);
-      slot.worker.postMessage({ id: job.id, document: job.document, options: job.options });
+      slot.worker.postMessage(
+        job.kind === 'compile'
+          ? { id: job.id, kind: 'compile', document: job.document, options: job.options }
+          : { id: job.id, kind: 'import', mjml: job.mjml },
+      );
     }
   }
 
@@ -181,16 +227,25 @@ export class CompilePool implements Compiler {
     slot.retired = true;
     slot.job = null;
     slot.timer = null;
-    job.resolve({
-      mjml: '',
-      html: '',
-      warnings: [],
-      errors: [
-        {
-          message: `Compilation did not finish within ${this.options.timeoutMs} ms. Simplify the document (fewer or smaller blocks) and try again.`,
-        },
-      ],
-    });
+    if (job.kind === 'import') {
+      job.reject(
+        importRefusal({
+          code: 'too_complex',
+          message: `Reading the MJML did not finish within ${this.options.timeoutMs} ms. Split it into smaller documents and import them one by one.`,
+        }),
+      );
+    } else {
+      job.resolve({
+        mjml: '',
+        html: '',
+        warnings: [],
+        errors: [
+          {
+            message: `Compilation did not finish within ${this.options.timeoutMs} ms. Simplify the document (fewer or smaller blocks) and try again.`,
+          },
+        ],
+      });
+    }
     void slot.worker.terminate();
     if (this.closed) return;
     const index = this.slots.indexOf(slot);

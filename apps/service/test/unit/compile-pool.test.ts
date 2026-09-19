@@ -51,6 +51,35 @@ describe('CompilePool with the real MJML worker', () => {
   });
 });
 
+describe('CompilePool reads MJML in its workers', () => {
+  it('imports MJML into a document with warnings', async () => {
+    const p = pool({ workerUrl: REAL_WORKER });
+    const result = await p.importMjml(
+      '<mjml><mj-body><mj-section><mj-column><mj-text>Hi</mj-text><mj-foo /></mj-column></mj-section></mj-body></mjml>',
+    );
+    expect(result.document.sections).toHaveLength(1);
+    expect(result.warnings.map((w) => w.code)).toContain('unknown_component');
+  });
+
+  it('refuses broken MJML with invalid_mjml, its reason, line and column', async () => {
+    const p = pool({ workerUrl: REAL_WORKER });
+    const err = await p.importMjml('<mjml>\n<mj-body>\n<mj-section>').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).code).toBe('invalid_mjml');
+    expect((err as ApiError).details).toEqual({ reason: 'invalid_xml', line: 3, column: 1 });
+    // The worker survived the refusal.
+    expect((await p.compile(helloDocument())).errors).toEqual([]);
+  });
+
+  it('an import that misses the deadline is too_complex, and the pool keeps serving', async () => {
+    const p = pool({ timeoutMs: 300 });
+    const err = await p.importMjml('spin').catch((e: unknown) => e);
+    expect((err as ApiError).code).toBe('invalid_mjml');
+    expect((err as ApiError).details).toMatchObject({ reason: 'too_complex' });
+    expect((await p.importMjml('<mjml/>')).warnings).toEqual([]);
+  });
+});
+
 describe('CompilePool isolation', () => {
   it('stops a compile that misses its deadline, answers with an error, and keeps serving', async () => {
     const p = pool({ timeoutMs: 300 });

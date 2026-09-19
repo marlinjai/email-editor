@@ -30,7 +30,8 @@ export function appOver(h: Harness, options: Partial<AppOptions> = {}) {
     if (body !== undefined) headers['content-type'] = 'application/json';
     const res = await app.request(c.path, { method: c.method ?? 'GET', headers, body });
     const text = await res.text();
-    return { status: res.status, body: text ? JSON.parse(text) : {}, headers: res.headers };
+    const json = /json/i.test(res.headers.get('content-type') ?? 'application/json');
+    return { status: res.status, body: text && json ? JSON.parse(text) : {}, headers: res.headers, text };
   }
 
   return { app, call, logged };

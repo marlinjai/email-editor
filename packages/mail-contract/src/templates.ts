@@ -217,6 +217,7 @@ export const MAX_IMPORTED_REMOTE_IMAGES = 50;
  * - `not_mjml`: no `<mjml>` root or no `<mj-body>`;
  * - `include_not_supported`: `mj-include` needs files, and an import has none;
  * - `too_deep`, `too_many_elements`: over the limits above;
+ * - `too_complex`: reading it took longer than the service allows for one document;
  * - `invalid_document`: the import produced a document the editor's schema refuses (a service bug; report it).
  */
 export const MJML_IMPORT_REFUSALS = [
@@ -225,6 +226,7 @@ export const MJML_IMPORT_REFUSALS = [
   'include_not_supported',
   'too_deep',
   'too_many_elements',
+  'too_complex',
   'invalid_document',
 ] as const;
 export type MjmlImportRefusal = (typeof MJML_IMPORT_REFUSALS)[number];
