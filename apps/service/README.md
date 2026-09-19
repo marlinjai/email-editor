@@ -464,6 +464,21 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
   `bounce_reverted` for each), blocks nothing more in that run, pauses the
   mailing with `pause_reason`, records `rejections.anomaly` on the provider,
   and audits `mailing.paused` as the system. Resuming starts a new run.
+  A **provider-wide** breaker covers what no run shows (one-to-one mailings,
+  test sends, streaks spread over mailings): the provider's last 5 messages
+  within 24 hours (and since the anomaly was last cleared) all refused alike.
+  It undoes those blocks, pauses the provider's sending mailings (skipping rows
+  a worker holds, which its next claim pauses), sets `breaker_open_at`, and
+  from then on the provider blocks nothing, and test sends, mailing starts,
+  resumes and retries answer `provider_anomaly` until an admin calls
+  `providers.clearAnomaly`. The run breaker is judged first, so a streak inside
+  one mailing pauses only that mailing. Undoing is exact: a block the bounce
+  created is deleted (with `contact.resubscribed`), one it hardened gets its
+  `replaced_reason` back, with no event.
+  Within 5.1.x, a phrase naming the mailbox ("user unknown", "recipient address
+  rejected", "no such user", "mailbox unavailable") beats the generic word
+  "relay" (Postfix's "relay recipient table"), while "Relay access denied" is
+  the sender's problem.
   Resend providers also receive `email.bounced` (type `Permanent` only) and
   `email.complained` at `POST /providers/:id/events/resend`
   (`src/routes/provider-events.ts`), Svix-signed with the endpoint's secret

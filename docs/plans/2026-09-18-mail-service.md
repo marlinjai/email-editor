@@ -794,7 +794,14 @@ block: a permanent rejection only recorded `message.failed`. Now:
   more is blocked in that run, the mailing is paused with a `pause_reason`,
   and the provider shows `rejections.anomaly` with the sample reply. Resuming
   (after fixing the provider) starts a new run, watched afresh; retry-failed
-  mails the addresses whose blocks were undone.
+  mails the addresses whose blocks were undone. A provider-wide breaker
+  (decided in the final review, 2026-09-19) covers one-to-one sends such as
+  ŌPUNTIA's "One person" and test sends: 5 refusals in a row with the same
+  reply from one provider within 24 hours undo those blocks, pause the
+  provider's sending mailings and halt the provider (no blocks, test sends and
+  mailing starts refused with `provider_anomaly`) until an admin clears the
+  anomaly (`providers.clearAnomaly`, a button on the provider card). Undoing is
+  exact: a hardened unsubscribe is restored, not deleted.
 - **Hardening an existing block.** An `unsubscribed` block the person could
   lift themselves becomes `bounced` or `complained`, and a `bounced` block that
   also draws a complaint becomes `complained`. A `manual` block is left alone.

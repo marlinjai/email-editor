@@ -157,7 +157,12 @@ if it bounces again, it is blocked again.
   `contact.resubscribed` with `source: 'bounce_reverted'` for each), pauses the
   mailing with a `pause_reason`, and sets the provider's
   `rejections.anomaly`. Fix the provider, then resume; the resumed run is
-  watched afresh.
+  watched afresh. Across a provider's sends (one-to-one mailings and test sends
+  included), 5 refusals in a row with the same reply within 24 hours halt the
+  provider (`anomaly.scope: 'provider'`, `blocking: true`): no blocks, and test
+  sends, sends, resumes and retries answer `provider_anomaly` (409) until an
+  admin calls `providers.clearAnomaly` (`POST /v1/providers/:id/clear-anomaly`).
+  A block a bounce hardened (an unsubscribe) is restored, not lifted.
 - **Resend:** also bounces and spam complaints reported afterwards, through
   Resend's webhooks. A Resend provider's `events` says where they arrive (`url`)
   and whether the service can verify them (`status`: `active` or
