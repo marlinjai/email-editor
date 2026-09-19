@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CompileResult, Mailing, MessageSummary, Page, Provider, Recipient, RecipientStatus, Segment, TemplateSummary, Topic } from '@marlinjai/mail-contract';
 import { CompileMessages, EmailPreview } from '@/components/email-preview';
 import { FormError } from '@/components/form-error';
+import { ExportMenu } from '@/components/export-menu';
 import { Badge, Button, EmptyState, ErrorPanel, LinkButton, Mono, Notice, PageHeader, Section, Select, Table, Td, Th, When } from '@/components/ui';
 import { useAction } from '@/components/use-action';
 import { MAILING_STATUS_LABEL, mailingControls } from '@/lib/mailing-status';
@@ -158,7 +159,12 @@ export function MailingView({
             </span>
           </>
         }
-        actions={canWrite ? <Controls ws={ws} mailing={mailing} allowed={controls} outcomeUnknown={outcomeUnknown} onChange={onChange} /> : null}
+        actions={
+          <div className="flex flex-wrap items-start justify-end gap-2">
+            {canWrite ? <Controls ws={ws} mailing={mailing} allowed={controls} outcomeUnknown={outcomeUnknown} onChange={onChange} /> : null}
+            <ExportMenu href={`/w/${ws}/mailings/${mailing.id}/export`} note="The mailing's own copy of its content." />
+          </div>
+        }
       />
 
       <ScheduledNotice ws={ws} mailing={mailing} canWrite={canWrite} onChange={onChange} />

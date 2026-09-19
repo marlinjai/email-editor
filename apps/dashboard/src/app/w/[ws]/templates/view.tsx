@@ -133,9 +133,12 @@ export function TemplatesView({
           </LinkButton>
         </nav>
         {canWrite && !creating ? (
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            New template
-          </Button>
+          <div className="flex gap-2">
+            <LinkButton href={`${base}/import`}>Import MJML</LinkButton>
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              New template
+            </Button>
+          </div>
         ) : null}
       </div>
       {creating ? <NewTemplate ws={ws} onCancel={() => setCreating(false)} /> : null}
@@ -144,15 +147,18 @@ export function TemplatesView({
           title={archived ? 'No archived templates' : 'No templates yet'}
           action={
             canWrite && !archived && !creating ? (
-              <Button variant="primary" onClick={() => setCreating(true)}>
-                New template
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <LinkButton href={`${base}/import`}>Import MJML</LinkButton>
+                <Button variant="primary" onClick={() => setCreating(true)}>
+                  New template
+                </Button>
+              </div>
             ) : null
           }
         >
           {archived
             ? 'Archived templates are kept but hidden from the mailing composer.'
-            : 'Design your first email in the editor: drag in sections, write, add images, preview on desktop and mobile.'}
+            : 'Design your first email in the editor: drag in sections, write, add images, preview on desktop and mobile. Or import one you already wrote in MJML.'}
         </EmptyState>
       ) : (
         <>
