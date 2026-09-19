@@ -1,41 +1,34 @@
 # Roadmap
 
-## Now
+## Leftovers (after the mail service build)
 
-- [ ] Turn the editor into a multi-tenant mail service with ŌPUNTIA's admin as its
-      first client [plan](docs/plans/2026-09-18-mail-service.md) : in progress, approved
-      2026-09-18, built by an agent team in phases S0 to S5. Clients keep their people, the service keeps the mail:
-      workspaces and API keys via auth-brain, a Postgres-backed API, a send worker
-      with per-provider policies (iCloud+ SMTP first), suppression and preference
-      topics, webhooks, a hosted unsubscribe page, and the editor published as an
-      SDK. The Phase 0 to 7 "complete" marks below describe UI over mock adapters,
-      not a running service (2026-09-18)
+Decisions and operator steps that remain after the mail service plan was built
+(S0 to S5, the dashboard, bounces, the landing page; plan completed 2026-09-19).
+
 - [ ] npm: run `scripts/first-publish.sh` after `npm login` (try `--dry-run`
       first) to publish the six packages' first version (the editor set and
       `@marlinjai/mail-contract`, `@marlinjai/mail-sdk`); npm cannot attach a
       trusted publisher to a package that does not exist yet. Then register
       each trusted publisher exactly as the script prints (repository
       `marlinjai/email-editor`, workflow `publish.yml`) and push the two tags
-      it prints; needs Marlin's npm account, details in the
-      [plan](docs/plans/2026-09-18-mail-service.md) under question 4 (2026-09-18)
+      it prints; needs Marlin's npm account, details in the under question 4 (2026-09-18)
 - [ ] Mail service: add a `topics.delete` route to the contract and the service
       (refused with `conflict` while a mailing uses the topic, which the schema
       already enforces) once a client needs to remove a topic; S2 ships without
-      it [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+      it (2026-09-18)
 - [ ] Mail dashboard: Marlin enrolls a second factor at auth.lumitra.co for his
       own sign-in to app.mail.lumitra.co, which requires one (#21 is deployed,
-      auth-brain#142 merged, the GHCR package public)
-      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
+      auth-brain#142 merged, the GHCR package public) (2026-09-19)
 - [ ] Mail service: decide whether to detect bounces that SMTP providers report
       later by email (iCloud+ reports almost all of them that way), which needs
       read access to the sender's inbox (IMAP, the Internet Message Access
       Protocol) and a parser for delivery status notifications; today only the
       immediate SMTP rejection and Resend's events suppress, and the provider card
-      says so [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
+      says so (2026-09-19)
 - [ ] Mail service: decide what `user.erased` means for workspace members (remove the
       person's member rows, and what happens to a workspace whose last owner is
       erased); today the service acknowledges it as a no-op and is subscribed only to
-      `tenant.erased` [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+      `tenant.erased` (2026-09-18)
 - [ ] Decide whether hosts may add new block types (not only redefine the 14
       standard ones): it needs an open block type in the store and schema, a
       renderer hook for the canvas and a compile hook the server can trust.
@@ -47,14 +40,13 @@
       key). Then one `execute_with_secrets` call runs
       `apps/service/scripts/stripe-setup.mjs` (catalogue, portal, webhook
       endpoint, ids and secret into dev and prod), exactly as
-      `apps/service/README.md` "Stripe setup: one command" spells out; redeploy
-      [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+      `apps/service/README.md` "Stripe setup: one command" spells out; redeploy (2026-09-18)
 - [ ] Mail service billing, live mode (Marlin's decision: prices, limits and
       tax in the plan's S5 defaults 1 and 2): `copy_secret op=copy` of
       `STRIPE_SECRET_KEY` from Infisical "lumitra-qr" prod to "Lumitra Mail"
       prod; rerun the setup command with `--live` and destinations in prod
       only; redeploy; then one real checkout, a plan switch in the portal and a
-      cancellation, refunded [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-18)
+      cancellation, refunded (2026-09-18)
 - [ ] Lumitra Mail privacy notice (needs Marlin's legal review): lumitra.co/datenschutz
       covers the landing page but defers product-specific processing to a notice on
       the product's own domain, and Mail has none. Write `mail.lumitra.co/privacy`
@@ -62,10 +54,15 @@
       sub-processors Hetzner, the workspace's provider and Storage Brain, erasure),
       publish the Art. 28 processing agreement template from "Legal shape", point the
       landing footer's privacy link at it, and add mail.lumitra.co to the subdomain
-      list of lumitra.co/impressum [plan](docs/plans/2026-09-18-mail-service.md) (2026-09-19)
+      list of lumitra.co/impressum (2026-09-19)
 
 ## Recently shipped
 
+- Lumitra Mail, the multi-tenant mail service with ŌPUNTIA's Studio as its first
+  client, built S0 to S5 and deployed at `https://mail.lumitra.co` (API, hosted
+  unsubscribe and signup pages, landing page) and `https://app.mail.lumitra.co`
+  (dashboard) on 2026-09-18 and 2026-09-19
+  [plan](docs/plans/2026-09-18-mail-service.md)
 - Lumitra Mail landing page live at `https://mail.lumitra.co/` in five
   languages (#31, 2026-09-19); `email-editor.lumitra.co` answers 308 to it
   through the redirect Worker, and email.lumitra.co links back (email-mcp #18)
