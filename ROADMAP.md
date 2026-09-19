@@ -1,5 +1,12 @@
 # Roadmap
 
+## Now
+
+- [ ] Automations with a visual flow canvas, custom events and (later) commerce
+      data, researched against MailerLite
+      [plan](docs/plans/2026-09-19-automations.md) : draft, awaiting Marlin's
+      answers to its eight questions (2026-09-19)
+
 ## Leftovers (after the mail service build)
 
 Decisions and operator steps that remain after the mail service plan was built
