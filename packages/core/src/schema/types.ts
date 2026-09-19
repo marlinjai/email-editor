@@ -363,21 +363,71 @@ export interface Section {
   backgroundPosition?: string;
   backgroundRepeat?: 'repeat' | 'no-repeat';
   backgroundSize?: string;
+  /**
+   * Full width (`full-width` in MJML). Inside a full-width {@link Wrapper},
+   * MJML renders the section at standard width whatever this says.
+   */
   fullWidth?: boolean;
-  isWrapper?: boolean;
   noStack?: boolean;
   hidden?: boolean;
   padding?: Spacing;
   columns: Column[];
   /**
-   * Emit the section's raw blocks straight into `<mj-body>` instead of inside
-   * an `<mj-section>`: markup that sat directly in the body of an imported
-   * document. Ignored as soon as the section holds any block that is not raw.
+   * Emit the section's raw blocks straight into the parent (`<mj-body>`, or
+   * the `<mj-wrapper>` the section sits in) instead of inside an
+   * `<mj-section>`: markup that sat there in an imported document. Ignored as
+   * soon as the section holds any block that is not raw.
    */
   bodyRaw?: boolean;
-  /** See {@link ExtraAttributes}. On a wrapper section they go on `<mj-wrapper>`. */
+  /** See {@link ExtraAttributes}. */
   extraAttributes?: ExtraAttributes;
 }
+
+/**
+ * A container around several sections (`<mj-wrapper>`): one background,
+ * border, radius and padding shared by the sections inside, with an optional
+ * vertical `gap` between them. Sits at the top level of a document, next to
+ * sections; it never holds another wrapper and never sits inside a section.
+ * It may be empty (it keeps its styling, and sections can be moved back in).
+ * Added in schema version 1.1.
+ */
+export interface Wrapper {
+  id: string;
+  type: 'wrapper';
+  hidden?: boolean;
+  backgroundColor?: string;
+  /** `background-url` in MJML. */
+  backgroundImage?: string;
+  backgroundGradient?: BackgroundGradient;
+  backgroundPosition?: string;
+  backgroundRepeat?: 'repeat' | 'no-repeat';
+  backgroundSize?: string;
+  /** CSS border shorthand for all four sides, e.g. `1px solid #dddddd`. */
+  border?: string;
+  borderTop?: string;
+  borderRight?: string;
+  borderBottom?: string;
+  borderLeft?: string;
+  borderRadius?: string;
+  /** MJML's default when unset is `20px 0`. */
+  padding?: Spacing;
+  /** Full width (`full-width`): the background spans the whole mail width; the sections inside stay at standard width. */
+  fullWidth?: boolean;
+  /** Class names for `css-class`, space separated, for the document's own `mj-style` rules. */
+  cssClass?: string;
+  /** Vertical space between the sections inside, in px (`gap`, MJML 4.15 and later). */
+  gap?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  /** See {@link ExtraAttributes}. */
+  extraAttributes?: ExtraAttributes;
+  sections: Section[];
+}
+
+/** What the top level of a document holds, in order: sections and wrappers. */
+export type TopLevelItem = Section | Wrapper;
+
+/** The document schema versions: 1.1 added {@link Wrapper}. */
+export type TemplateVersion = '1.0' | '1.1';
 
 /**
  * Complete email template structure
@@ -389,9 +439,24 @@ export interface EmailTemplate {
    * `migrateTemplate` never adds or changes it.
    */
   id?: string;
-  version: '1.0';
+  /**
+   * The schema version. `migrateTemplate` brings every document it accepts to
+   * the current one (1.1); a 1.0 document cannot hold a wrapper.
+   */
+  version: TemplateVersion;
   metadata: TemplateMetadata;
-  sections: Section[];
+  /** The document's top level, in order: sections and wrappers (see {@link TopLevelItem}). */
+  sections: TopLevelItem[];
+}
+
+/** Whether a top-level item is a {@link Wrapper}. */
+export function isWrapper(item: TopLevelItem): item is Wrapper {
+  return item.type === 'wrapper';
+}
+
+/** Every section of a document in order, the ones inside wrappers included. */
+export function allSections(items: readonly TopLevelItem[]): Section[] {
+  return items.flatMap((item) => (isWrapper(item) ? item.sections : [item]));
 }
 
 /**
