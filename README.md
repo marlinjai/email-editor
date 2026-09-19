@@ -6,6 +6,23 @@ Replace GrapesJS and Unlayer with a fully controllable, customizable email edito
 
 ---
 
+## Lumitra Mail
+
+This repository also runs **Lumitra Mail**, a multi-tenant mail service and
+marketing platform built on the editor:
+
+- **Service** (`apps/service`): the v1 API, the send worker, hosted unsubscribe and
+  signup pages and the landing page, live at https://mail.lumitra.co.
+- **Dashboard** (`apps/dashboard`): the UI over the same API, live at
+  https://app.mail.lumitra.co (auth-brain sign-in).
+- **Contract and SDK** (`packages/mail-contract`, `packages/mail-sdk`): the typed
+  API definition and client.
+
+Docs: https://docs.email-editor.lumitra.co, `apps/service/README.md` and
+`docs/plans/2026-09-18-mail-service.md`.
+
+---
+
 ## Features
 
 ### Editor

@@ -1,7 +1,7 @@
 ---
 title: Turn the email editor into a mail service with workspaces, and make ŌPUNTIA its first client
 type: plan
-status: in-progress
+status: completed
 date: 2026-09-18
 summary: Rebuild this repository's demo-complete platform as a real multi-tenant service (workspaces, API keys via auth-brain, a Postgres-backed API, a send worker with provider policies, suppression and preference topics, webhooks, a hosted unsubscribe page) with the visual editor embeddable through a published SDK. ŌPUNTIA's admin Studio is the first client and keeps its own people; the service keeps the mail.
 tags: [saas, multi-tenant, mjml, smtp, resend, unsubscribe, webhooks, auth-brain, opuntia]
@@ -297,6 +297,17 @@ Written once so the phases built in parallel cannot drift apart:
   applied as a reviewed diff), custom domains per workspace.
 
 ## Progress
+
+**Completed 2026-09-19.** Every phase S0 to S5 is merged and deployed: the API,
+worker, hosted pages and landing page at `https://mail.lumitra.co`, the dashboard at
+`https://app.mail.lumitra.co`. Each pull request passed CI (typecheck, unit,
+integration on Postgres, dashboard end to end, arm64 images, roadmap-check) and the
+later ones an independent review. What remains are operator steps and decisions that
+need Marlin (npm first publish, Stripe keys and live mode, a second factor for his
+sign-in, the Mail privacy notice, IMAP bounce detection, `user.erased`, new block
+types, `topics.delete`); each is a dated line under "Leftovers" in `ROADMAP.md`.
+ŌPUNTIA's side of the first client lives in its own plan and pull request
+(opuntia-website #136), gated on the npm publish and the signed processing addendum.
 
 ### S0, foundation (built 2026-09-18, branch `feat/s0-foundation`)
 
