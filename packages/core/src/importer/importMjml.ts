@@ -29,7 +29,10 @@ import type {
   TableBlock,
   TemplateMetadata,
   TextBlock,
+  TopLevelItem,
+  Wrapper,
 } from '../schema/types';
+import { CURRENT_TEMPLATE_VERSION } from '../schema/migrate';
 import { scanMjml } from './scan';
 import { ENDING_TAGS, KNOWN_TAGS, isComment, parseMjml, serialize, type MjmlNode } from './tree';
 import {
@@ -51,12 +54,15 @@ import {
  * - The editor's own export is recognised (`css-class="el-<type> el-<id>"`,
  *   and the `data-ee-*` markers on its raw markup), so exporting a template and
  *   importing it again gives back the same blocks with the same ids.
- * - What the editor cannot hold as a block (an `mj-wrapper` around several
- *   sections, an `mj-hero` with content, `mj-social`, a hand-written
- *   `mj-table`, an unknown component, ...) is compiled with the whole source,
- *   in place, and kept as a Raw HTML block holding exactly that output, so the
- *   compiled mail does not change. Each such case is a warning with the MJML
- *   it came from.
+ * - An `mj-wrapper` becomes a wrapper holding its sections. A child the
+ *   editor cannot hold as a section (a section it cannot read, an `mj-hero`,
+ *   an `mj-raw`, ...) stays in the wrapper, in place, as a Raw block of a
+ *   raw-only section, so nothing inside a wrapper is dropped.
+ * - What the editor cannot hold as a block (an `mj-hero` with content,
+ *   `mj-social`, a hand-written `mj-table`, an unknown component, ...) is
+ *   compiled with the whole source, in place, and kept as a Raw HTML block
+ *   holding exactly that output, so the compiled mail does not change. Each
+ *   such case is a warning with the MJML it came from.
  */
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -286,16 +292,9 @@ class Importer {
 
   // Body
 
-  body(body: MjmlNode): Section[] {
-    const sections: Section[] = [];
-    let rawRun: RawBlock[] | null = null;
-    const pushRaw = (block: RawBlock) => {
-      if (!rawRun) {
-        rawRun = [];
-        sections.push({ id: this.id(), type: 'section', bodyRaw: true, columns: [{ id: this.id(), width: 100, blocks: rawRun }] });
-      }
-      rawRun.push(block);
-    };
+  body(body: MjmlNode): TopLevelItem[] {
+    const items: TopLevelItem[] = [];
+    const raw = this.rawRuns((section) => items.push(section));
     const counts = new Map<string, number>();
 
     for (const node of body.children) {
@@ -305,59 +304,153 @@ class Importer {
 
       if (node.tagName === 'mj-raw') {
         if (isComment(node) && EDITOR_COMMENTS.has(node.content!.trim())) continue;
-        const attrs = { ...node.attributes };
-        const { id, classes } = this.identity(attrs, 'el-raw');
-        if (Object.keys(attrs).length > 0 || classes.length > 0) {
-          pushRaw(this.fallback(node, body, path, 'This mj-raw has attributes (such as position) the editor cannot keep.'));
-        } else {
-          pushRaw({ id: this.id(id), type: 'raw', html: node.content ?? '' });
-        }
+        raw.push(this.raw(node, body, path));
         continue;
       }
-      if (node.tagName === 'mj-section' || node.tagName === 'mj-wrapper') {
-        const section = node.tagName === 'mj-section' ? this.section(node, undefined, path) : this.wrapper(node, path);
+      if (node.tagName === 'mj-wrapper') {
+        raw.end();
+        items.push(this.wrapper(node, path));
+        continue;
+      }
+      if (node.tagName === 'mj-section') {
+        const section = this.section(node, path);
         if (section) {
-          rawRun = null;
-          sections.push(section);
+          raw.end();
+          items.push(section);
         } else {
-          const why =
-            node.tagName === 'mj-wrapper'
-              ? 'The editor holds a wrapper around exactly one plain section; this one holds more, or its sections carry attributes.'
-              : 'The editor cannot hold this section as it is (see the other warnings for it).';
-          pushRaw(this.fallback(node, body, path, why));
+          raw.push(this.fallback(node, body, path, 'The editor cannot hold this section as it is (see the other warnings for it).'));
         }
         continue;
       }
       if (node.tagName === 'mj-hero') {
-        pushRaw(this.fallback(node, body, path, "The editor's Hero block has no content of its own, so an mj-hero with text and buttons cannot become one."));
+        raw.push(this.fallback(node, body, path, "The editor's Hero block has no content of its own, so an mj-hero with text and buttons cannot become one."));
         continue;
       }
       if (!KNOWN_TAGS.has(node.tagName)) {
-        pushRaw(this.fallback(node, body, path, '', true));
+        raw.push(this.fallback(node, body, path, '', true));
         continue;
       }
-      pushRaw(this.fallback(node, body, path, `<${node.tagName}> does not belong directly in mj-body; MJML renders it as it can.`));
+      raw.push(this.fallback(node, body, path, `<${node.tagName}> does not belong directly in mj-body; MJML renders it as it can.`));
     }
     if (typeof body.content === 'string' && body.content.trim()) {
       this.warn('stray_text', 'info', 'mj-body', body, 'Text directly in mj-body is ignored by MJML, and by the import.');
     }
-    return sections;
+    return items;
   }
 
-  wrapper(node: MjmlNode, path: string): Section | null {
-    const inner = node.children.filter((c) => !isComment(c));
-    if (inner.length !== 1 || inner[0]!.tagName !== 'mj-section' || Object.keys(inner[0]!.attributes).length > 0) return null;
-    if (node.children.some((c) => isComment(c) && /^<!--\[if/.test(c.content ?? ''))) return null;
-    return this.section(inner[0]!, node, path);
+  /**
+   * Consecutive raw markup (in mj-body or in an mj-wrapper) collects in one
+   * raw-only section (`bodyRaw`), which the compiler emits back in place as
+   * `mj-raw`; any other child ends the run.
+   */
+  rawRuns(add: (section: Section) => void): { push: (block: RawBlock) => void; end: () => void } {
+    let run: RawBlock[] | null = null;
+    return {
+      push: (block) => {
+        if (!run) {
+          run = [];
+          add({ id: this.id(), type: 'section', bodyRaw: true, columns: [{ id: this.id(), width: 100, blocks: run }] });
+        }
+        run.push(block);
+      },
+      end: () => {
+        run = null;
+      },
+    };
   }
 
-  section(node: MjmlNode, wrapper: MjmlNode | undefined, path: string): Section | null {
-    const outer = wrapper ?? node;
-    const attrs = { ...outer.attributes };
-    const { id, classes } = this.identity(attrs, wrapper ? 'el-wrapper' : 'el-section');
+  /** An `mj-raw` child of mj-body or mj-wrapper: its markup, or its compiled output when it has attributes the editor cannot keep. */
+  raw(node: MjmlNode, parent: MjmlNode, path: string): RawBlock {
+    const attrs = { ...node.attributes };
+    const { id, classes } = this.identity(attrs, 'el-raw');
+    if (Object.keys(attrs).length > 0 || classes.length > 0) {
+      return this.fallback(node, parent, path, 'This mj-raw has attributes (such as position) the editor cannot keep.');
+    }
+    return { id: this.id(id), type: 'raw', html: node.content ?? '' };
+  }
+
+  wrapper(node: MjmlNode, path: string): Wrapper {
+    const attrs = { ...node.attributes };
+    const { id, classes } = this.identity(attrs, 'el-wrapper');
+    const wrapper: Wrapper = { id: this.id(id), type: 'wrapper', sections: [] };
+
+    const gradient = id ? this.gradients.get(id) : undefined;
+    if (gradient) {
+      wrapper.backgroundGradient = gradient;
+      delete attrs['background-color'];
+    }
+    this.mapCommon(attrs, wrapper, {
+      'background-color': 'backgroundColor',
+      'background-url': 'backgroundImage',
+      'background-position': 'backgroundPosition',
+      'background-size': 'backgroundSize',
+      border: 'border',
+      'border-top': 'borderTop',
+      'border-right': 'borderRight',
+      'border-bottom': 'borderBottom',
+      'border-left': 'borderLeft',
+      'border-radius': 'borderRadius',
+    });
+    this.mapEnum(attrs, wrapper, 'background-repeat', 'backgroundRepeat', ['repeat', 'no-repeat']);
+    this.mapEnum(attrs, wrapper, 'text-align', 'textAlign', ['left', 'center', 'right']);
+    if (attrs['full-width'] === 'full-width') {
+      wrapper.fullWidth = true;
+      delete attrs['full-width'];
+    }
+    if (attrs.gap !== undefined && /^[0-9]+(\.[0-9]+)?px$/.test(attrs.gap)) {
+      wrapper.gap = attrs.gap;
+      delete attrs.gap;
+    }
+    this.mapPadding(attrs, wrapper);
+    if (classes.length > 0) wrapper.cssClass = classes.join(' ');
+    const extra = this.extras(attrs, [], path, node);
+    if (extra) wrapper.extraAttributes = extra;
+
+    // Children: sections, and whatever else sat there kept in place as raw.
+    const raw = this.rawRuns((section) => wrapper.sections.push(section));
+    const counts = new Map<string, number>();
+    for (const child of node.children) {
+      const n = (counts.get(child.tagName) ?? 0) + 1;
+      counts.set(child.tagName, n);
+      const childPath = `${path} > ${child.tagName}[${n}]`;
+      if (child.tagName === 'mj-raw') {
+        if (isComment(child) && EDITOR_COMMENTS.has(child.content!.trim())) continue;
+        raw.push(this.raw(child, node, childPath));
+        continue;
+      }
+      if (child.tagName === 'mj-section') {
+        const section = this.section(child, childPath);
+        if (section) {
+          raw.end();
+          wrapper.sections.push(section);
+        } else {
+          raw.push(this.fallback(child, node, childPath, 'The editor cannot hold this section as it is (see the other warnings for it); it stays in its wrapper.'));
+        }
+        continue;
+      }
+      if (!KNOWN_TAGS.has(child.tagName)) {
+        raw.push(this.fallback(child, node, childPath, '', true));
+        continue;
+      }
+      const why =
+        child.tagName === 'mj-hero'
+          ? "The editor's Hero block has no content of its own, so an mj-hero with text and buttons cannot become one; it stays in its wrapper."
+          : child.tagName === 'mj-wrapper'
+            ? 'A wrapper cannot hold another wrapper; MJML renders this one as it can, and it stays in its outer wrapper.'
+            : `<${child.tagName}> does not belong directly in mj-wrapper; MJML renders it as it can, and it stays in its wrapper.`;
+      raw.push(this.fallback(child, node, childPath, why));
+    }
+    if (typeof node.content === 'string' && node.content.trim()) {
+      this.warn('stray_text', 'info', path, node, 'Text directly in mj-wrapper is ignored by MJML, and by the import.');
+    }
+    return wrapper;
+  }
+
+  section(node: MjmlNode, path: string): Section | null {
+    const attrs = { ...node.attributes };
+    const { id, classes } = this.identity(attrs, 'el-section');
     const sectionId = this.id(id);
     const section: Section = { id: sectionId, type: 'section', columns: [] };
-    if (wrapper) section.isWrapper = true;
 
     const gradient = id ? this.gradients.get(id) : undefined;
     if (gradient) {
@@ -394,7 +487,7 @@ class Importer {
     let parent = node;
     if (children.length === 1 && children[0]!.tagName === 'mj-group') {
       const group = children[0]!;
-      if (Object.keys(group.attributes).length > 0 || wrapper) return null;
+      if (Object.keys(group.attributes).length > 0) return null;
       columnNodes = group.children.filter((c) => {
         if (!isComment(c)) return true;
         if (/^<!--\[if/.test(c.content ?? '')) columnNodes = [];
@@ -411,7 +504,7 @@ class Importer {
       counts.set(col.tagName, n);
       section.columns.push(this.column(col, columnNodes.length, `${path}${parent !== node ? ' > mj-group[1]' : ''} > mj-column[${index + 1}]`));
     }
-    const extra = this.extras(attrs, classes, path, outer);
+    const extra = this.extras(attrs, classes, path, node);
     if (extra) section.extraAttributes = extra;
     return section;
   }
@@ -897,7 +990,7 @@ export function importMjml(source: string): MjmlImportResult {
   importer.resolveFallbacks(metadata);
   importer.summarize();
 
-  const document: EmailTemplate = { version: '1.0', metadata, sections };
+  const document: EmailTemplate = { version: CURRENT_TEMPLATE_VERSION, metadata, sections };
   try {
     migrateTemplate(document);
   } catch (err) {
