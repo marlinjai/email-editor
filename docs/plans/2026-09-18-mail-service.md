@@ -765,8 +765,10 @@ block: a permanent rejection only recorded `message.failed`. Now:
   undetermined bounces, `email.delivery_delayed` and every other type are
   acknowledged and ignored. The message is found by Resend's email id, within
   the provider and the workspace, and the address it went to is blocked. An
-  event for an email the service did not send through that provider is only
-  counted (`events.unmatched`) and logged: two workspaces or another system may
+  event for an unknown email younger than an hour (its own `created_at`)
+  answers 503 without recording anything, since it can outrun the worker's
+  recording of the send, and Resend redelivers it. An older one, or one without
+  a readable `created_at`, is only counted (`events.unmatched`) and logged: two workspaces or another system may
   share one Resend account, and a wrong block costs a real person their mail
   (decided in review, 2026-09-19). The contract already had `contact.bounced` with `reason: 'bounced' |
   'complained'`, so complaints use it; no new event type.

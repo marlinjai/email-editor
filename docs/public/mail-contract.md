@@ -166,9 +166,10 @@ if it bounces again, it is blocked again.
   Resend for that URL with the events `email.bounced` and `email.complained`,
   and store its signing secret with `providers.setEventsSecret`
   (`PUT /v1/providers/:id/events-secret`, `{ signing_secret: "whsec_..." }`).
-  Only an event for a message the service sent through that provider acts;
-  an event for any other email on the same Resend account is counted in
-  `events.unmatched` and never blocks anyone.
+  Only an event for a message the service sent through that provider acts.
+  An event for an unknown email is asked to be redelivered (503) during its
+  first hour, in case the send is not recorded yet; after that it is counted
+  in `events.unmatched` and never blocks anyone.
 - **Not detected:** bounces that an SMTP server reports later as an email to
   the sender's inbox. That is how iCloud+ reports almost all of them, so with an
   iCloud+ provider, addresses that bounce later have to be blocked by hand.

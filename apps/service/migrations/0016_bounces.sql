@@ -61,7 +61,7 @@ CREATE TABLE provider_events (
   external_id          text NOT NULL CHECK (length(external_id) BETWEEN 1 AND 200),
   type                 text NOT NULL CHECK (length(type) BETWEEN 1 AND 100),
   provider_message_id  text,
-  outcome              text NOT NULL CHECK (outcome IN ('suppressed', 'already_suppressed', 'ignored', 'unmatched')),
+  outcome              text NOT NULL CHECK (outcome IN ('suppressed', 'already_suppressed', 'ignored')),
   received_at          timestamptz NOT NULL DEFAULT now(),
   UNIQUE (provider_id, external_id),
   FOREIGN KEY (workspace_id, provider_id) REFERENCES providers (workspace_id, id) ON DELETE CASCADE

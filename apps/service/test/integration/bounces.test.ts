@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { Provider, WebhookEvent, type WebhookEventOf } from '@marlinjai/mail-contract';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { repos } from '../../src/repo/index.js';
 import { svixSign } from '../../src/provider-events/svix.js';
 import { PermanentSendError } from '../../src/transport/index.js';
@@ -238,6 +238,15 @@ function bounceEvent(emailId: string, to: string, bounceType = 'Permanent') {
   };
 }
 
+/**
+ * A bounce for an email the service never recorded, created over an hour ago:
+ * acknowledged without acting. For tests that only check whether a delivery is
+ * accepted (its signature), not what it does.
+ */
+function staleBounce(emailId: string, to: string) {
+  return { ...bounceEvent(emailId, to), created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() };
+}
+
 function complaintEvent(emailId: string, to: string) {
   return { type: 'email.complained', created_at: new Date().toISOString(), data: { email_id: emailId, to: [to], subject: 'Hello' } };
 }
@@ -302,24 +311,50 @@ describe('Resend events', () => {
     expect((await bouncedEvents(W.id)).map((e) => e.data.email)).toEqual(['cyd@example.com']);
   });
 
-  it('an event for an email this provider never sent is counted and logged, never acted on', async () => {
+  it('an unmatched event younger than an hour answers 503 and records nothing; the redelivery after the send is recorded suppresses', async () => {
+    const p = await resendProvider(W.id);
+    const event = bounceEvent('re-late', 'late@example.com');
+    const first = await post(p.id, event);
+    expect(first.status).toBe(503);
+    const [claims] = await h.sql<{ n: number }[]>`SELECT count(*)::int AS n FROM provider_events WHERE provider_id = ${p.id}`;
+    expect(claims!.n).toBe(0);
+    expect(await suppressionsOf(W.id)).toEqual([]);
+    expect((await h.call({ path: `/v1/providers/${p.id}`, key: W.key })).body.events.unmatched).toBe(0);
+
+    // The worker records the send; Resend redelivers the same event (same svix-id, signed afresh).
+    const msg = await archived(W.id, p.id, 'late@example.com', 're-late');
+    const again = await post(p.id, event, { id: first.id, timestamp: Math.floor(Date.now() / 1000) + 5 });
+    expect(again).toMatchObject({ status: 200, body: { duplicate: false, outcome: 'suppressed' } });
+    expect(await suppressionsOf(W.id)).toMatchObject([{ email: 'late@example.com', source_message_id: msg.id }]);
+  });
+
+  it('an unmatched event older than an hour, or without a readable created_at, is acknowledged, counted and logged, never acted on', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    h.restartApp(); // the app takes console.log when it is built
     const p = await resendProvider(W.id);
     await repos(h.sql).contacts.insert(W.id, { email: 'eve@example.com', externalId: 'ext-eve' });
-    // Another system on the same Resend account sent this one: no message of ours has its id.
+    const old = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const events = [
+      { ...bounceEvent('re-unknown', 'eve@example.com'), created_at: old },
+      { ...complaintEvent('re-unknown-2', 'eve@example.com'), created_at: old },
+      { ...bounceEvent('re-unknown-3', 'eve@example.com'), created_at: undefined },
+      { ...bounceEvent('re-unknown-4', 'eve@example.com'), created_at: 'yesterday-ish' },
+    ];
     let firstId = '';
-    for (const event of [bounceEvent('re-unknown', 'eve@example.com'), complaintEvent('re-unknown-2', 'eve@example.com')]) {
+    for (const event of events) {
       const res = await post(p.id, event);
       firstId ||= res.id;
-      expect(res).toMatchObject({ status: 200, body: { ok: true, duplicate: false, outcome: 'unmatched' } });
+      expect(res, JSON.stringify(event)).toMatchObject({ status: 200, body: { ok: true, duplicate: false, outcome: 'ignored' } });
     }
-    expect((await post(p.id, bounceEvent('re-unknown', 'eve@example.com'), { id: firstId })).body).toMatchObject({ duplicate: true, outcome: 'unmatched' });
     expect(await suppressionsOf(W.id)).toEqual([]);
     expect(await bouncedEvents(W.id)).toEqual([]);
-    const provider = await h.call({ path: `/v1/providers/${p.id}`, key: W.key });
-    expect(provider.body.events.unmatched).toBe(2);
-    // A retry of the same event is not counted twice.
-    const [again] = await h.sql<{ n: number }[]>`SELECT events_unmatched_count AS n FROM providers WHERE id = ${p.id}`;
-    expect(again!.n).toBe(2);
+    expect((await h.call({ path: `/v1/providers/${p.id}`, key: W.key })).body.events.unmatched).toBe(4);
+    // A redelivery of an acknowledged event is a duplicate and not counted again.
+    expect((await post(p.id, events[0], { id: firstId })).body).toMatchObject({ duplicate: true, outcome: 'ignored' });
+    expect((await h.call({ path: `/v1/providers/${p.id}`, key: W.key })).body.events.unmatched).toBe(4);
+    expect(logSpy.mock.calls.some((c) => String(c[0]).includes('never sent; ignored'))).toBe(true);
+    logSpy.mockRestore();
+    h.restartApp();
   });
 
   it('a transient or undetermined bounce, a delay and other types are acknowledged and ignored', async () => {
@@ -340,7 +375,7 @@ describe('Resend events', () => {
 
   it('refuses a bad signature, another secret, a stale timestamp, missing headers and a body changed after signing', async () => {
     const p = await resendProvider(W.id);
-    const event = bounceEvent('re-3', 'x@example.com');
+    const event = staleBounce('re-3', 'x@example.com');
     const other = `whsec_${randomBytes(24).toString('base64')}`;
     expect((await post(p.id, event, { signature: 'v1,AAAA' })).status).toBe(400);
     expect((await post(p.id, event, { secret: other })).status).toBe(400);
@@ -405,15 +440,16 @@ describe('Resend events', () => {
     await archived(B.id, pb.id, 'shared@example.com', 're-b');
 
     // B's message id, sent to A's endpoint: A has no such message, so nothing happens anywhere.
-    const res = await post(pa.id, bounceEvent('re-b', 'shared@example.com'));
-    expect(res.body.outcome).toBe('unmatched');
+    const oldB = { ...bounceEvent('re-b', 'shared@example.com'), created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() };
+    const res = await post(pa.id, oldB);
+    expect(res.body.outcome).toBe('ignored');
     expect(await suppressionsOf(W.id)).toEqual([]);
     expect(await suppressionsOf(B.id)).toEqual([]);
     expect(await bouncedEvents(B.id)).toEqual([]);
 
     expect((await post(pa.id, bounceEvent('re-z', 'z@example.com'), { secret: secretB })).status).toBe(400);
     // The same svix-id at another provider is another event.
-    const atB = await post(pb.id, bounceEvent('re-b', 'shared@example.com'), { id: res.id, secret: secretB });
+    const atB = await post(pb.id, oldB, { id: res.id, secret: secretB });
     expect(atB.body).toMatchObject({ duplicate: false, outcome: 'suppressed' });
     expect(await suppressionsOf(B.id)).toHaveLength(1);
     expect(await suppressionsOf(W.id)).toEqual([]);
@@ -496,7 +532,7 @@ describe('Resend events endpoint registration', () => {
     expect(audit.map((a) => a.action)).toEqual(['provider.created', 'provider.events_registered']);
 
     // Events signed with that secret are accepted at once.
-    expect((await post(created.body.id, bounceEvent('re-9', 'h@example.com'))).status).toBe(200);
+    expect((await post(created.body.id, staleBounce('re-9', 'h@example.com'))).status).toBe(200);
 
     // Verifying again registers nothing more.
     await app.call({ method: 'POST', path: `/v1/providers/${created.body.id}/verify`, key: W.key });
@@ -572,7 +608,7 @@ describe('Resend events endpoint registration', () => {
     expect(kept.status).toBe(200);
     expect(same.seen.map((s) => `${s.method} ${s.url}`)).toEqual(['GET https://api.resend.com/webhooks/wh_123']);
     expect(kept.body.events).toMatchObject({ status: 'active', source: 'automatic' });
-    expect((await post(created.body.id, bounceEvent('re-12', 'k@example.com'))).status).toBe(200);
+    expect((await post(created.body.id, staleBounce('re-12', 'k@example.com'))).status).toBe(200);
 
     const otherSecret = `whsec_${randomBytes(24).toString('base64')}`;
     const otherKey = `re_${randomBytes(18).toString('base64url')}`;
@@ -588,8 +624,8 @@ describe('Resend events endpoint registration', () => {
       'DELETE https://api.resend.com/webhooks/wh_123 old',
       'POST https://api.resend.com/webhooks new',
     ]);
-    expect((await post(created.body.id, bounceEvent('re-13', 'l@example.com'))).status).toBe(400);
-    expect((await post(created.body.id, bounceEvent('re-13', 'l@example.com'), { secret: otherSecret })).status).toBe(200);
+    expect((await post(created.body.id, staleBounce('re-13', 'l@example.com'))).status).toBe(400);
+    expect((await post(created.body.id, staleBounce('re-13', 'l@example.com'), { secret: otherSecret })).status).toBe(200);
 
     // A rename without a new key calls nothing at Resend.
     const quiet = fakeResend({});
@@ -625,8 +661,8 @@ describe('Resend events endpoint registration', () => {
     const second = `whsec_${randomBytes(24).toString('base64')}`;
     await h.call({ method: 'PUT', path, key: W.key, body: { signing_secret: SECRET } });
     await h.call({ method: 'PUT', path, key: W.key, body: { signing_secret: second } });
-    expect((await post(created.body.id, bounceEvent('re-11', 'j@example.com'))).status).toBe(400);
-    expect((await post(created.body.id, bounceEvent('re-11', 'j@example.com'), { secret: second })).status).toBe(200);
+    expect((await post(created.body.id, staleBounce('re-11', 'j@example.com'))).status).toBe(400);
+    expect((await post(created.body.id, staleBounce('re-11', 'j@example.com'), { secret: second })).status).toBe(200);
 
     const audit = await h.sql<{ action: string; details: string }[]>`
       SELECT action, details::text AS details FROM audit_log WHERE target_id = ${created.body.id} ORDER BY created_at`;

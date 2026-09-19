@@ -22,6 +22,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 const ResendEvent = z.object({
   type: z.string().min(1).max(100),
+  /** When Resend created the event; the same on every delivery attempt, unlike `svix-timestamp`. */
+  created_at: z.string().optional(),
   data: z
     .object({
       email_id: z.string().min(1).max(200).optional(),
@@ -52,6 +54,28 @@ export type ProviderEventsDeps = {
 const ACTOR = (type: string) => ({ type: 'system' as const, reason: `Resend ${type}` });
 
 /**
+ * How long an event naming an unknown email is retried: Resend can report a
+ * bounce before the worker has recorded the send's message id, and a redelivery
+ * a few seconds later finds it.
+ */
+export const UNMATCHED_RETRY_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Whether an event is young enough to be redelivered, by its own `created_at`
+ * (Svix signs each attempt afresh, so the header timestamp always looks new).
+ * A missing or unreadable `created_at` counts as old: acknowledged, never acted on.
+ */
+export function isYoungEvent(createdAt: string | undefined, now = Date.now()): boolean {
+  if (!createdAt) return false;
+  const at = Date.parse(createdAt);
+  if (Number.isNaN(at)) return false;
+  return now - at < UNMATCHED_RETRY_WINDOW_MS;
+}
+
+/** Unwinds the event's transaction without recording it, so a redelivery is processed afresh. */
+class NotYetMatched extends Error {}
+
+/**
  * `POST /providers/:id/events/resend`: where Resend posts a provider's events.
  * Public and outside /v1, like the Stripe webhook: Resend holds no API key, the
  * signature is the credential.
@@ -69,10 +93,12 @@ const ACTOR = (type: string) => ({ type: 'system' as const, reason: `Resend ${ty
  *    `email.complained` as `complained`, on every topic, and emits
  *    `contact.bounced`. The message is found by Resend's email id, within this
  *    provider and workspace; the address blocked is the one the message went
- *    to. An event for an email the service did not send through this provider
- *    (another workspace or system sharing the Resend account) is counted on the
- *    provider (`events.unmatched`) and logged, never acted on: a wrong block
- *    costs a real person their mail. `email.delivery_delayed`, transient
+ *    to. An event for an unknown email younger than an hour (by its own
+ *    `created_at`) answers 503 and records nothing, so Resend redelivers it once
+ *    the worker has recorded the send. An older one (another workspace or system
+ *    sharing the Resend account) is counted on the provider (`events.unmatched`)
+ *    and logged as `ignored`, never acted on: a wrong block costs a real person
+ *    their mail. `email.delivery_delayed`, transient
  *    bounces and every other type are acknowledged and ignored.
  *
  * A processing failure answers 500, so Resend retries on its schedule.
@@ -108,7 +134,9 @@ export function providerEventRoutes(sql: Sql, deps: ProviderEventsDeps) {
     const emailId = event.data.email_id ?? null;
     const workspaceId = provider.workspace_id;
 
-    const result = (await sql.begin(async (tx) => {
+    let result: { duplicate: boolean; outcome: ProviderEventOutcome | null };
+    try {
+      result = (await sql.begin(async (tx) => {
       const r = repos(tx);
       const claimed = await r.providerEvents.claim(workspaceId, { providerId: provider.id, externalId, type: event.type, providerMessageId: emailId });
       if (!claimed) return { duplicate: true as const, outcome: await r.providerEvents.outcomeOf(provider.id, externalId) };
@@ -123,11 +151,14 @@ export function providerEventRoutes(sql: Sql, deps: ProviderEventsDeps) {
             diagnostic: action.diagnostic,
             actor: ACTOR(event.type),
           });
+        } else if (isYoungEvent(event.created_at)) {
+          // The worker may not have recorded this send yet: roll back (the
+          // claim included) and let Resend redeliver.
+          throw new NotYetMatched();
         } else {
           // Not a message this provider sent through the service: another
           // workspace or system may share the Resend account, and a wrong block
           // costs a real person their mail. Counted and logged, never acted on.
-          outcome = 'unmatched';
           await r.providers.countUnmatchedEvent(workspaceId, provider.id);
           log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} names email ${emailId ?? '(none)'}, which this provider never sent; ignored`);
         }
@@ -135,6 +166,12 @@ export function providerEventRoutes(sql: Sql, deps: ProviderEventsDeps) {
       }
       return { duplicate: false as const, outcome };
     })) as { duplicate: boolean; outcome: ProviderEventOutcome | null };
+    } catch (err) {
+      if (!(err instanceof NotYetMatched)) throw err;
+      log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} names email ${emailId}, not recorded yet; asking Resend to redeliver`);
+      c.header('retry-after', '60');
+      return c.json({ error: 'the email this event names is not recorded yet; retry' }, 503);
+    }
 
     if (!result.duplicate) {
       if (!action) log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} acknowledged, nothing to do`);
