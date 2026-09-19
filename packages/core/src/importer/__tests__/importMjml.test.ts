@@ -51,7 +51,15 @@ describe('sources that cannot be imported', () => {
     expect(err.column).toBe(3);
   });
 
-  it('mj-include inside content is only text, and is kept as such', () => {
+  it('mj-include inside content is refused too, with where it is (never left for the parser to judge)', () => {
+    const err = failure('<mjml><mj-body><mj-section><mj-column>\n<mj-raw><p>x</p>\n  <mj-include path="/etc/passwd" type="html" /></mj-raw>\n</mj-column></mj-section></mj-body></mjml>');
+    expect(err.code).toBe('include_not_supported');
+    expect(err.line).toBe(3);
+    expect(err.column).toBe(3);
+    expect(failure(column('<mj-text>< MJ-INCLUDE path="x"></mj-text>')).code).toBe('include_not_supported');
+  });
+
+  it('an escaped mj-include inside content is only text, and is kept as such', () => {
     const { document } = importMjml(column('<mj-raw><p>&lt;mj-include&gt; is a tag</p></mj-raw>'));
     expect(JSON.stringify(document)).toContain('mj-include');
   });

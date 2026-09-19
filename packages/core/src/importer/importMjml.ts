@@ -793,7 +793,9 @@ class Importer {
     }
     let html = '';
     try {
-      html = mjml2html(serialize(this.root), { validationLevel: 'skip', minify: false, keepComments: true }).html;
+      // Never resolve <mj-include>: its path is read from the server's disk.
+      // The scan already refused every include; this is the second lock.
+      html = mjml2html(serialize(this.root), { ignoreIncludes: true, validationLevel: 'skip', minify: false, keepComments: true }).html;
     } catch {
       html = '';
     }

@@ -48,6 +48,17 @@ export function scanMjml(source: string, endingTags: ReadonlySet<string>): void 
     throw new MjmlImportError('too_large', `The MJML is larger than ${MAX_MJML_BYTES} bytes.`);
   }
   const at = locator(source);
+  // mj-include anywhere, content included, is refused before anything else:
+  // the service refuses every stored document that mentions one, and the
+  // parser must never be the one to decide whether it is "only text".
+  const include = /<\s*mj-include\b/i.exec(source);
+  if (include) {
+    throw new MjmlImportError(
+      'include_not_supported',
+      'mj-include is not supported: an import has no files to include. Paste the included MJML in its place.',
+      at(include.index),
+    );
+  }
   const fail = (code: 'invalid_xml' | 'not_mjml' | 'include_not_supported' | 'too_deep' | 'too_many_elements', message: string, index: number): never => {
     throw new MjmlImportError(code, message, at(index));
   };

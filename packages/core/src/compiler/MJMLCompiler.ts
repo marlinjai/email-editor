@@ -195,6 +195,17 @@ export class MJMLCompiler {
     }
 
     // Default attributes: the imported document's own, or the editor's.
+    //
+    // SECURITY: `mjmlHead.attributes` and `mjmlHead.headRaw` (like a Raw
+    // block's html and a body-level raw section) are emitted verbatim, by
+    // design: they carry MJML the editor cannot model. They are not escaped,
+    // so they can close their element and open another, including
+    // `<mj-include>`, whose path mjml-core would read from the server's disk.
+    // The defence is two layers, both required: `compile` passes
+    // `ignoreIncludes: true` to mjml, and the mail service's validateDocument
+    // refuses any document that contains `<mj-include` at all. Attribute
+    // values (`extraAttributes`, `bodyAttributes`) are quote-escaped and their
+    // names restricted by the schema, so they cannot leave their attribute.
     const mjmlHead: MjmlHead | undefined = metadata.mjmlHead;
     const attributes = mjmlHead?.attributes ?? DEFAULT_MJML_ATTRIBUTES;
     if (attributes.trim()) parts.push(`<mj-attributes>${attributes}</mj-attributes>`);
@@ -274,6 +285,7 @@ export class MJMLCompiler {
 
     // Markup that sat directly in mj-body of an imported document: its raw
     // blocks go back there, unwrapped, as long as the section holds nothing else.
+    // Emitted verbatim like every Raw block: see the SECURITY note in generateHead.
     if (section.bodyRaw) {
       const blocks = section.columns.flatMap((c) => c.blocks).filter((b) => !b.hidden);
       if (blocks.every((b) => b.type === 'raw') && section.columns.every((c) => !c.subColumns?.length)) {
