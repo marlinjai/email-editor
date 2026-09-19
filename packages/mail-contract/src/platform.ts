@@ -188,6 +188,12 @@ export type MailingAudienceFromSegment = z.infer<typeof MailingAudienceFromSegme
 
 export const SIGNUP_FORM_FIELDS = ['first_name', 'last_name'] as const;
 
+/**
+ * The languages the hosted pages (signup, confirmation, unsubscribe) are
+ * written in: a signup form's `translations` may only use these keys.
+ */
+export const HOSTED_PAGE_LOCALES = ['en', 'de', 'it', 'fr', 'es'] as const;
+
 /** Per-locale copy of a form, for the hosted page's languages. */
 export const SignupFormTranslation = z.object({
   title: z.string().min(1).max(120),

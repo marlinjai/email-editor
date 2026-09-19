@@ -6,6 +6,7 @@ import { mail } from '@/lib/mail';
 import { can } from '@/lib/roles';
 import { workspaceContext } from '@/lib/workspace';
 import { EraseContact } from './erase';
+import { ContactTags } from './tags';
 
 export const metadata: Metadata = { title: 'Contact' };
 
@@ -25,9 +26,15 @@ export default async function ContactPage({ params }: { params: Promise<{ ws: st
     );
   }
   const c = contact.data;
-  const [messages, suppressions] = await Promise.all([
+  const [messages, suppressions, tags] = await Promise.all([
     act('contacts.messages', async () => (await mail(ws)).api.contacts.messages(id, { limit: 50 })),
     act('suppressions.list', async () => (await (await mail(ws)).api.suppressions.list({ email: c.email, limit: 20 })).data),
+    act('tags.list', async () => {
+      const { api } = await mail(ws);
+      const all = [];
+      for await (const t of api.paginate('tags.list', { query: { limit: 100 } })) all.push(t);
+      return all;
+    }),
   ]);
   const props = Object.entries(c.properties);
   return (
@@ -71,6 +78,16 @@ export default async function ContactPage({ params }: { params: Promise<{ ws: st
               ))
             )}
           </p>
+        </div>
+        <div className="sm:col-span-4">
+          <p className="text-faint">Tags</p>
+          <div className="mt-1">
+            {tags.ok ? (
+              <ContactTags ws={ws} contactId={c.id} tags={c.tags} all={tags.data} canWrite={can(role, 'write')} />
+            ) : (
+              <span className="text-warn">The workspace&apos;s tags could not be loaded: {tags.error.message}</span>
+            )}
+          </div>
         </div>
         {props.length > 0 ? (
           <div className="sm:col-span-4">

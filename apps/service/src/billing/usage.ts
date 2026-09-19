@@ -1,6 +1,7 @@
 import {
   USAGE_METRICS,
   USAGE_WARNING_RATIO,
+  formatUsageWarningHeader,
   type PlanFeature,
   type Usage,
   type UsageMetric,
@@ -69,8 +70,7 @@ export async function computeUsage(db: Db, workspaceId: string, now: Date = new 
 
 /** The `x-mail-usage-warning` value (`messages=8200/10000,...`), or null when nothing is at 80 percent. */
 export function usageWarningHeader(usage: Usage): string | null {
-  if (usage.warnings.length === 0) return null;
-  return usage.warnings.map((w) => `${w.metric}=${w.used}/${w.limit}`).join(',');
+  return formatUsageWarningHeader(usage.warnings);
 }
 
 function limitReached(message: string, details: Record<string, unknown>): never {

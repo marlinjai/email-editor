@@ -12,6 +12,12 @@ export const AbVariant = z.object({
   subject: z.string().min(1).max(998).optional(),
   /** Replaces the mailing's document for this variant. */
   document: z.record(z.unknown()).optional(),
+  /**
+   * Keeps the document this variant key already has in the mailing's current
+   * test, so a test can be changed without sending every document again. The
+   * service refuses it (`validation_failed`) when that variant has none.
+   */
+  keep_document: z.literal(true).optional(),
 });
 export type AbVariant = z.infer<typeof AbVariant>;
 
@@ -35,8 +41,12 @@ export const AbTestConfig = z
     decide_after_minutes: z.number().int().min(15).max(10_080).optional(),
   })
   .refine((c) => new Set(c.variants.map((v) => v.key)).size === c.variants.length, 'variant keys must be unique')
-  .refine((c) => c.variants.every((v) => v.subject !== undefined || v.document !== undefined), {
+  .refine((c) => c.variants.every((v) => v.subject !== undefined || v.document !== undefined || v.keep_document === true), {
     message: 'every variant changes the subject, the document or both',
+    path: ['variants'],
+  })
+  .refine((c) => c.variants.every((v) => !(v.document !== undefined && v.keep_document === true)), {
+    message: 'a variant sends a new document or keeps its current one, not both',
     path: ['variants'],
   })
   .refine((c) => (c.winner_metric === 'manual') === (c.decide_after_minutes === undefined), {
@@ -71,3 +81,13 @@ export type AbTestState = z.infer<typeof AbTestState>;
 export const AbWinnerRequest = z.object({ variant: z.string().regex(/^[a-z]$/) });
 export type AbWinnerRequest = z.infer<typeof AbWinnerRequest>;
 
+
+/**
+ * How many of `total` recipients go into an A/B test's test group: the
+ * fraction, rounded up, at least one per variant, at most everyone. The rest
+ * wait for the winner. The service splits by this, and a screen can state the
+ * numbers before a pick.
+ */
+export function testGroupSize(total: number, fraction: number, variants: number): number {
+  return Math.min(total, Math.max(variants, Math.ceil(total * fraction)));
+}

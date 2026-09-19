@@ -14,11 +14,21 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(import.meta.dirname, '../..'),
   poweredByHeader: false,
   experimental: {
+    // Both limits are global: Next.js has no per-action body limit, and the
+    // proxy's is one setting for every route. Only the CSV import needs 52 MB
+    // (MAX_IMPORT_BYTES, 50 MB, plus multipart overhead); image uploads need 12.
+    // A separate upload route outside the proxy could carry the large limit
+    // alone, but it would skip the auth-brain gate (second factor, the `mail`
+    // grant) and need a second, hand-written session check, so the larger
+    // global limit is the safer trade: the proxy may buffer up to 52 MB of one
+    // request before the gate refuses it, per request, and every server
+    // action still needs a signed-in session before it reads anything.
     serverActions: {
-      // Image uploads (up to 10 MB, MAX_ASSET_BYTES) and template documents
-      // (up to 1 MB) pass through server actions.
-      bodySizeLimit: '12mb',
+      bodySizeLimit: '52mb',
     },
+    // The proxy (src/proxy.ts) buffers at most this much of a body (10 MB by
+    // default) and passes a truncated body on silently, so it matches the above.
+    proxyClientMaxBodySize: '52mb',
   },
   async headers() {
     return [

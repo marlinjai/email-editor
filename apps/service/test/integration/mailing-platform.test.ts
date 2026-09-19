@@ -385,6 +385,29 @@ describe('A/B tests', () => {
     // Everyone was in the test group: nothing is held, so it finished without a pick.
     expect(await mailingStatus(h, W.id, mailing.id)).toBe('sent');
   });
+
+  it('keep_document changes a test without sending its documents again, and needs one to keep', async () => {
+    const { mailing } = await setup(4);
+    expect((await setAb(mailing.id, abConfig({ test_fraction: 1, variants: [{ key: 'a', document: newsletter('Kept news') }, { key: 'b', subject: 'B' }] }))).status).toBe(200);
+    // Changed: a new subject for b, a's content kept as it is.
+    const changed = await setAb(mailing.id, abConfig({ test_fraction: 1, variants: [{ key: 'a', keep_document: true }, { key: 'b', subject: 'B, changed' }] }));
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+    expect(changed.body.ab_test.variants).toEqual([
+      { key: 'a', subject: null, has_document: true },
+      { key: 'b', subject: 'B, changed', has_document: false },
+    ]);
+    // b has no document of its own: nothing to keep.
+    const refused = await setAb(mailing.id, abConfig({ variants: [{ key: 'a', keep_document: true }, { key: 'b', keep_document: true }] }));
+    expect(refused.status).toBe(400);
+    expect(refused.body.error.details.issues).toEqual([{ path: ['variants', 1, 'keep_document'], message: 'this variant has no document of its own' }]);
+    // Both a new document and keep: refused by the contract.
+    expect((await setAb(mailing.id, abConfig({ variants: [{ key: 'a', keep_document: true, document: newsletter('x') }, { key: 'b', subject: 'y' }] }))).status).toBe(400);
+
+    await action(h, W, mailing.id, 'send');
+    await makeWorker(h).drain();
+    expect(h.transport.sent.filter((m) => m.html.includes('Kept news'))).toHaveLength(2);
+    expect(h.transport.sent.filter((m) => m.subject === 'B, changed')).toHaveLength(2);
+  });
 });
 
 describe('tracking off (the default, and the ŌPUNTIA setting)', () => {

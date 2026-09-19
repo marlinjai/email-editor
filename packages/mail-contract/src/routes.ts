@@ -97,7 +97,7 @@ import {
   TrackingSettings,
 } from './platform';
 import { Invite, InviteAccept, InviteAccepted, InviteCreate, InviteCreated, InviteListQuery } from './invites';
-import { CheckoutRequest, CheckoutSession, Plan, PortalRequest, PortalSession, Subscription, Usage } from './billing';
+import { CatalogPlan, CheckoutRequest, CheckoutSession, PortalRequest, PortalSession, Subscription, Usage } from './billing';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -1074,7 +1074,7 @@ export const billingRoutes = {
   'billing.plans': {
     method: 'GET',
     path: '/v1/billing/plans',
-    response: z.object({ data: z.array(Plan) }),
+    response: z.object({ data: z.array(CatalogPlan) }),
     status: 200,
     access: 'read',
     phase: 'S5',

@@ -9,7 +9,9 @@
  * neutral and never names the service's own brand as the sender.
  */
 
-export const PAGE_LOCALES = ['en', 'de', 'it', 'fr', 'es'] as const;
+import { HOSTED_PAGE_LOCALES } from '@marlinjai/mail-contract';
+
+export const PAGE_LOCALES = HOSTED_PAGE_LOCALES;
 export type PageLocale = (typeof PAGE_LOCALES)[number];
 
 const en = {

@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-/** Sub-navigation for settings: a row of links, the current one marked. */
-export function SettingsTabs({ tabs }: { tabs: Array<{ href: string; label: string }> }) {
+/** Sub-navigation within an area (settings, contacts): a row of links, the current one marked. The first tab matches its path exactly. */
+export function SubTabs({ label, tabs }: { label: string; tabs: Array<{ href: string; label: string }> }) {
   const pathname = usePathname();
   return (
-    <nav aria-label="Settings" className="-mx-1 flex gap-1 overflow-x-auto border-b border-line">
+    <nav aria-label={label} className="-mx-1 flex gap-1 overflow-x-auto border-b border-line">
       {tabs.map((tab, i) => {
         const active = i === 0 ? pathname === tab.href : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (

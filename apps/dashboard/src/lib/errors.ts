@@ -1,4 +1,5 @@
 import { MailApiError, MailNetworkError, MailResponseValidationError, MailTimeoutError, type ErrorCode } from '@marlinjai/mail-sdk';
+import { BILLING_NOT_CONFIGURED, isBillingNotConfigured } from './billing-state';
 import type { ActionError } from './result';
 
 /**
@@ -63,17 +64,21 @@ function fieldErrors(details: Record<string, unknown> | undefined): Record<strin
   return out;
 }
 
+function messageFor(err: MailApiError): string {
+  const base = MESSAGES[err.code] ?? MESSAGES.internal_error;
+  // `already_exists` names what exists ("the slug news"); the service says it best.
+  if (err.code === 'already_exists' && err.message) return `${err.message} Choose another.`;
+  // The service names the plan, the limit and what to do; the screen adds the way to Billing.
+  if (err.code === 'plan_limit_reached' && err.message) return err.message;
+  if (isBillingNotConfigured(err.code, err.details)) return BILLING_NOT_CONFIGURED;
+  if (SERVICE_MESSAGE_WINS.has(err.code) && err.message) return `${base} ${err.message}`;
+  return base;
+}
+
 /** Turns anything a mail service call can throw into what the screen shows. */
 export function describeError(err: unknown): ActionError {
   if (err instanceof MailApiError) {
-    const base = MESSAGES[err.code] ?? MESSAGES.internal_error;
-    // `already_exists` names what exists ("the slug news"); the service says it best.
-    const message =
-      err.code === 'already_exists' && err.message
-        ? `${err.message} Choose another.`
-        : SERVICE_MESSAGE_WINS.has(err.code) && err.message
-          ? `${base} ${err.message}`
-          : base;
+    const message = messageFor(err);
     return {
       code: err.code,
       message,
