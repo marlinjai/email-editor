@@ -829,3 +829,142 @@ describe('workspace erasure', () => {
     expect(seen.at(-1)).toBe('DELETE https://api.resend.com/webhooks/wh_123 true');
   });
 });
+
+// The provider-wide bounce breaker, and exact reverts
+
+describe('provider-wide bounce breaker', () => {
+  const ALIKE = (i: number) => `550 5.1.1 <one${i}@example.com>: Recipient address rejected: User unknown in local recipient table`;
+
+  async function setup() {
+    const s = await seedSending(h, W.id);
+    // A mailing still sending while the streak builds up (nothing drains it until later).
+    const others = [];
+    for (let i = 0; i < 3; i++) others.push(await seedContact(h, W.id, s.topic.id, { email: `other${i}@example.com` }));
+    const active = await mailingTo(s, others.map((c) => c.id));
+    const draft = await createMailing(h, W, { topic: s.topic.slug, provider_id: s.provider.id });
+    return { s, active, draft };
+  }
+
+  const testSend = (mailingId: string, to: string) => h.call({ method: 'POST', path: `/v1/mailings/${mailingId}/test`, key: W.key, body: { to } });
+
+  /** Five test sends refused alike: the fifth trips the provider's breaker. */
+  async function tripByTestSends(draftId: string, prefix = 'one') {
+    for (let i = 0; i < 5; i++) {
+      h.transport.failNextWith(new PermanentSendError(ALIKE(i), 550));
+      const res = await testSend(draftId, `${prefix}${i}@example.com`);
+      expect(res.status, JSON.stringify(res.body)).toBe(502);
+    }
+  }
+
+  /** A one-to-one mailing, sent and drained. */
+  async function onePerson(s: Awaited<ReturnType<typeof seedSending>>, email: string) {
+    const c = await seedContact(h, W.id, s.topic.id, { email });
+    const m = await mailingTo(s, [c.id]);
+    await drainUntilSettled(h, makeWorker(h), W.id, m.id);
+    return m;
+  }
+
+  it('forward: one-to-one sends with different replies keep blocking; four alike do not trip', async () => {
+    const { draft } = await setup();
+    for (let i = 0; i < 4; i++) {
+      h.transport.failNextWith(new PermanentSendError(ALIKE(i), 550));
+      await testSend(draft.id, `one${i}@example.com`);
+    }
+    h.transport.failNextWith(new PermanentSendError('550 5.1.1 <one4@example.com>: no such mailbox here', 550));
+    await testSend(draft.id, 'one4@example.com');
+    expect((await suppressionsOf(W.id)).map((x) => x.email).sort()).toEqual([0, 1, 2, 3, 4].map((i) => `one${i}@example.com`));
+    const provider = await h.call({ path: `/v1/providers/${draft.provider_id}`, key: W.key });
+    expect(provider.body.rejections.anomaly).toBeNull();
+    expect((await testSend(draft.id, 'fine@example.com')).status).toBe(200);
+  });
+
+  it('trip: five test sends refused alike undo the blocks exactly, pause active mailings, refuse test sends and starts', async () => {
+    const { s, active, draft } = await setup();
+    // one0 had unsubscribed from everything; a test send (which ignores blocks) hardens it to bounced.
+    await repos(h.sql).suppressions.create(W.id, { email: 'one0@example.com', reason: 'unsubscribed', topicId: null });
+    await tripByTestSends(draft.id);
+
+    // Exact revert: one0 is unsubscribed again, silently; one1 to one3 were created by the streak and are gone.
+    const blocks = await suppressionsOf(W.id);
+    expect(blocks.map((b) => [b.email, b.reason, b.replaced_reason])).toEqual([['one0@example.com', 'unsubscribed', null]]);
+    const reverted = (await eventsOf(h, W.id, 'contact.resubscribed')).map((e) => WebhookEvent.parse(e.payload));
+    expect(reverted.map((e) => (e.data as { email: string }).email).sort()).toEqual(['one1@example.com', 'one2@example.com', 'one3@example.com']);
+    for (const e of reverted) expect(e.data).toMatchObject({ source: 'bounce_reverted', topic: null });
+
+    const provider = await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key });
+    expect(provider.body.rejections.anomaly).toMatchObject({ scope: 'provider', blocking: true, sample: ALIKE(4) });
+    expect(Provider.safeParse(provider.body).success).toBe(true);
+
+    const pausedActive = await h.call({ path: `/v1/mailings/${active.id}`, key: W.key });
+    expect(pausedActive.body).toMatchObject({ status: 'paused' });
+    expect(pausedActive.body.pause_reason).toMatch(/provider's bounce circuit breaker/);
+
+    // Test sends, resumes and new sends are refused with a clear error until an admin clears it.
+    const refused = await testSend(draft.id, 'someone@example.com');
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe('provider_anomaly');
+    expect(refused.body.error.message).toMatch(/clear its anomaly/);
+    expect((await action(h, W, active.id, 'resume')).body.error.code).toBe('provider_anomaly');
+    const c = await seedContact(h, W.id, s.topic.id, { email: 'later@example.com' });
+    const fresh = await createMailing(h, W, { topic: s.topic.slug, provider_id: s.provider.id });
+    await addRecipients(h, W, fresh.id, [{ contact_id: c.id }]);
+    expect((await action(h, W, fresh.id, 'send')).body.error.code).toBe('provider_anomaly');
+
+    const audit = await h.sql<{ action: string }[]>`
+      SELECT action FROM audit_log WHERE workspace_id = ${W.id} AND action IN ('provider.bounces_halted', 'mailing.paused') ORDER BY created_at`;
+    expect(audit.map((a) => a.action).sort()).toEqual(['mailing.paused', 'provider.bounces_halted']);
+  });
+
+  it('resume: after an admin clears the anomaly, test sends, resumes and real bounces work again', async () => {
+    const { s, active, draft } = await setup();
+    await tripByTestSends(draft.id);
+
+    const cleared = await h.call({ method: 'POST', path: `/v1/providers/${s.provider.id}/clear-anomaly`, key: W.key });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.rejections.anomaly).toBeNull();
+    const audit = await h.sql<{ n: number }[]>`SELECT count(*)::int AS n FROM audit_log WHERE workspace_id = ${W.id} AND action = 'provider.anomaly_cleared'`;
+    expect(audit[0]!.n).toBe(1);
+
+    expect((await testSend(draft.id, 'fine@example.com')).status).toBe(200);
+    expect((await action(h, W, active.id, 'resume')).status).toBe(202);
+    await drainUntilSettled(h, makeWorker(h), W.id, active.id);
+    expect(await mailingStatus(h, W.id, active.id)).toBe('sent');
+
+    // A genuine bounce after the reset blocks as usual: the old streak no longer counts.
+    h.transport.failNextWith(new PermanentSendError(ALIKE(9), 550));
+    await testSend(draft.id, 'one9@example.com');
+    expect((await suppressionsOf(W.id)).map((x) => x.email)).toEqual(['one9@example.com']);
+  });
+
+  it('re-entry: after a clear, five one-to-one mailings refused alike trip it again, at the fifth', async () => {
+    const { s, draft } = await setup();
+    await tripByTestSends(draft.id);
+    await h.call({ method: 'POST', path: `/v1/providers/${s.provider.id}/clear-anomaly`, key: W.key });
+    // The mailing that was sending is paused; the one-to-one mailings run on their own.
+    for (let i = 0; i < 4; i++) {
+      h.transport.failNextWith(new PermanentSendError(ALIKE(10 + i), 550));
+      await onePerson(s, `solo${i}@example.com`);
+    }
+    expect((await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key })).body.rejections.anomaly).toBeNull();
+    expect(await suppressionsOf(W.id)).toHaveLength(4);
+    h.transport.failNextWith(new PermanentSendError(ALIKE(14), 550));
+    await onePerson(s, 'solo4@example.com');
+    const provider = await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key });
+    expect(provider.body.rejections.anomaly).toMatchObject({ scope: 'provider', blocking: true });
+    expect(await suppressionsOf(W.id)).toEqual([]);
+  });
+
+  it("tenancy: B cannot clear A's anomaly; a revoked key and a send-scoped key are refused", async () => {
+    const { s, draft } = await setup();
+    await tripByTestSends(draft.id);
+    const B = await h.seedWorkspace('bounce-b3');
+    const path = `/v1/providers/${s.provider.id}/clear-anomaly`;
+    expect((await h.call({ method: 'POST', path, key: B.key })).status).toBe(404);
+    const minted = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, body: { name: 'short-lived' } });
+    await h.call({ method: 'DELETE', path: `/v1/api-keys/${minted.body.api_key.id}`, key: W.key });
+    expect((await h.call({ method: 'POST', path, key: minted.body.key })).status).toBe(401);
+    const send = await h.call({ method: 'POST', path: '/v1/api-keys', key: W.key, body: { name: 'send', scope: 'send' } });
+    expect((await h.call({ method: 'POST', path, key: send.body.key })).status).toBe(403);
+    expect((await h.call({ path: `/v1/providers/${s.provider.id}`, key: W.key })).body.rejections.anomaly.blocking).toBe(true);
+  });
+});

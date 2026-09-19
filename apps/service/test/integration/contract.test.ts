@@ -159,6 +159,7 @@ describe('contract conformance, S2 providers, topics, contacts and suppressions'
     const { appOver } = await import('../support/app-call.js');
     const offline = appOver(h, { providerFetch: (async () => { throw new TypeError('offline'); }) as unknown as typeof fetch });
     await run('providers.verify', await offline.call({ method: 'POST', path: `/v1/providers/${provider.body.id}/verify`, key }));
+    await run('providers.clearAnomaly', await h.call({ method: 'POST', path: `/v1/providers/${provider.body.id}/clear-anomaly`, key }));
     await run('providers.setEventsSecret', await h.call({
       method: 'PUT',
       path: `/v1/providers/${provider.body.id}/events-secret`,
