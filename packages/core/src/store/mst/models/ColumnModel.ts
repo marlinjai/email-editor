@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { BlockModel, BlockInstance, BlockSnapshotIn, BlockType } from './BlockModel';
 import { SubColumnModel, createSubColumn } from './SubColumnModel';
 import { paddingIn, paddingOut } from './spacingSnapshot';
+import { COLUMN_DEFAULTS, dropFilled, fillDefaults, type Filled } from './filledDefaults';
 import type { CSSProperties } from '../types';
 import type { BackgroundGradient } from '../../../schema/gradient';
 import { buildGradientCSS } from '../../../schema/gradient';
@@ -37,6 +38,8 @@ const ColumnModelBase = types
     subColumns: types.optional(types.array(types.late(() => SubColumnModel)), []),
     /** MJML attributes the inspector has no control for (kept from an import). */
     extraAttributes: types.maybe(types.frozen<Record<string, string>>()),
+    /** Defaults the store filled when it opened the node; they go back out only if changed (see `filledDefaults.ts`). */
+    filled: types.maybe(types.frozen<Filled>()),
   })
   .preProcessSnapshot((snapshot: any) => {
     if (
@@ -314,12 +317,13 @@ const ColumnModelBase = types
   }));
 
 /**
- * ColumnModel: the column model with its padding mapped between the schema's
+ * ColumnModel: the column model with its filled defaults dropped again on the
+ * way out (`filledDefaults.ts`) and its padding mapped between the schema's
  * `padding` object and the store's flat fields (see `spacingSnapshot.ts`).
  */
 export const ColumnModel: typeof ColumnModelBase = ColumnModelBase.preProcessSnapshot((snapshot) =>
-  paddingIn(snapshot)
-).postProcessSnapshot((snapshot) => paddingOut(snapshot)) as unknown as typeof ColumnModelBase;
+  fillDefaults(paddingIn(snapshot), COLUMN_DEFAULTS)
+).postProcessSnapshot((snapshot) => paddingOut(dropFilled(snapshot))) as unknown as typeof ColumnModelBase;
 
 export type ColumnInstance = Instance<typeof ColumnModel>;
 export type ColumnSnapshotIn = SnapshotIn<typeof ColumnModel>;

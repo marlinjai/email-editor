@@ -29,8 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The editor dropped every `padding` object when it opened a document, and its
-  own padding edits never reached the compiled mail.
+- The editor now gives back exactly the document it was given. It dropped
+  every `padding` object when it opened a document (and its own padding edits
+  never reached the compiled mail), made every column without a width 100%
+  wide, gave an untitled document the title "Untitled Template", added the
+  fields of every block type to each block, and turned ISO date strings into
+  numbers.
 - The compiler wrote only the padding sides that were set, so `{ top, bottom }`
   was read by MJML as vertical and horizontal padding; it now writes all four.
 

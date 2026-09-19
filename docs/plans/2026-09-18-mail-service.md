@@ -962,11 +962,26 @@ MJML, and also export as MJML or as HTML". Branch `feat/mjml-import-export`.
   editor cannot hold as a block is compiled in place, with the whole source, and
   kept as a Raw HTML block holding exactly that output; it is a `kept_as_html`
   warning with the MJML fragment.
-- **Found and fixed on the way.** The editor's store dropped every `padding`
-  object when it opened a document, and its own padding edits never reached the
-  compiler; padding now maps at the snapshot boundary like navbar links. The
-  compiler wrote only the padding sides that were set, so `{ top, bottom }`
-  became MJML's two-value shorthand; it now writes all four.
+- **Found and fixed on the way: the editor's store did not give back the
+  document it was given.** Asked by the orchestrator to sweep the whole class.
+  The store dropped every `padding` object when it opened a document, and its
+  own padding edits never reached the compiler; padding now maps at the
+  snapshot boundary like navbar links. It also filled defaults on the way in
+  and never took them out: every column without a width became 100% wide (two
+  such columns compiled as two stacked full-width columns), an untitled
+  document gained the title "Untitled Template" (which reached the mail as
+  `<mj-title>`), every block carried the fields of all 14 block types, and
+  dates written as ISO strings came back as numbers. The boundary is now
+  symmetric (`filledDefaults.ts`): what the store fills is recorded and dropped
+  again on the way out unless edited, columns without a width take MJML's even
+  share inside the store, and dates keep how they were written.
+  `document-roundtrip.test.ts` opens every block type (fully populated and with
+  only its required fields), sections, columns, sub-columns, gradients and
+  metadata in the store and asserts the snapshot deep-equals the input, also
+  after an edit and an undo. The only addition is the template id the store
+  assigns to a document without one. Separately, the compiler wrote only the
+  padding sides that were set, so `{ top, bottom }` became MJML's two-value
+  shorthand; it now writes all four.
 - **Round-trip corpus** (`packages/core/src/importer/__tests__/corpus.test.ts`).
   All 35 prebuilt sections: export, import, export gives byte-identical MJML and
   HTML, no warning of severity `warning`, and a second pass gives the same

@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { ColumnModel, ColumnInstance, ColumnSnapshotIn, createColumn } from './ColumnModel';
 import { BlockInstance } from './BlockModel';
 import { paddingIn, paddingOut } from './spacingSnapshot';
+import { SECTION_DEFAULTS, dropFilled, fillColumnWidths, fillDefaults, type Filled } from './filledDefaults';
 import type { CSSProperties } from '../types';
 import type { BackgroundGradient } from '../../..';
 import { buildGradientCSS } from '../../..';
@@ -64,6 +65,9 @@ const SectionModelBase = types
 
     /** MJML attributes the inspector has no control for (kept from an import). */
     extraAttributes: types.maybe(types.frozen<Record<string, string>>()),
+
+    /** Defaults the store filled when it opened the node; they go back out only if changed (see `filledDefaults.ts`). */
+    filled: types.maybe(types.frozen<Filled>()),
   })
   .actions(self => ({
     /**
@@ -381,12 +385,14 @@ const SectionModelBase = types
   }));
 
 /**
- * SectionModel: the section model with its padding mapped between the
+ * SectionModel: the section model with its filled defaults dropped again on the
+ * way out, columns without a width sharing it evenly as in MJML
+ * (`filledDefaults.ts`), and its padding mapped between the
  * schema's `padding` object and the store's flat fields (see `spacingSnapshot.ts`).
  */
 export const SectionModel: typeof SectionModelBase = SectionModelBase.preProcessSnapshot((snapshot) =>
-  paddingIn(snapshot)
-).postProcessSnapshot((snapshot) => paddingOut(snapshot)) as unknown as typeof SectionModelBase;
+  fillDefaults(fillColumnWidths(paddingIn(snapshot)), SECTION_DEFAULTS)
+).postProcessSnapshot((snapshot) => paddingOut(dropFilled(snapshot))) as unknown as typeof SectionModelBase;
 
 export type SectionInstance = Instance<typeof SectionModel>;
 export type SectionSnapshotIn = SnapshotIn<typeof SectionModel>;
