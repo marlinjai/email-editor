@@ -123,3 +123,37 @@ describe('the section background', () => {
     expect(section.backgroundImage).toBe('https://i.example/s.png');
   });
 });
+
+describe('joining a neighbouring container without a drag', () => {
+  it('the container above: at its end; the one below: at its start', () => {
+    const store = createRootStore({
+      template: {
+        id: 'd',
+        version: '1.1',
+        metadata: {},
+        sections: [
+          { id: 'w1', type: 'wrapper', sections: [{ id: 'x', type: 'section', columns: [{ id: 'xc', blocks: [] }] }] },
+          { id: 's', type: 'section', columns: [{ id: 'sc', blocks: [] }] },
+          { id: 'w2', type: 'wrapper', sections: [{ id: 'y', type: 'section', columns: [{ id: 'yc', blocks: [] }] }] },
+        ],
+      } as never,
+    });
+    render(
+      <StoreProvider value={store}>
+        <SectionProperties section={store.template.getSectionById('s')!} />
+      </StoreProvider>
+    );
+    expect(screen.getByRole('button', { name: 'Add to the container below' })).toBeTruthy();
+    act(() => screen.getByRole('button', { name: 'Add to the container above' }).click());
+    expect(store.template.getWrapperById('w1')!.sections.map((x) => x.id)).toEqual(['x', 's']);
+    act(() => void store.undo());
+    cleanup();
+    render(
+      <StoreProvider value={store}>
+        <SectionProperties section={store.template.getSectionById('s')!} />
+      </StoreProvider>
+    );
+    act(() => screen.getByRole('button', { name: 'Add to the container below' }).click());
+    expect(store.template.getWrapperById('w2')!.sections.map((x) => x.id)).toEqual(['s', 'y']);
+  });
+});

@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, act, within } from '@testing-library/react';
 import { createRootStore } from '@marlinjai/email-editor-core';
 import { StoreProvider } from '../../store';
-import { LayersPanel } from '../LayersPanel';
+import { LayersPanel, layersCollision } from '../LayersPanel';
 
 afterEach(cleanup);
 
@@ -77,5 +77,36 @@ describe('the Layers panel shows wrappers with their sections one level in', () 
     });
     expect(screen.getByTestId('layers-end-w').textContent).toContain('Empty: drag a section here');
     expect(screen.getByTestId('layers-wrapper-w').textContent).toContain('Container (empty)');
+  });
+});
+
+describe('layersCollision', () => {
+  const rect = (top: number, height: number) => ({ top, height, bottom: top + height, left: 0, right: 200, width: 200 });
+  const containers = ['end', 'self'].map((id) => ({ id, data: { current: undefined }, disabled: false, key: id, node: { current: null }, rect: { current: null } }));
+  const droppableRects = new Map([
+    ['end', rect(354, 20)],
+    ['self', rect(378, 84)],
+  ]);
+
+  it('from the keyboard, the row whose top edge is nearest wins, however tall the dragged row is', () => {
+    const result = layersCollision({
+      active: { id: 'self' } as never,
+      collisionRect: rect(354, 84),
+      droppableRects: droppableRects as never,
+      droppableContainers: containers as never,
+      pointerCoordinates: null,
+    });
+    expect(result[0]!.id).toBe('end');
+  });
+
+  it('with a pointer, the row under the pointer wins', () => {
+    const result = layersCollision({
+      active: { id: 'self' } as never,
+      collisionRect: rect(340, 84),
+      droppableRects: droppableRects as never,
+      droppableContainers: containers as never,
+      pointerCoordinates: { x: 20, y: 400 },
+    });
+    expect(result[0]!.id).toBe('self');
   });
 });

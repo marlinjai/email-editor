@@ -86,16 +86,19 @@ export const SectionProperties = observer(function SectionProperties({
           </span>
         </div>
       ) : (
-        <button
-          type="button"
-          className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-          onClick={() => {
-            const w = template.wrapSection(section.id);
-            if (w) editorUI.selectWrapper(w.id);
-          }}
-        >
-          Wrap in container
-        </button>
+        <div className="space-y-1">
+          <button
+            type="button"
+            className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+            onClick={() => {
+              const w = template.wrapSection(section.id);
+              if (w) editorUI.selectWrapper(w.id);
+            }}
+          >
+            Wrap in container
+          </button>
+          <NeighbourContainers sectionId={section.id} />
+        </div>
       )}
 
       {section.columnsOverflow ? (
@@ -199,5 +202,39 @@ export const SectionProperties = observer(function SectionProperties({
         }}
       />
     </div>
+  );
+});
+
+/**
+ * A top-level section right next to a container can join it without a drag:
+ * at the end of the container above, or at the start of the one below.
+ */
+const NeighbourContainers = observer(function NeighbourContainers({ sectionId }: { sectionId: string }) {
+  const { template } = useStore();
+  const index = template.getSectionIndex(sectionId);
+  if (index === -1) return null;
+  const above = template.sections[index - 1];
+  const below = template.sections[index + 1];
+  return (
+    <>
+      {above && above.type === 'wrapper' ? (
+        <button
+          type="button"
+          className="w-full rounded border border-violet-200 px-2 py-1.5 text-xs text-violet-800 hover:bg-violet-50"
+          onClick={() => template.moveSectionTo(sectionId, { wrapperId: above.id, index: template.getWrapperById(above.id)!.sections.length })}
+        >
+          Add to the container above
+        </button>
+      ) : null}
+      {below && below.type === 'wrapper' ? (
+        <button
+          type="button"
+          className="w-full rounded border border-violet-200 px-2 py-1.5 text-xs text-violet-800 hover:bg-violet-50"
+          onClick={() => template.moveSectionTo(sectionId, { wrapperId: below.id, index: 0 })}
+        >
+          Add to the container below
+        </button>
+      ) : null}
+    </>
   );
 });

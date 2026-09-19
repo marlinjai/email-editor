@@ -181,7 +181,11 @@ const WrapperPanel = observer(function WrapperPanel({ wrapper }: { wrapper: Wrap
             ? undefined
             : { top: '20px', right: '0px', bottom: '20px', left: '0px' }
         }
-        hint="Unset, a container has 20px above and below, as in MJML."
+        hint={
+          wrapper.paddingTop || wrapper.paddingRight || wrapper.paddingBottom || wrapper.paddingLeft
+            ? 'A side left empty is 0.'
+            : 'Unset, a container has 20px above and below, as in MJML.'
+        }
         onChange={(side, value) => {
           const prop = `padding${side.charAt(0).toUpperCase()}${side.slice(1)}` as 'paddingTop';
           update({ [prop]: value });

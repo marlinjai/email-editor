@@ -9,12 +9,15 @@ import { ChevronRight, Eye, EyeOff, Trash2, GripVertical, Copy, Group, Ungroup, 
 import clsx from 'clsx';
 import {
   DndContext,
+  useDndContext,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -25,6 +28,26 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { isWrapperInstance, type WrapperInstance } from '@marlinjai/email-editor-core';
 import { flattenLayers, planLayerDrop, type LayerItem, type LayerRow } from './layersTree';
+
+/**
+ * Rows here differ a lot in height (a section row lists its columns and
+ * blocks), so the centre-to-centre rule would keep a tall dragged row "over"
+ * its own place. With a pointer, the row under the pointer wins; from the
+ * keyboard, the row whose top edge is nearest the dragged row's top edge.
+ */
+export const layersCollision: CollisionDetection = (args) => {
+  if (args.pointerCoordinates) {
+    const within = pointerWithin(args);
+    return within.length > 0 ? within : closestCenter(args);
+  }
+  const top = args.collisionRect.top;
+  return args.droppableContainers
+    .flatMap((container) => {
+      const rect = args.droppableRects.get(container.id);
+      return rect ? [{ id: container.id, data: { droppableContainer: container, value: Math.abs(rect.top - top) } }] : [];
+    })
+    .sort((a, b) => a.data.value - b.data.value);
+};
 
 export const LayersPanel = observer(function LayersPanel() {
   const { template, editorUI } = useStore();
@@ -86,7 +109,7 @@ export const LayersPanel = observer(function LayersPanel() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={layersCollision}
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
@@ -131,6 +154,7 @@ const SortableRow = observer(function SortableRow({
     transform,
     transition,
     isDragging,
+    isOver,
   } = useSortable({ id: row.id, disabled: row.kind === 'end' ? { draggable: true, droppable: false } : false });
 
   const style = {
@@ -139,19 +163,7 @@ const SortableRow = observer(function SortableRow({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  if (row.kind === 'end') {
-    const wrapper = template.getWrapperById(row.parent);
-    const empty = !wrapper || wrapper.sections.length === 0;
-    return (
-      <div ref={setNodeRef} style={style} className="ml-4 border-l-2 border-violet-300" data-testid={`layers-end-${row.parent}`}>
-        {empty ? (
-          <div className="px-3 py-1.5 text-xs italic text-text-dark-muted">Empty: drag a section here</div>
-        ) : (
-          <div className="h-1.5" aria-hidden="true" />
-        )}
-      </div>
-    );
-  }
+  if (row.kind === 'end') return <EndRow wrapperId={row.parent} setNodeRef={setNodeRef} style={style} isOver={isOver} />;
 
   if (row.kind === 'wrapper') {
     const wrapper = template.getWrapperById(row.id);
@@ -180,6 +192,42 @@ const SortableRow = observer(function SortableRow({
         onSelect={() => editorUI.selectSection(section.id)}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
+    </div>
+  );
+});
+
+/**
+ * Closes a container's sections: a drop just above it lands inside, at the
+ * end; a drop below it lands after the container. Tall enough to be a target
+ * for the pointer and for keyboard dragging (a thin row would lose to the
+ * dragged row's own place), and labelled while something is being dragged.
+ */
+const EndRow = observer(function EndRow({
+  wrapperId,
+  setNodeRef,
+  style,
+  isOver,
+}: {
+  wrapperId: string;
+  setNodeRef: (el: HTMLElement | null) => void;
+  style: React.CSSProperties;
+  isOver: boolean;
+}) {
+  const { template } = useStore();
+  const { active } = useDndContext();
+  const wrapper = template.getWrapperById(wrapperId);
+  const empty = !wrapper || wrapper.sections.length === 0;
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="ml-4 border-l-2 border-violet-300"
+      data-testid={`layers-end-${wrapperId}`}
+      data-over={isOver ? 'true' : undefined}
+    >
+      <div className={clsx('min-h-[20px] px-3 py-0.5 text-[11px] italic rounded', isOver ? 'bg-violet-100 text-violet-800' : 'text-text-dark-muted')}>
+        {empty ? 'Empty: drag a section here' : active ? 'End of container' : null}
+      </div>
     </div>
   );
 });
@@ -229,7 +277,9 @@ const WrapperItem = observer(function WrapperItem({
       >
         <ChevronRight size={14} className={clsx('transition-transform', !collapsed && 'rotate-90')} />
       </button>
-      <span className={clsx('flex-1 text-sm font-medium', wrapper.hidden && 'opacity-50')}>{wrapper.displayName}</span>
+      <span className={clsx('flex-1 min-w-0 truncate text-sm font-medium', wrapper.hidden && 'opacity-50')} title={wrapper.displayName}>
+        {wrapper.displayName}
+      </span>
       <RowButton
         label={wrapper.hidden ? 'Show container' : 'Hide container'}
         onClick={() => wrapper.toggleHidden()}
@@ -351,7 +401,7 @@ const SectionItem = observer(function SectionItem({
           />
         </button>
 
-        <span className={clsx('flex-1 text-sm', section.hidden && 'opacity-50')}>
+        <span className={clsx('flex-1 min-w-0 truncate text-sm', section.hidden && 'opacity-50')} title={section.displayName}>
           {section.displayName}
         </span>
 
