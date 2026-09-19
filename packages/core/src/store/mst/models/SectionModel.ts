@@ -3,6 +3,7 @@ import { types, Instance, SnapshotIn, SnapshotOut, destroy, detach } from 'mobx-
 import { nanoid } from 'nanoid';
 import { ColumnModel, ColumnInstance, ColumnSnapshotIn, createColumn } from './ColumnModel';
 import { BlockInstance } from './BlockModel';
+import { paddingIn, paddingOut } from './spacingSnapshot';
 import type { CSSProperties } from '../types';
 import type { BackgroundGradient } from '../../..';
 import { buildGradientCSS } from '../../..';
@@ -13,7 +14,7 @@ import { buildGradientCSS } from '../../..';
  * Sections are the top-level structural elements that contain columns.
  * Each section maps to an <mj-section> in MJML.
  */
-export const SectionModel = types
+const SectionModelBase = types
   .model('Section', {
     id: types.identifier,
     type: types.optional(types.literal('section'), 'section'),
@@ -53,6 +54,16 @@ export const SectionModel = types
 
     // Columns
     columns: types.array(ColumnModel),
+
+    /**
+     * Emit the section's raw blocks straight into mj-body instead of wrapping
+     * them in an mj-section (set by the MJML import for markup that sat
+     * directly in mj-body). Ignored once the section holds any other block.
+     */
+    bodyRaw: types.maybe(types.boolean),
+
+    /** MJML attributes the inspector has no control for (kept from an import). */
+    extraAttributes: types.maybe(types.frozen<Record<string, string>>()),
   })
   .actions(self => ({
     /**
@@ -368,6 +379,14 @@ export const SectionModel = types
       return `${count}-Column Section`;
     },
   }));
+
+/**
+ * SectionModel: the section model with its padding mapped between the
+ * schema's `padding` object and the store's flat fields (see `spacingSnapshot.ts`).
+ */
+export const SectionModel: typeof SectionModelBase = SectionModelBase.preProcessSnapshot((snapshot) =>
+  paddingIn(snapshot)
+).postProcessSnapshot((snapshot) => paddingOut(snapshot)) as unknown as typeof SectionModelBase;
 
 export type SectionInstance = Instance<typeof SectionModel>;
 export type SectionSnapshotIn = SnapshotIn<typeof SectionModel>;

@@ -3,6 +3,7 @@ import { types, Instance, SnapshotIn, SnapshotOut, destroy, detach, isStateTreeN
 import { nanoid } from 'nanoid';
 import { BlockModel, BlockInstance, BlockSnapshotIn, BlockType } from './BlockModel';
 import { SubColumnModel, createSubColumn } from './SubColumnModel';
+import { paddingIn, paddingOut } from './spacingSnapshot';
 import type { CSSProperties } from '../types';
 import type { BackgroundGradient } from '../../../schema/gradient';
 import { buildGradientCSS } from '../../../schema/gradient';
@@ -13,7 +14,7 @@ import { buildGradientCSS } from '../../../schema/gradient';
  * Columns contain blocks and have their own styling properties.
  * A section can have 1-4 columns.
  */
-export const ColumnModel = types
+const ColumnModelBase = types
   .model('Column', {
     id: types.identifier,
     width: types.optional(types.number, 100), // percentage (e.g., 50 for 50%)
@@ -34,6 +35,8 @@ export const ColumnModel = types
      * makes the inferred RootStore type exceed the compiler's serialization limit.
      */
     subColumns: types.optional(types.array(types.late(() => SubColumnModel)), []),
+    /** MJML attributes the inspector has no control for (kept from an import). */
+    extraAttributes: types.maybe(types.frozen<Record<string, string>>()),
   })
   .preProcessSnapshot((snapshot: any) => {
     if (
@@ -309,6 +312,14 @@ export const ColumnModel = types
       return attrs;
     },
   }));
+
+/**
+ * ColumnModel: the column model with its padding mapped between the schema's
+ * `padding` object and the store's flat fields (see `spacingSnapshot.ts`).
+ */
+export const ColumnModel: typeof ColumnModelBase = ColumnModelBase.preProcessSnapshot((snapshot) =>
+  paddingIn(snapshot)
+).postProcessSnapshot((snapshot) => paddingOut(snapshot)) as unknown as typeof ColumnModelBase;
 
 export type ColumnInstance = Instance<typeof ColumnModel>;
 export type ColumnSnapshotIn = SnapshotIn<typeof ColumnModel>;

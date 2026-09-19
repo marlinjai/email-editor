@@ -1,5 +1,6 @@
 // packages/core/src/store/mst/models/BlockModel.ts
 import { types, Instance, SnapshotIn, SnapshotOut, IAnyType } from 'mobx-state-tree';
+import { paddingIn, paddingOut } from './spacingSnapshot';
 import type { CSSProperties } from '../types';
 
 /**
@@ -155,6 +156,9 @@ const BlockModelBase = types
 
     // === Locked Blocks (Header/Footer) ===
     locked: types.optional(types.boolean, false),
+
+    // === MJML attributes the inspector has no control for (kept from an import) ===
+    extraAttributes: types.maybe(types.frozen<Record<string, string>>()),
   })
   .actions(self => ({
     /**
@@ -440,16 +444,21 @@ const BlockModelBase = types
  * boundary, so the store reads a stored navbar and every snapshot it emits
  * (onChange, undo history, persistence) is a schema-valid document.
  *
+ * Padding is mapped the same way (see `spacingSnapshot.ts`): the schema's
+ * `padding` object in, the store's flat `paddingTop`... fields inside.
+ *
  * Both processors keep the base creation and snapshot types, so the result is
  * typed as the base model; the explicit annotation also keeps the declaration
  * emitter from inlining the whole model type.
  */
-export const BlockModel: typeof BlockModelBase = BlockModelBase.preProcessSnapshot((snapshot) => {
+export const BlockModel: typeof BlockModelBase = BlockModelBase.preProcessSnapshot((raw) => {
+  const snapshot = paddingIn(raw);
   if (!snapshot || snapshot.type !== 'navbar') return snapshot;
   const { links, navLinks, ...rest } = snapshot as typeof snapshot & { navLinks?: unknown[] };
   const stored = navLinks && navLinks.length > 0 ? navLinks : ((links as unknown[] | undefined) ?? []);
   return { ...rest, links: [], navLinks: stored } as typeof snapshot;
-}).postProcessSnapshot((snapshot) => {
+}).postProcessSnapshot((raw) => {
+  const snapshot = paddingOut(raw);
   if (snapshot.type !== 'navbar') return snapshot;
   const { navLinks, links: _socialLinks, ...rest } = snapshot;
   return { ...rest, links: navLinks } as unknown as typeof snapshot;

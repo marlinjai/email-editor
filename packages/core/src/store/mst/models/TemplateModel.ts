@@ -1,5 +1,6 @@
 // packages/core/src/store/mst/models/TemplateModel.ts
 import { types, Instance, SnapshotIn, SnapshotOut, destroy, detach, getSnapshot } from 'mobx-state-tree';
+import type { MjmlHead } from '../../../schema/types';
 import { nanoid } from 'nanoid';
 import { SectionModel, createSection } from './SectionModel';
 import { BlockModel, BlockType } from './BlockModel';
@@ -56,6 +57,8 @@ export const TemplateMetadataModel = types
     breakpoint: types.maybe(types.string),
     customCSS: types.maybe(types.string),
     inlineCSS: types.maybe(types.string),
+    /** The MJML head and body settings of an imported document (see `MjmlHead` in the schema). */
+    mjmlHead: types.maybe(types.frozen<MjmlHead>()),
   })
   .actions(self => ({
     update(updates: {

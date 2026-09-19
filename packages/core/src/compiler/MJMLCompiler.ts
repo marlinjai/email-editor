@@ -29,18 +29,60 @@ import type {
   TableBlock,
 } from '../schema/types';
 import { buildGradientCSS } from '../schema/gradient';
+import type { ExtraAttributes, MjmlHead } from '../schema/types';
+
+/** The `<mj-attributes>` a document gets unless it brings its own (`metadata.mjmlHead.attributes`). */
+export const DEFAULT_MJML_ATTRIBUTES = `
+        <mj-all font-family="Georgia, serif" />
+        <mj-text font-size="14px" line-height="1.6" />
+      `;
+
+/** Marks the editor's own raw markup so the MJML import can read the block back exactly. */
+export const EDITOR_DATA_ATTRIBUTE = {
+  social: 'data-ee-social',
+  subColumns: 'data-ee-subcols',
+} as const;
+
+/** A block's (or sub-columns') JSON, base64-encoded, for an {@link EDITOR_DATA_ATTRIBUTE}. */
+export function encodeEditorData(value: unknown): string {
+  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64');
+}
 
 /**
- * Converts spacing object to MJML attribute string
+ * The attribute list of one MJML element: the editor's own attributes, then
+ * the imported ones it has no control for (`extraAttributes`), never both for
+ * the same name, with the editor's `el-*` classes and any imported
+ * `css-class` merged into one `css-class`.
+ */
+function finishAttributes(attrs: string[], classes: string[], extra?: ExtraAttributes): string {
+  const out = [...attrs];
+  const taken = new Set(attrs.map((a) => a.slice(0, a.indexOf('='))));
+  const allClasses = [...classes];
+  if (extra) {
+    for (const [name, value] of Object.entries(extra)) {
+      if (name === 'css-class') {
+        for (const c of value.split(/\s+/)) if (c && !allClasses.includes(c)) allClasses.push(c);
+        continue;
+      }
+      if (taken.has(name)) continue;
+      out.push(`${name}="${value}"`);
+    }
+  }
+  if (allClasses.length > 0) out.push(`css-class="${allClasses.join(' ')}"`);
+  return out.join(' ');
+}
+
+/**
+ * Converts a spacing object to an MJML `padding` value: all four sides, a side
+ * that is not set being `0`, as the editor's canvas shows it. (Emitting only
+ * the sides that are set would turn `{ top, bottom }` into MJML's two-value
+ * shorthand, which means vertical and horizontal.) Empty when no side is set.
  */
 function spacingToString(spacing?: Spacing): string {
   if (!spacing) return '';
-  const parts: string[] = [];
-  if (spacing.top) parts.push(spacing.top);
-  if (spacing.right) parts.push(spacing.right);
-  if (spacing.bottom) parts.push(spacing.bottom);
-  if (spacing.left) parts.push(spacing.left);
-  return parts.join(' ') || '';
+  const { top, right, bottom, left } = spacing;
+  if (!top && !right && !bottom && !left) return '';
+  return [top || '0', right || '0', bottom || '0', left || '0'].join(' ');
 }
 
 /** Options for one {@link MJMLCompiler.compile} call. */
@@ -106,11 +148,12 @@ export class MJMLCompiler {
     const body = sections.map((section) => this.sectionToMJML(section)).join('\n');
     const gradientCSS = this.collectGradientStyles(sections);
     const head = this.generateHead(metadata, gradientCSS);
+    const bodyAttributes = finishAttributes([], [], metadata.mjmlHead?.bodyAttributes);
 
     return `
 <mjml>
   ${head}
-  <mj-body>
+  <mj-body${bodyAttributes ? ` ${bodyAttributes}` : ''}>
     ${body}
   </mj-body>
 </mjml>
@@ -146,13 +189,13 @@ export class MJMLCompiler {
       parts.push(`<mj-breakpoint width="${metadata.breakpoint}" />`);
     }
 
-    // Add default attributes
-    parts.push(`
-      <mj-attributes>
-        <mj-all font-family="Georgia, serif" />
-        <mj-text font-size="14px" line-height="1.6" />
-      </mj-attributes>
-    `);
+    // Default attributes: the imported document's own, or the editor's.
+    const mjmlHead: MjmlHead | undefined = metadata.mjmlHead;
+    const attributes = mjmlHead?.attributes ?? DEFAULT_MJML_ATTRIBUTES;
+    if (attributes.trim()) parts.push(`<mj-attributes>${attributes}</mj-attributes>`);
+
+    // Other head elements an imported document brought (mj-html-attributes, ...)
+    if (mjmlHead?.headRaw) parts.push(mjmlHead.headRaw);
 
     // mj-style - Custom CSS
     if (metadata.customCSS) {
@@ -224,6 +267,15 @@ export class MJMLCompiler {
     // Skip hidden sections
     if (section.hidden) return '';
 
+    // Markup that sat directly in mj-body of an imported document: its raw
+    // blocks go back there, unwrapped, as long as the section holds nothing else.
+    if (section.bodyRaw) {
+      const blocks = section.columns.flatMap((c) => c.blocks).filter((b) => !b.hidden);
+      if (blocks.every((b) => b.type === 'raw') && section.columns.every((c) => !c.subColumns?.length)) {
+        return blocks.map((b) => `<mj-raw>${(b as RawBlock).html}</mj-raw>`).join('\n');
+      }
+    }
+
     const attrs: string[] = [];
     const cssClasses: string[] = [section.isWrapper ? 'el-wrapper' : 'el-section', `el-${section.id}`];
 
@@ -259,11 +311,12 @@ export class MJMLCompiler {
     }
 
     const columns = section.columns.map((col) => this.columnToMJML(col)).join('\n');
+    const sectionAttrs = finishAttributes(attrs, cssClasses, section.extraAttributes);
 
     // Use mj-wrapper for wrapper sections
     if (section.isWrapper) {
       return `
-<mj-wrapper ${attrs.join(' ')} css-class="${cssClasses.join(' ')}">
+<mj-wrapper ${sectionAttrs}>
   <mj-section>
     ${columns}
   </mj-section>
@@ -274,7 +327,7 @@ export class MJMLCompiler {
     // Use mj-group for non-stacking columns (prevents mobile stacking)
     if (section.noStack && section.columns.length > 1) {
       return `
-<mj-section ${attrs.join(' ')} css-class="${cssClasses.join(' ')}">
+<mj-section ${sectionAttrs}>
   <mj-group>
     ${columns}
   </mj-group>
@@ -283,7 +336,7 @@ export class MJMLCompiler {
     }
 
     return `
-<mj-section ${attrs.join(' ')} css-class="${cssClasses.join(' ')}">
+<mj-section ${sectionAttrs}>
   ${columns}
 </mj-section>
     `.trim();
@@ -327,12 +380,10 @@ export class MJMLCompiler {
       if (padding) attrs.push(`padding="${padding}"`);
     }
 
-    attrs.push(`css-class="${cssClasses.join(' ')}"`);
-
     const blocks = column.blocks.map((block) => this.blockToMJML(block)).join('\n');
 
     return `
-<mj-column ${attrs.join(' ')}>
+<mj-column ${finishAttributes(attrs, cssClasses, column.extraAttributes)}>
   ${blocks}
 </mj-column>
     `.trim();
@@ -367,7 +418,7 @@ export class MJMLCompiler {
     }).join('');
 
     // Reuse the standard column attribute path so width / bg / padding still apply on the parent column.
-    const colAttrs: string[] = [`css-class="el-column el-${column.id}"`];
+    const colAttrs: string[] = [];
     if (column.width) colAttrs.push(`width="${column.width}%"`);
     if (column.backgroundColor) colAttrs.push(`background-color="${column.backgroundColor}"`);
     if (column.verticalAlign) colAttrs.push(`vertical-align="${column.verticalAlign}"`);
@@ -377,9 +428,9 @@ export class MJMLCompiler {
     }
 
     return `
-<mj-column ${colAttrs.join(' ')}>
+<mj-column ${finishAttributes(colAttrs, ['el-column', `el-${column.id}`], column.extraAttributes)}>
   <mj-raw>
-    <table role="presentation" class="ee-sub-cols" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    <table role="presentation" class="ee-sub-cols" ${EDITOR_DATA_ATTRIBUTE.subColumns}="${encodeEditorData(subs)}" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
       <tr>${cells}</tr>
     </table>
   </mj-raw>
@@ -471,7 +522,7 @@ export class MJMLCompiler {
       ? `<div style="${inlineStyles.join(';')}">${block.content}</div>`
       : block.content;
 
-    return `<mj-text ${attrs.join(' ')} css-class="el-text el-${block.id}">${styledContent}</mj-text>`;
+    return `<mj-text ${finishAttributes(attrs, ['el-text', `el-${block.id}`], block.extraAttributes)}>${styledContent}</mj-text>`;
   }
 
   /**
@@ -491,7 +542,7 @@ export class MJMLCompiler {
       if (padding) attrs.push(`padding="${padding}"`);
     }
 
-    return `<mj-image ${attrs.join(' ')} css-class="el-image el-${block.id}" />`;
+    return `<mj-image ${finishAttributes(attrs, ['el-image', `el-${block.id}`], block.extraAttributes)} />`;
   }
 
   /**
@@ -511,7 +562,7 @@ export class MJMLCompiler {
       if (padding) attrs.push(`padding="${padding}"`);
     }
 
-    return `<mj-button ${attrs.join(' ')} css-class="el-button el-${block.id}">${block.label}</mj-button>`;
+    return `<mj-button ${finishAttributes(attrs, ['el-button', `el-${block.id}`], block.extraAttributes)}>${block.label}</mj-button>`;
   }
 
   /**
@@ -529,14 +580,14 @@ export class MJMLCompiler {
       if (padding) attrs.push(`padding="${padding}"`);
     }
 
-    return `<mj-divider ${attrs.join(' ')} css-class="el-divider el-${block.id}" />`;
+    return `<mj-divider ${finishAttributes(attrs, ['el-divider', `el-${block.id}`], block.extraAttributes)} />`;
   }
 
   /**
    * Convert spacer block to MJML
    */
   private spacerBlockToMJML(block: SpacerBlock): string {
-    return `<mj-spacer height="${block.height}" css-class="el-spacer el-${block.id}" />`;
+    return `<mj-spacer ${finishAttributes([`height="${block.height}"`], ['el-spacer', `el-${block.id}`], block.extraAttributes)} />`;
   }
 
   /**
@@ -642,7 +693,7 @@ ${verticalButtons}`;
     // Use table align attribute (Outlook) + margin (modern clients) for reliable alignment
     return `<!-- Social Icons (horizontal) -->
 <mj-raw>
-  <table align="${align}" role="presentation" cellpadding="0" cellspacing="0" style="margin: ${alignMargin};">
+  <table align="${align}" role="presentation" cellpadding="0" cellspacing="0" style="margin: ${alignMargin};" ${EDITOR_DATA_ATTRIBUTE.social}="${encodeEditorData(block)}">
     <tr>
       ${socialCells}
     </tr>
@@ -654,10 +705,7 @@ ${verticalButtons}`;
    * Convert hero block to MJML
    */
   private heroBlockToMJML(block: HeroBlock): string {
-    const attrs: string[] = [
-      `background-url="${block.backgroundImage}"`,
-      `css-class="el-hero el-${block.id}"`,
-    ];
+    const attrs: string[] = [`background-url="${block.backgroundImage}"`];
 
     if (block.backgroundHeight) attrs.push(`background-height="${block.backgroundHeight}"`);
     if (block.backgroundWidth) attrs.push(`background-width="${block.backgroundWidth}"`);
@@ -666,7 +714,7 @@ ${verticalButtons}`;
     if (block.mode) attrs.push(`mode="${block.mode}"`);
 
     return `
-<mj-hero ${attrs.join(' ')}>
+<mj-hero ${finishAttributes(attrs, ['el-hero', `el-${block.id}`], block.extraAttributes)}>
   <mj-text align="center" color="#ffffff" font-size="32px" font-weight="bold">
     Hero Title
   </mj-text>
@@ -684,7 +732,7 @@ ${verticalButtons}`;
    * Convert accordion block to MJML
    */
   private accordionBlockToMJML(block: AccordionBlock): string {
-    const attrs: string[] = [`css-class="el-accordion el-${block.id}"`];
+    const attrs: string[] = [];
 
     if (block.iconPosition) attrs.push(`icon-position="${block.iconPosition}"`);
     if (block.borderColor) attrs.push(`border="${block.borderColor}"`);
@@ -701,7 +749,7 @@ ${verticalButtons}`;
       .join('\n');
 
     return `
-<mj-accordion ${attrs.join(' ')}>
+<mj-accordion ${finishAttributes(attrs, ['el-accordion', `el-${block.id}`], block.extraAttributes)}>
 ${items}
 </mj-accordion>
     `.trim();
@@ -718,7 +766,7 @@ ${items}
    * Convert navbar block to MJML
    */
   private navbarBlockToMJML(block: NavbarBlock): string {
-    const attrs: string[] = [`css-class="el-navbar el-${block.id}"`];
+    const attrs: string[] = [];
 
     if (block.hamburger) attrs.push('hamburger="hamburger"');
     if (block.baseUrl) attrs.push(`base-url="${block.baseUrl}"`);
@@ -738,7 +786,7 @@ ${items}
       .join('\n');
 
     return `
-<mj-navbar ${attrs.join(' ')}>
+<mj-navbar ${finishAttributes(attrs, ['el-navbar', `el-${block.id}`], block.extraAttributes)}>
 ${links}
 </mj-navbar>
     `.trim();
@@ -748,7 +796,7 @@ ${links}
    * Convert carousel block to MJML
    */
   private carouselBlockToMJML(block: CarouselBlock): string {
-    const attrs: string[] = [`css-class="el-carousel el-${block.id}"`];
+    const attrs: string[] = [];
 
     if (block.thumbnails) attrs.push(`thumbnails="${block.thumbnails}"`);
     if (block.borderRadius) attrs.push(`border-radius="${block.borderRadius}"`);
@@ -770,7 +818,7 @@ ${links}
       .join('\n');
 
     return `
-<mj-carousel ${attrs.join(' ')}>
+<mj-carousel ${finishAttributes(attrs, ['el-carousel', `el-${block.id}`], block.extraAttributes)}>
 ${images}
 </mj-carousel>
     `.trim();
@@ -780,7 +828,7 @@ ${images}
    * Convert table block to MJML
    */
   private tableBlockToMJML(block: TableBlock): string {
-    const attrs: string[] = [`css-class="el-table el-${block.id}"`];
+    const attrs: string[] = [];
 
     if (block.align) attrs.push(`align="${block.align}"`);
     if (block.color) attrs.push(`color="${block.color}"`);
@@ -811,7 +859,7 @@ ${images}
       .join('\n');
 
     return `
-<mj-table ${attrs.join(' ')}>
+<mj-table ${finishAttributes(attrs, ['el-table', `el-${block.id}`], block.extraAttributes)}>
 ${headerRow}
 ${dataRows}
 </mj-table>

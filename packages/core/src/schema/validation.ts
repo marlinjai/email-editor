@@ -31,6 +31,16 @@ export const BackgroundGradientSchema = z.object({
   stops: z.array(GradientStopSchema).min(1),
 }) satisfies z.ZodType<BackgroundGradient>;
 
+/** MJML attributes kept from an import (see `ExtraAttributes`): names are MJML attribute names. */
+export const ExtraAttributesSchema = z.record(z.string().regex(/^[a-z][a-z0-9-]*$/), z.string());
+
+/** See `MjmlHead`. */
+export const MjmlHeadSchema = z.object({
+  attributes: z.string().optional(),
+  bodyAttributes: ExtraAttributesSchema.optional(),
+  headRaw: z.string().optional(),
+});
+
 /**
  * Custom font schema
  */
@@ -61,6 +71,7 @@ export const TemplateMetadataSchema = z.object({
   breakpoint: z.string().optional(),
   customCSS: z.string().optional(),
   inlineCSS: z.string().optional(),
+  mjmlHead: MjmlHeadSchema.optional(),
 });
 
 /**
@@ -70,6 +81,7 @@ export const TextBlockSchema = z.object({
   id: z.string(),
   type: z.literal('text'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   content: z.string(),
   align: z.enum(['left', 'center', 'right', 'justify']).optional(),
   color: z.string().optional(),
@@ -86,6 +98,7 @@ export const ImageBlockSchema = z.object({
   id: z.string(),
   type: z.literal('image'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   src: z.string().min(1), // Allow any non-empty string, not just URLs
   alt: z.string().optional(),
   width: z.string().optional(),
@@ -103,6 +116,7 @@ export const ButtonBlockSchema = z.object({
   id: z.string(),
   type: z.literal('button'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   label: z.string().min(1),
   href: z.string().min(1), // Allow any non-empty string
   align: z.enum(['left', 'center', 'right']).optional(),
@@ -121,6 +135,7 @@ export const DividerBlockSchema = z.object({
   id: z.string(),
   type: z.literal('divider'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   borderColor: z.string().optional(),
   borderWidth: z.string().optional(),
   borderStyle: z.enum(['solid', 'dashed', 'dotted']).optional(),
@@ -135,6 +150,7 @@ export const SpacerBlockSchema = z.object({
   id: z.string(),
   type: z.literal('spacer'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   height: z.string(),
 });
 
@@ -145,6 +161,7 @@ export const HeaderBlockSchema = z.object({
   id: z.string(),
   type: z.literal('header'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   locked: z.literal(true),
 });
 
@@ -155,6 +172,7 @@ export const FooterBlockSchema = z.object({
   id: z.string(),
   type: z.literal('footer'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   locked: z.literal(true),
 });
 
@@ -166,6 +184,7 @@ export const SocialBlockSchema = z.object({
   id: z.string(),
   type: z.literal('social'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   mode: z.enum(['horizontal', 'vertical']).optional(),
   align: z.enum(['left', 'center', 'right']).optional(),
   iconSize: z.string().optional(),
@@ -187,6 +206,7 @@ export const HeroBlockSchema = z.object({
   id: z.string(),
   type: z.literal('hero'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   backgroundImage: z.string().min(1),
   backgroundHeight: z.string().optional(),
   backgroundWidth: z.string().optional(),
@@ -202,6 +222,7 @@ export const AccordionBlockSchema = z.object({
   id: z.string(),
   type: z.literal('accordion'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   items: z.array(
     z.object({
       title: z.string(),
@@ -220,6 +241,7 @@ export const RawBlockSchema = z.object({
   id: z.string(),
   type: z.literal('raw'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   html: z.string(),
 });
 
@@ -230,6 +252,7 @@ export const NavbarBlockSchema = z.object({
   id: z.string(),
   type: z.literal('navbar'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   links: z.array(
     z.object({
       label: z.string(),
@@ -251,6 +274,7 @@ export const CarouselBlockSchema = z.object({
   id: z.string(),
   type: z.literal('carousel'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   images: z.array(
     z.object({
       src: z.string(),
@@ -273,6 +297,7 @@ export const TableBlockSchema = z.object({
   id: z.string(),
   type: z.literal('table'),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   headers: z.array(z.string()),
   rows: z.array(z.array(z.string())),
   align: z.enum(['left', 'center', 'right']).optional(),
@@ -316,6 +341,7 @@ export const ColumnSchema = z.object({
   padding: SpacingSchema.optional(),
   verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(), // Vertical content alignment
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   blocks: z.array(BlockSchema),
 });
 
@@ -336,6 +362,8 @@ export const SectionSchema = z.object({
   fullWidth: z.boolean().optional(),
   isWrapper: z.boolean().optional(),
   hidden: z.boolean().optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
+  bodyRaw: z.boolean().optional(),
   columns: z.array(ColumnSchema).min(1),
 });
 
