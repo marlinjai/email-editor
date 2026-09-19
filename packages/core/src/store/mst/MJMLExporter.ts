@@ -65,6 +65,8 @@ export class MJMLExporter {
     const mjml = this.templateToMJML(template);
 
     const result = mjml2html(mjml, {
+      // Never resolve <mj-include>: see MJMLCompiler.compile.
+      ignoreIncludes: true,
       validationLevel: this.options.validationLevel,
       minify: this.options.minify,
       beautify: this.options.beautify,
