@@ -199,6 +199,25 @@ describe('scheduling, segments and A/B tests on a mailing', () => {
     });
   });
 
+  it('keeps a variant\'s current content without fetching or sending a document', async () => {
+    api.mailings.setAbTest.mockResolvedValue({ id: 'm1' });
+    await saveAbTest('ws', 'm1', {
+      variants: [
+        { key: 'a', subject: 'Hello', templateId: '' },
+        { key: 'c', subject: '', templateId: 'keep' },
+      ],
+      testPercent: 30,
+      winnerMetric: 'manual',
+      decideAfterMinutes: null,
+    });
+    expect(api.templates.get).not.toHaveBeenCalled();
+    expect(api.mailings.setAbTest).toHaveBeenCalledWith('m1', {
+      variants: [{ key: 'a', subject: 'Hello' }, { key: 'c', keep_document: true }],
+      test_fraction: 0.3,
+      winner_metric: 'manual',
+    });
+  });
+
   it('refuses a variant that changes nothing, and a metric test without a time', async () => {
     const r = await saveAbTest('ws', 'm1', {
       variants: [

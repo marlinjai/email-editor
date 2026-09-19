@@ -103,34 +103,52 @@ test('billing on Free: usage bars, and buying says billing is not yet available'
   await expect(page.getByRole('meter', { name: 'Messages' })).toHaveAttribute('aria-valuetext', /of 1,000 messages/);
   await expect(page.getByTestId('plan-free').getByText('Current')).toBeVisible();
 
-  // Stripe is not configured on this instance: the service answers 503 billing_not_configured.
-  await page.getByRole('button', { name: 'Upgrade to Starter' }).click();
+  // Stripe is not configured on this instance: the catalogue says no paid plan
+  // is sellable, so the screen says so before anyone clicks.
   await expect(page.getByTestId('billing-unavailable')).toContainText('Billing is not available yet');
   await expect(page.getByTestId('billing-unavailable')).toContainText("Free plan's limits apply");
   await expect(page.getByRole('button', { name: 'Not yet available' })).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Not yet available' }).first()).toBeDisabled();
-  // Nothing about it is kept: a reload offers the plans again.
+  await expect(page.getByRole('button', { name: /^Upgrade to/ })).toHaveCount(0);
+
+  // Back from a cancelled checkout: said once, and the address is clean again.
+  await open(page, '/settings/billing?checkout=cancelled');
+  await expect(page.getByTestId('checkout-return')).toContainText('Checkout was cancelled. Nothing was charged');
+  await expect(page).toHaveURL(new RegExp(`/w/${ws}/settings/billing$`));
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Upgrade to Growth' })).toBeEnabled();
+  await expect(page.getByTestId('checkout-return')).toHaveCount(0);
 });
 
-test('plan limits: a feature the plan lacks is refused, with the way to Billing', async ({ page }) => {
-  // Tracking is not in Free.
+test('plan limits: what the plan lacks is off up front, and a limit hit on saving links to Billing', async ({ page }) => {
+  // Tracking is not in Free: the switches are off, and the screen says why.
   await open(page, '/settings');
-  await page.getByLabel('Track opens').check();
-  await page.getByRole('button', { name: 'Save tracking' }).click();
-  const refusal = page.getByRole('alert').filter({ hasText: 'Free plan does not include tracking' });
-  await expect(refusal).toBeVisible();
-  await refusal.getByRole('link', { name: 'See plans and usage' }).click();
+  await expect(page.getByLabel('Track opens')).toBeDisabled();
+  await expect(page.getByLabel('Track clicks')).toBeDisabled();
+  const gate = page.getByTestId('plan-gate');
+  await expect(gate).toContainText('The Free plan does not include open and click tracking.');
+  await gate.getByRole('link', { name: 'See plans and usage' }).click();
   await expect(page).toHaveURL(new RegExp(`/w/${ws}/settings/billing$`));
 
   // Neither are A/B tests.
   await open(page, `/mailings/${abMailingId}`);
-  await page.getByRole('button', { name: 'Set up an A/B test' }).click();
-  await page.getByLabel('Subject of variant B').fill('A different subject');
-  await page.getByRole('button', { name: 'Save the test' }).click();
-  await expect(page.getByRole('alert').filter({ hasText: /Free plan does not include ab.testing/ })).toBeVisible();
-  await expect(page.getByRole('alert').getByRole('link', { name: 'See plans and usage' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Set up an A/B test' })).toBeDisabled();
+  await expect(page.getByTestId('plan-gate')).toContainText('The Free plan does not include A/B tests.');
+
+  // A counted limit is met on saving: Free has one webhook endpoint.
+  await open(page, '/settings/webhooks');
+  for (const url of ['http://localhost:9/first', 'http://localhost:9/second']) {
+    await page.getByRole('button', { name: 'Add endpoint' }).first().click();
+    await page.getByLabel('Endpoint URL').fill(url);
+    await page.getByRole('button', { name: 'Add endpoint' }).last().click();
+    if (url.endsWith('first')) {
+      await expect(page.getByTestId('secret-value')).toContainText('whsec_');
+      await page.getByRole('button', { name: 'I have stored it' }).click();
+    }
+  }
+  const refusal = page.getByRole('alert').filter({ hasText: /Free plan allows 1 webhook/ });
+  await expect(refusal).toBeVisible();
+  await refusal.getByRole('link', { name: 'See plans and usage' }).click();
+  await expect(page).toHaveURL(new RegExp(`/w/${ws}/settings/billing$`));
 });
 
 test('tags and typed properties', async ({ page }) => {
@@ -167,6 +185,8 @@ test('import, forward: upload, map, dry run, commit; the contacts count toward t
   await expect(dryRun.getByTestId('report-skipped')).toHaveText('2');
   await expect(dryRun).toContainText('not a valid email address (1)');
   await expect(dryRun).toContainText('the address appears earlier in the file (1)');
+  // The rows of the dry run that just finished on this page, without a reload.
+  await expect(page.getByRole('table', { name: 'Rows of the file' }).getByRole('row')).toHaveCount(51);
   // Nothing is written by a dry run.
   expect((await serviceFor(OWNER, ws).contacts.list({ limit: 1 })).data).toHaveLength(0);
 
@@ -337,8 +357,15 @@ test('mailing: a segment as the audience, the usage header after a test, and sch
 
 test('design partner: exempt billing, tracking on, and an A/B test on all four paths', async ({ page }) => {
   test.setTimeout(240_000);
+  // Back from a checkout, the screen waits for the plan to change (Stripe's
+  // webhook sets it; here an operator does), then says it did, once.
+  await open(page, '/settings/billing?checkout=success');
+  await expect(page.getByTestId('checkout-return')).toContainText('Your upgrade is being confirmed');
+  await expect(page).toHaveURL(new RegExp(`/w/${ws}/settings/billing$`));
   await setPlan(ws, 'design_partner');
-  await open(page, '/settings/billing');
+  await expect(page.getByTestId('checkout-return')).toContainText('Your plan is now Design partner.', { timeout: 15_000 });
+  await page.reload();
+  await expect(page.getByTestId('checkout-return')).toHaveCount(0);
   await expect(page.getByTestId('current-plan')).toHaveText('Design partner');
   await expect(page.getByText('A design partner outside billing: no limits and nothing to pay.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Plans' })).toHaveCount(0);
@@ -361,6 +388,7 @@ test('design partner: exempt billing, tracking on, and an A/B test on all four p
   // Forward: set up.
   await page.getByRole('button', { name: 'Set up an A/B test' }).click();
   await page.getByLabel('Subject of variant B').fill('Subject B');
+  await page.getByLabel('Content of variant B').selectOption({ label: 'Newsletter (v1)' });
   await page.getByLabel('Test group').fill('50');
   await page.getByLabel('The winner is').selectOption('manual');
   await page.getByRole('button', { name: 'Save the test' }).click();
@@ -368,8 +396,12 @@ test('design partner: exempt billing, tracking on, and an A/B test on all four p
   await expect(ab).toContainText('Set up');
   await expect(ab.getByRole('table', { name: 'Variants' }).getByRole('row')).toHaveCount(3);
 
-  // Backtrack: a third variant, then back to two.
+  await expect(ab.getByRole('row', { name: /b.*Subject B.*its own content/i })).toBeVisible();
+
+  // Backtrack: a third variant, then back to two. B's own content is kept
+  // by default, without being chosen again.
   await page.getByRole('button', { name: 'Change the test' }).click();
+  await expect(page.getByLabel('Content of variant B')).toHaveValue('keep');
   await page.getByRole('button', { name: 'Add a variant' }).click();
   await page.getByLabel('Subject of variant C').fill('Subject C');
   await page.getByRole('button', { name: 'Save the test' }).click();
@@ -378,6 +410,7 @@ test('design partner: exempt billing, tracking on, and an A/B test on all four p
   await page.getByRole('button', { name: 'Remove variant C' }).click();
   await page.getByRole('button', { name: 'Save the test' }).click();
   await expect(ab.getByRole('table', { name: 'Variants' }).getByRole('row')).toHaveCount(3);
+  await expect(ab.getByRole('row', { name: /b.*Subject B.*its own content/i })).toBeVisible();
 
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await page.getByRole('button', { name: 'Send to 4 recipients' }).click();
@@ -387,6 +420,10 @@ test('design partner: exempt billing, tracking on, and an A/B test on all four p
   await page.reload();
   await expect(page.getByRole('button', { name: 'Send B to the rest' })).toBeVisible();
   await page.getByRole('button', { name: 'Send B to the rest' }).click();
+  // The pick is confirmed with the numbers: 2 in the test group, 2 waiting.
+  const confirmPick = page.getByRole('dialog');
+  await expect(confirmPick).toContainText('the other 2 of 4 recipients');
+  await confirmPick.getByRole('button', { name: 'Send B to 2 recipients' }).click();
   await expect(ab).toContainText('Decided');
   await expect(ab.getByRole('row', { name: /b.*winner/i })).toBeVisible();
   const done = await waitForMailing(OWNER, ws, abMailingId, ['sent'], 120_000);

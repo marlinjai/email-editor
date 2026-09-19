@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTestClient, errorResponse, jsonResponse } from './test-helpers';
-import { MailApiError, type ResponseMeta } from '../index';
+import { MailApiError, MailResponseValidationError, type ResponseMeta } from '../index';
 
 const mailing = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -53,5 +53,31 @@ describe('onResponse: the response headers a caller can read', () => {
     const seen: ResponseMeta[] = [];
     await client.request('topics.list', {}, { onResponse: (m) => seen.push(m) });
     expect(seen.map((m) => m.requestId)).toEqual(['req-2']);
+  });
+
+  it('is called only once the body parsed and validated', async () => {
+    const { client, fetchMock } = createTestClient();
+    // 200, but not the contract's shape for topics.list.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { unexpected: true }, { 'x-request-id': 'req-bad' }));
+    const seen: ResponseMeta[] = [];
+    const err = await client.request('topics.list', {}, { onResponse: (m) => seen.push(m) }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(MailResponseValidationError);
+    expect(seen).toEqual([]);
+  });
+});
+
+describe('billing_not_configured is not retried', () => {
+  it('answers at once: a configuration state, not an outage', async () => {
+    const { client, fetchMock } = createTestClient({ validateResponses: false });
+    fetchMock.mockImplementation(async () => errorResponse(503, 'service_unavailable', 'Billing is not configured.', { reason: 'billing_not_configured' }));
+    const err = await client.billing.checkout({ plan: 'starter', success_url: 'https://a.test/ok', cancel_url: 'https://a.test/no' }).catch((e: unknown) => e);
+    expect((err as MailApiError).code).toBe('service_unavailable');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('while any other service_unavailable is still retried', async () => {
+    const { client, fetchMock } = createTestClient({ validateResponses: false });
+    fetchMock.mockImplementation(async () => errorResponse(503, 'service_unavailable', 'Busy.'));
+    await client.request('topics.list', {}).catch(() => {});
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

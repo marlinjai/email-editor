@@ -4,7 +4,6 @@ import {
   ErrorBody,
   IDEMPOTENCY_KEY_HEADER,
   REQUEST_ID_HEADER,
-  RETRYABLE_ERRORS,
   RETRY_AFTER_HEADER,
   USAGE_WARNING_HEADER,
   parseUsageWarningHeader,
@@ -17,6 +16,7 @@ import {
   type RouteQuery,
   type RouteResponse,
   acceptsIdempotencyKey,
+  isRetryableError,
   buildPath,
   routes,
 } from '@marlinjai/mail-contract';
@@ -59,8 +59,9 @@ export interface RequestOpts {
   idempotencyKey?: string;
   signal?: AbortSignal;
   /**
-   * Called with the successful response's metadata before the body is
-   * returned: once per call, once per page for `paginate`. Not called when the call fails: a `MailApiError` carries its own
+   * Called with the successful response's metadata once its body parsed and
+   * validated, just before it is returned: once per call, once per page for
+   * `paginate`. Not called when the call fails: a `MailApiError` carries its own
    * status and request id. An exception thrown here propagates to the caller.
    */
   onResponse?: (meta: ResponseMeta) => void;
@@ -81,7 +82,6 @@ export interface ExecuteArgs<K extends OperationId> {
   body?: RouteBody<K>;
 }
 
-const RETRYABLE_SET = new Set<ErrorCode>(RETRYABLE_ERRORS);
 const RETRY_BASE_MS = 250;
 const RETRY_MAX_MS = 8_000;
 const MAX_ERROR_TEXT_LENGTH = 2_000;
@@ -181,13 +181,18 @@ export async function execute<K extends OperationId>(
 
       const requestId = response.headers.get(REQUEST_ID_HEADER);
       if (response.status >= 200 && response.status < 300) {
-        opts.onResponse?.(responseMeta(response, requestId));
         const text = await response.text();
         const json = text.length > 0 ? (JSON.parse(text) as unknown) : undefined;
-        if (!config.validateResponses) return json as RouteResponse<K>;
-        const parsed = route.response.safeParse(json);
-        if (!parsed.success) throw new MailResponseValidationError(operationId, parsed.error.issues);
-        return parsed.data as RouteResponse<K>;
+        let data: RouteResponse<K>;
+        if (!config.validateResponses) data = json as RouteResponse<K>;
+        else {
+          const parsed = route.response.safeParse(json);
+          if (!parsed.success) throw new MailResponseValidationError(operationId, parsed.error.issues);
+          data = parsed.data as RouteResponse<K>;
+        }
+        // After the body parsed and validated: onResponse sees only calls that succeed.
+        opts.onResponse?.(responseMeta(response, requestId));
+        return data;
       }
 
       const text = await response.text();
@@ -201,7 +206,7 @@ export async function execute<K extends OperationId>(
       });
       lastError = apiError;
 
-      const retryable = RETRYABLE_SET.has(errorBody.code);
+      const retryable = isRetryableError(errorBody.code, errorBody.details);
       if (retryable && attempt < config.maxRetries) {
         const retryAfterMs = parseRetryAfterMs(response.headers.get(RETRY_AFTER_HEADER));
         const delay = retryAfterMs ?? backoffDelayMs(attempt, RETRY_BASE_MS, RETRY_MAX_MS, config.random);
@@ -276,13 +281,18 @@ export async function executeMultipart<K extends OperationId>(
 
       const requestId = response.headers.get(REQUEST_ID_HEADER);
       if (response.status >= 200 && response.status < 300) {
-        opts.onResponse?.(responseMeta(response, requestId));
         const text = await response.text();
         const json = text.length > 0 ? (JSON.parse(text) as unknown) : undefined;
-        if (!config.validateResponses) return json as RouteResponse<K>;
-        const parsed = route.response.safeParse(json);
-        if (!parsed.success) throw new MailResponseValidationError(operationId, parsed.error.issues);
-        return parsed.data as RouteResponse<K>;
+        let data: RouteResponse<K>;
+        if (!config.validateResponses) data = json as RouteResponse<K>;
+        else {
+          const parsed = route.response.safeParse(json);
+          if (!parsed.success) throw new MailResponseValidationError(operationId, parsed.error.issues);
+          data = parsed.data as RouteResponse<K>;
+        }
+        // After the body parsed and validated: onResponse sees only calls that succeed.
+        opts.onResponse?.(responseMeta(response, requestId));
+        return data;
       }
 
       const text = await response.text();
@@ -295,7 +305,7 @@ export async function executeMultipart<K extends OperationId>(
         requestId,
       });
       lastError = apiError;
-      const retryable = RETRYABLE_SET.has(errorBody.code);
+      const retryable = isRetryableError(errorBody.code, errorBody.details);
       if (retryable && attempt < config.maxRetries) {
         const retryAfterMs = parseRetryAfterMs(response.headers.get(RETRY_AFTER_HEADER));
         const delay = retryAfterMs ?? backoffDelayMs(attempt, RETRY_BASE_MS, RETRY_MAX_MS, config.random);

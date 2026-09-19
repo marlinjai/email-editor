@@ -1,4 +1,4 @@
-import { IDEMPOTENCY_KEY_HEADER, type Subscription } from '@marlinjai/mail-contract';
+import { BILLING_NOT_CONFIGURED_REASON, IDEMPOTENCY_KEY_HEADER, type Subscription } from '@marlinjai/mail-contract';
 import { Hono } from 'hono';
 import { ApiError } from '../api-error.js';
 import { actorOf, type AppEnv } from '../context.js';
@@ -22,7 +22,7 @@ export type BillingRouteDeps = MountDeps & {
 };
 
 function notConfigured(what: string): never {
-  throw new ApiError('service_unavailable', `Billing is not configured on this instance (${what}).`, { reason: 'billing_not_configured' });
+  throw new ApiError('service_unavailable', `Billing is not configured on this instance (${what}).`, { reason: BILLING_NOT_CONFIGURED_REASON });
 }
 
 /** A Stripe failure, as the API answers it: never Stripe's own message, which may name internals. */

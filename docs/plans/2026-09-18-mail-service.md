@@ -756,7 +756,16 @@ headers in the SDK:
 - **Limits of the platform:** the proxy and server actions now take bodies up to
   52 MB (a 50 MB CSV import plus multipart overhead; the proxy's default was
   10 MB), and the import upload goes through a client with a 120 second timeout
-  and one retry.
+  and one retry. Both limits are global in Next.js; an upload route outside the
+  proxy could carry the large limit alone but would skip the auth-brain gate, so
+  the global limit is kept and the trade-off is written down in `next.config.ts`.
+- **Contract additions from the review:** `billing.plans` lists each plan as a
+  `CatalogPlan` with `sellable` (checkout can sell it now, the landing page's
+  signal), so no screen offers a plan checkout would refuse; `keep_document` on
+  an A/B variant keeps the content it has, so a test can change without sending
+  documents again; `testGroupSize` (the service's split, which the pick's
+  confirmation states); `BILLING_NOT_CONFIGURED_REASON` and `isRetryableError`,
+  under which the SDK no longer retries `billing_not_configured`.
 - **Tests:** vitest for the new actions and for the segment builder's model
   (every contract filter shape round-trips); a second Playwright spec
   (`platform.spec.ts`) in its own workspace covers billing on Free and as a
@@ -776,8 +785,12 @@ Defaults taken (each can be overturned later):
 3. **An A/B variant's own content is a template's current version**, chosen per
    variant; without one the variant differs in the subject only. Changing a test
    re-chooses the content, since a variant keeps only its copy.
-4. **Checkout and the portal return to the Billing screen**, which says so after
-   a checkout and reads the plan from the service (Stripe's webhook sets it).
+4. **Checkout and the portal return to the Billing screen**, which says so once
+   (the address loses its query) and, after a checkout, waits up to a minute for
+   Stripe's webhook to change the plan, asking every 3 seconds.
+5. **Features the plan lacks are off up front** (tracking, A/B tests), with the
+   reason and a link to Billing; tracking already on can still be turned off
+   after a downgrade. Counted limits are met on saving, with the same link.
 
 ### First-client findings: document ids and the asset policy (built 2026-09-18, #28)
 

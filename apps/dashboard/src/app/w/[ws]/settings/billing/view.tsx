@@ -6,7 +6,7 @@ import { USAGE_METRICS, type CatalogPlan, type Plan, type PlanId, type Subscript
 import { FormError } from '@/components/form-error';
 import { Badge, Button, Notice, Panel, Section, Spinner, When, type Tone } from '@/components/ui';
 import { useAction } from '@/components/use-action';
-import { isBillingNotConfigured } from '@/lib/errors';
+import { isBillingNotConfigured } from '@/lib/billing-state';
 import { formatCount, percent } from '@/lib/format';
 import type { ActionError } from '@/lib/result';
 import { formatPrice, METRIC_LABELS, PLAN_NAMES, usageLevel } from '@/lib/usage';

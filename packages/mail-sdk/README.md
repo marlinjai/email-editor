@@ -218,6 +218,9 @@ error `code` is in the contract's `RETRYABLE_ERRORS` (`rate_limited`,
 including `daily_budget_exhausted` and `plan_limit_reached` even though both
 are HTTP 429, is never retried: retrying them would not help, since the
 condition they report does not clear on its own within the request's lifetime.
+For the same reason a `service_unavailable` whose `details.reason` is
+`billing_not_configured` (checkout or the portal while Stripe is not set up) is
+answered at once; the contract's `isRetryableError` holds the rule.
 
 - Exponential backoff with full jitter, capped at 8 seconds between attempts.
 - `Retry-After` (seconds or a Hypertext Transfer Protocol (HTTP) date) is
@@ -248,8 +251,9 @@ if (warnings.length > 0) {
 }
 ```
 
-`onResponse` is not called for a failed call (a `MailApiError` carries its
-own status and request id). A limit that is already exceeded fails the call
+`onResponse` runs once the body has parsed and validated, just before the call
+returns; it is not called for a failed call (a `MailApiError` carries its own
+status and request id). A limit that is already exceeded fails the call
 with `plan_limit_reached` (HTTP 429), whose `details` name the `metric`, the
 `used` count, the `limit` and the `plan`.
 

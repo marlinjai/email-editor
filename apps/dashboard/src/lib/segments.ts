@@ -6,7 +6,7 @@ import {
   type FilterOperator,
   type JsonValue,
   type SegmentFilter,
-} from '@marlinjai/mail-sdk';
+} from '@marlinjai/mail-contract';
 
 /*
  * The segment builder's model: the contract's filter tree (and, or, not over
@@ -15,7 +15,22 @@ import {
  * the API, round-trips through the editor unchanged in meaning.
  */
 
-export type ConditionNode = { kind: 'condition'; id: string; negate: boolean; field: string; op: FilterOperator; value: string };
+/**
+ * `value` is what the form shows. A condition read from a saved filter keeps
+ * the value it was saved with (`original`, and the text it was shown as): left
+ * untouched, that exact value goes back, whatever its type; edited, the new
+ * text is typed like it (a property without a definition that held a number
+ * stays a number).
+ */
+export type ConditionNode = {
+  kind: 'condition';
+  id: string;
+  negate: boolean;
+  field: string;
+  op: FilterOperator;
+  value: string;
+  original?: { value: JsonValue; text: string };
+};
 export type GroupNode = { kind: 'group'; id: string; negate: boolean; mode: 'and' | 'or'; children: FilterNode[] };
 export type FilterNode = ConditionNode | GroupNode;
 
@@ -78,19 +93,56 @@ export function propertyType(field: string, properties: ContactPropertyDefinitio
   return properties.find((p) => p.key === key)?.type ?? null;
 }
 
-/** The value as the form holds it: text, with lists comma-separated. */
-function valueToText(value: JsonValue | undefined): string {
-  if (value === undefined || value === null) return '';
-  if (Array.isArray(value)) return value.map((v) => valueToText(v as JsonValue)).join(', ');
+/** One value as text: an object or array as JSON, null as nothing. */
+function scalarText(value: JsonValue): string {
+  if (value === null) return '';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+/** In a list, a comma or a backslash inside one value is escaped with a backslash. */
+const escapeItem = (text: string) => text.replace(/\\/g, '\\\\').replace(/,/g, '\\,');
+
+/** The value as the form holds it: text, with list items separated by commas. */
+export function valueToText(value: JsonValue | undefined): string {
+  if (value === undefined) return '';
+  if (Array.isArray(value)) return value.map((v) => escapeItem(scalarText(v))).join(', ');
+  return scalarText(value);
+}
+
+/** A list typed as text back into its items: commas separate, a backslash escapes the next character. */
+export function splitList(text: string): string[] {
+  const items: string[] = [];
+  let current = '';
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    if (c === '\\' && i + 1 < text.length) {
+      current += text[++i];
+    } else if (c === ',') {
+      items.push(current);
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  items.push(current);
+  return items.map((x) => x.trim()).filter((x) => x !== '');
 }
 
 export function fromFilter(filter: SegmentFilter, negate = false): FilterNode {
   if ('and' in filter) return { kind: 'group', id: nodeId(), negate, mode: 'and', children: filter.and.map((f) => fromFilter(f)) };
   if ('or' in filter) return { kind: 'group', id: nodeId(), negate, mode: 'or', children: filter.or.map((f) => fromFilter(f)) };
   if ('not' in filter) return fromFilter(filter.not, !negate);
-  return { kind: 'condition', id: nodeId(), negate, field: filter.field, op: filter.op, value: valueToText(filter.value) };
+  const text = valueToText(filter.value);
+  return {
+    kind: 'condition',
+    id: nodeId(),
+    negate,
+    field: filter.field,
+    op: filter.op,
+    value: text,
+    ...(filter.value !== undefined ? { original: { value: filter.value, text } } : {}),
+  };
 }
 
 /** Every editor starts from a group, so there is always somewhere to add a condition. */
@@ -114,10 +166,26 @@ export function newGroup(): GroupNode {
 
 export type BuildResult = { ok: true; filter: SegmentFilter } | { ok: false; problems: Record<string, string> };
 
-/** One scalar of a condition, typed the way the service compares the field. */
-function scalar(field: string, text: string, type: ContactPropertyType | null): { ok: true; value: JsonValue } | { ok: false; problem: string } {
+/**
+ * One scalar of a condition, typed the way the service compares the field. A
+ * property without a definition is typed like the value it had (`like`), so an
+ * edit keeps a number a number, a yes or no a boolean, and an object an object.
+ */
+function scalar(field: string, text: string, type: ContactPropertyType | null, like?: JsonValue): { ok: true; value: JsonValue } | { ok: false; problem: string } {
   const t = text.trim();
   if (t === '') return { ok: false, problem: 'Enter a value' };
+  if (field.startsWith('property:') && type === null && like !== undefined && like !== null) {
+    if (typeof like === 'number' && t !== '' && Number.isFinite(Number(t))) return { ok: true, value: Number(t) };
+    if (typeof like === 'boolean' && (t === 'true' || t === 'false')) return { ok: true, value: t === 'true' };
+    if (typeof like === 'object') {
+      try {
+        const parsed = JSON.parse(t) as JsonValue;
+        if (parsed !== null && typeof parsed === 'object') return { ok: true, value: parsed };
+      } catch {
+        // not JSON any more: compared as text
+      }
+    }
+  }
   if (field.startsWith('engagement:')) {
     const n = Number(t);
     return Number.isInteger(n) && n > 0 ? { ok: true, value: n } : { ok: false, problem: 'A whole number of days' };
@@ -163,16 +231,20 @@ export function toFilter(root: GroupNode, properties: ContactPropertyDefinition[
         return null;
       }
       const type = propertyType(node.field, properties);
+      const original = node.original?.value;
+      const untouched = node.original !== undefined && node.value === node.original.text && takesList(node.op) === Array.isArray(original);
+      const like = (i: number): JsonValue | undefined => (Array.isArray(original) ? (original[i] ?? original[0]) : original);
       if (!takesValue(node.op)) out = { field: node.field, op: node.op };
+      else if (untouched) out = { field: node.field, op: node.op, value: original! };
       else if (takesList(node.op)) {
-        const parts = node.value.split(',').map((p) => p.trim()).filter(Boolean);
+        const parts = splitList(node.value);
         if (parts.length === 0) {
           problems[node.id] = 'Enter one or more values, separated by commas';
           return null;
         }
         const values: JsonValue[] = [];
-        for (const p of parts) {
-          const v = scalar(node.field, p, type);
+        for (const [i, p] of parts.entries()) {
+          const v = scalar(node.field, p, type, like(i));
           if (!v.ok) {
             problems[node.id] = v.problem;
             return null;
@@ -181,7 +253,7 @@ export function toFilter(root: GroupNode, properties: ContactPropertyDefinition[
         }
         out = { field: node.field, op: node.op, value: values };
       } else {
-        const v = scalar(node.field, node.value, type);
+        const v = scalar(node.field, node.value, type, like(0));
         if (!v.ok) {
           problems[node.id] = v.problem;
           return null;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SegmentFilter } from '@marlinjai/mail-sdk';
-import { emptyRoot, newCondition, newGroup, rootFrom, toFilter, updateNode, type GroupNode } from '@/lib/segments';
+import { emptyRoot, newCondition, newGroup, rootFrom, splitList, toFilter, updateNode, valueToText, type ConditionNode, type GroupNode } from '@/lib/segments';
 
 const props = [
   { key: 'tier', label: 'Tier', type: 'number' as const },
@@ -83,5 +83,43 @@ describe('the segment builder model', () => {
     for (let i = 0; i < 6; i++) node = { ...newGroup(), children: [node, { ...newCondition('tag'), value: 'b' }] };
     const r = toFilter(node, props);
     expect(r.ok).toBe(false);
+  });
+
+  it('keeps untyped property values as they were saved: numbers, booleans, objects, lists', () => {
+    const filters: SegmentFilter[] = [
+      { field: 'property:score', op: 'gt', value: 7 },
+      { field: 'property:opted', op: 'eq', value: true },
+      { field: 'property:meta', op: 'eq', value: { plan: 'pro', seats: 3 } },
+      { field: 'property:score', op: 'in', value: [1, 2, 3] },
+      { field: 'property:note', op: 'eq', value: '12' },
+    ];
+    for (const f of filters) expect(toFilter(rootFrom(f), [])).toEqual({ ok: true, filter: f });
+  });
+
+  it('types an edited untyped value like the one it replaces', () => {
+    const edit = (f: SegmentFilter, text: string) => {
+      const root = rootFrom(f);
+      const c = root.children[0] as ConditionNode;
+      return toFilter(updateNode(root, c.id, (n) => ({ ...(n as ConditionNode), value: text })), []);
+    };
+    expect(edit({ field: 'property:score', op: 'gt', value: 7 }, '9')).toEqual({ ok: true, filter: { field: 'property:score', op: 'gt', value: 9 } });
+    expect(edit({ field: 'property:opted', op: 'eq', value: true }, 'false')).toEqual({ ok: true, filter: { field: 'property:opted', op: 'eq', value: false } });
+    expect(edit({ field: 'property:meta', op: 'eq', value: { a: 1 } }, '{"a":2}')).toEqual({ ok: true, filter: { field: 'property:meta', op: 'eq', value: { a: 2 } } });
+    expect(edit({ field: 'property:score', op: 'in', value: [1, 2] }, '1, 2, 5')).toEqual({ ok: true, filter: { field: 'property:score', op: 'in', value: [1, 2, 5] } });
+    // Text that no longer fits the old type is compared as text.
+    expect(edit({ field: 'property:score', op: 'gt', value: 7 }, 'many')).toEqual({ ok: true, filter: { field: 'property:score', op: 'gt', value: 'many' } });
+    // A string that looks like a number stays a string.
+    expect(edit({ field: 'property:note', op: 'eq', value: '12' }, '13')).toEqual({ ok: true, filter: { field: 'property:note', op: 'eq', value: '13' } });
+  });
+
+  it('keeps commas inside list values', () => {
+    const f: SegmentFilter = { field: 'property:city', op: 'in', value: ['Berlin, Mitte', 'Köln', 'a\\b'] };
+    const root = rootFrom(f);
+    expect((root.children[0] as ConditionNode).value).toBe('Berlin\\, Mitte, Köln, a\\\\b');
+    expect(toFilter(root, [])).toEqual({ ok: true, filter: f });
+    expect(splitList(valueToText(['x,y', 'z']))).toEqual(['x,y', 'z']);
+    // Typed by hand: an escaped comma stays inside its value.
+    const typed = toFilter({ ...emptyRoot(), children: [{ ...newCondition('property:city'), op: 'in', value: 'Berlin\\, Mitte, Köln' }] }, []);
+    expect(typed).toEqual({ ok: true, filter: { field: 'property:city', op: 'in', value: ['Berlin, Mitte', 'Köln'] } });
   });
 });

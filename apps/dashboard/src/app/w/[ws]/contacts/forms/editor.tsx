@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   HOSTED_PAGE_LOCALES,
   SIGNUP_FORM_FIELDS,
@@ -23,35 +23,43 @@ export type FormLookups = { topics: Topic[]; tags: Tag[]; providers: Provider[];
 const FIELD_LABELS: Record<(typeof SIGNUP_FORM_FIELDS)[number], string> = { first_name: 'First name', last_name: 'Last name' };
 const LOCALE_NAMES: Record<(typeof HOSTED_PAGE_LOCALES)[number], string> = { en: 'English', de: 'German', it: 'Italian', fr: 'French', es: 'Spanish' };
 
-/** A snippet with a copy button that says whether the copy worked. */
+/**
+ * A snippet with a copy button that says whether the copy worked, out loud
+ * too, and returns to "Copy" after a moment. Without a clipboard (an insecure
+ * origin, an old browser) it says to select the text instead.
+ */
 function CopyBlock({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  useEffect(() => {
+    if (state === 'idle') return;
+    const t = setTimeout(() => setState('idle'), 2_500);
+    return () => clearTimeout(t);
+  }, [state]);
+  const copy = () => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) {
+      setState('failed');
+      return;
+    }
+    navigator.clipboard.writeText(value).then(
+      () => setState('copied'),
+      () => setState('failed'),
+    );
+  };
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[12.5px] font-medium text-muted">{label}</span>
-        <Button
-          variant="ghost"
-          className="h-7 px-2 text-[12px]"
-          onClick={() =>
-            navigator.clipboard.writeText(value).then(
-              () => setState('copied'),
-              () => setState('failed'),
-            )
-          }
-        >
+        <Button variant="ghost" className="h-7 px-2 text-[12px]" onClick={copy}>
           {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed, select it instead' : 'Copy'}
         </Button>
       </div>
       {multiline ? (
         <pre className="max-h-56 overflow-auto rounded-lg border border-line bg-black/40 p-3 font-mono text-[11.5px] whitespace-pre-wrap text-ink">{value}</pre>
       ) : (
-        <code className="block truncate rounded-lg border border-line bg-black/40 px-3 py-2 font-mono text-[12px] text-ink" title={value}>
-          {value}
-        </code>
+        <code className="block rounded-lg border border-line bg-black/40 px-3 py-2 font-mono text-[12px] break-all text-ink">{value}</code>
       )}
-      <span aria-live="polite" className="sr-only">
-        {state === 'copied' ? `${label} copied` : state === 'failed' ? 'Copying failed' : ''}
+      <span role="status" className="sr-only">
+        {state === 'copied' ? `${label} copied` : state === 'failed' ? `${label} could not be copied; select the text and copy it` : ''}
       </span>
     </div>
   );

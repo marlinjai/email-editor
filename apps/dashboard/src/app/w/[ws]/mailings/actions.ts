@@ -16,6 +16,7 @@ import {
   type ResponseMeta,
   type UsageWarningHeaderEntry,
 } from '@marlinjai/mail-sdk';
+import { KEEP_CONTENT } from '@/lib/ab';
 import { act, parseInput } from '@/lib/action';
 import { mail } from '@/lib/mail';
 import type { ActionResult } from '@/lib/result';
@@ -306,8 +307,9 @@ const AbInput = z
 
 /**
  * Sets the mailing's A/B test. A variant's content comes from a template's
- * current version; without one it keeps the mailing's content and differs in
- * the subject only.
+ * current version, stays what the variant already has (KEEP_CONTENT, which the
+ * service resolves under its lock), or is the mailing's own (no template): then
+ * the variant differs in the subject only.
  */
 export async function saveAbTest(ws: string, id: string, input: z.input<typeof AbInput>): Promise<ActionResult<Mailing>> {
   const parsed = parseInput(AbInput, input);
@@ -316,7 +318,7 @@ export async function saveAbTest(ws: string, id: string, input: z.input<typeof A
   return act('mailings.setAbTest', async () => {
     const { api } = await mail(ws);
     const documents = new Map<string, Record<string, unknown>>();
-    for (const templateId of new Set(a.variants.map((v) => v.templateId).filter(Boolean))) {
+    for (const templateId of new Set(a.variants.map((v) => v.templateId).filter((t) => t && t !== KEEP_CONTENT))) {
       const template = await api.templates.get(templateId);
       documents.set(templateId, template.document as unknown as Record<string, unknown>);
     }
@@ -324,7 +326,7 @@ export async function saveAbTest(ws: string, id: string, input: z.input<typeof A
       variants: a.variants.map((v) => ({
         key: v.key,
         ...(v.subject ? { subject: v.subject } : {}),
-        ...(v.templateId ? { document: documents.get(v.templateId)! } : {}),
+        ...(v.templateId === KEEP_CONTENT ? { keep_document: true as const } : v.templateId ? { document: documents.get(v.templateId)! } : {}),
       })),
       test_fraction: a.testPercent / 100,
       winner_metric: a.winnerMetric,

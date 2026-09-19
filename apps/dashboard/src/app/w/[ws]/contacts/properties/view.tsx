@@ -113,7 +113,9 @@ export function PropertiesView({ ws, properties, canAdmin }: { ws: string; prope
               <Th>Label</Th>
               <Th>Key</Th>
               <Th>Type</Th>
-              {canAdmin ? <Th className="w-0">{''}</Th> : null}
+              {canAdmin ? <Th className="w-0">
+                  <span className="sr-only">Actions</span>
+                </Th> : null}
             </tr>
           </thead>
           <tbody>

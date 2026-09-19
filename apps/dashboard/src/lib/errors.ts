@@ -1,4 +1,5 @@
 import { MailApiError, MailNetworkError, MailResponseValidationError, MailTimeoutError, type ErrorCode } from '@marlinjai/mail-sdk';
+import { BILLING_NOT_CONFIGURED, isBillingNotConfigured } from './billing-state';
 import type { ActionError } from './result';
 
 /**
@@ -49,18 +50,6 @@ const SERVICE_MESSAGE_WINS: ReadonlySet<ErrorCode> = new Set([
   'insufficient_role',
   'provider_error',
 ]);
-
-/**
- * Checkout and the portal answer `service_unavailable` with this reason until
- * Stripe is configured for the instance: not a passing outage, so it is not
- * worded as one.
- */
-export function isBillingNotConfigured(code: string, details: Record<string, unknown> | undefined): boolean {
-  return code === 'service_unavailable' && details?.reason === 'billing_not_configured';
-}
-
-export const BILLING_NOT_CONFIGURED =
-  'Billing is not available yet: paid plans cannot be bought here until payments are set up. Nothing was charged, and the workspace keeps its current plan.';
 
 type Issue = { path?: Array<string | number>; message?: string };
 

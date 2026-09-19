@@ -84,7 +84,9 @@ export function TagsView({ ws, tags, canWrite }: { ws: string; tags: Tag[]; canW
               <Th>Slug</Th>
               <Th className="text-right">Contacts</Th>
               <Th>Created</Th>
-              {canWrite ? <Th className="w-0">{''}</Th> : null}
+              {canWrite ? <Th className="w-0">
+                  <span className="sr-only">Actions</span>
+                </Th> : null}
             </tr>
           </thead>
           <tbody>

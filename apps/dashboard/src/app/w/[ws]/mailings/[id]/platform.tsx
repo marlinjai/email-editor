@@ -2,12 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
-import type { Mailing, MailingAnalytics, RecipientBatchResult, Segment, TemplateSummary } from '@marlinjai/mail-contract';
+import { testGroupSize, type Mailing, type MailingAnalytics, type RecipientBatchResult, type Segment, type TemplateSummary } from '@marlinjai/mail-contract';
 import { ConfirmDialog, Dialog } from '@/components/dialog';
 import { PlanGate } from '@/components/plan-gate';
 import { FormError } from '@/components/form-error';
-import { Badge, Button, describedBy, Field, Input, Mono, Notice, Select, Table, Td, Th, When } from '@/components/ui';
+import { Badge, Button, describedBy, Field, Input, Mono, Notice, Select, Spinner, Table, Td, Th, When } from '@/components/ui';
 import { useAction } from '@/components/use-action';
+import { KEEP_CONTENT } from '@/lib/ab';
 import { formatCount, percent } from '@/lib/format';
 import { addSegmentAudience, mailingAnalytics, pickAbWinner, removeAbTest, saveAbTest, scheduleMailing, unscheduleMailing } from '../actions';
 
@@ -189,10 +190,15 @@ export function AbTestSection({
   const ab = mailing.ab_test;
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const pick = useAction();
+  const [picking, setPicking] = useState<string | null>(null);
 
   if (ab && !editing) {
     const deciding = ab.status === 'testing' || ab.status === 'awaiting_pick';
+    // The split the service made at the start (the same formula, from the contract).
+    const total = mailing.counts.total;
+    const testSize = testGroupSize(total, ab.test_fraction, ab.variants.length);
+    const rest = Math.max(0, total - testSize);
+    const pickedKey = picking?.toUpperCase() ?? '';
     return (
       <div className="flex flex-col gap-4" data-testid="ab-test">
         <div className="flex flex-wrap items-center gap-2 text-[13px]">
@@ -220,7 +226,11 @@ export function AbTestSection({
               <Th className="w-16">Variant</Th>
               <Th>Subject</Th>
               <Th>Content</Th>
-              {canWrite && deciding ? <Th className="w-0">{''}</Th> : null}
+              {canWrite && deciding ? (
+                <Th className="w-0">
+                  <span className="sr-only">Pick</span>
+                </Th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -236,7 +246,7 @@ export function AbTestSection({
                 <Td className="text-muted">{v.has_document ? 'its own content' : "the mailing's content"}</Td>
                 {canWrite && deciding ? (
                   <Td>
-                    <Button busy={pick.pending} onClick={() => void pick.run(() => pickAbWinner(ws, mailing.id, v.key), onChange)}>
+                    <Button onClick={() => setPicking(v.key)}>
                       Send {v.key.toUpperCase()} to the rest
                     </Button>
                   </Td>
@@ -250,7 +260,6 @@ export function AbTestSection({
             Variant {ab.winner?.toUpperCase()} was picked {ab.decided_by === 'manual' ? 'by hand' : `by ${ab.winner_metric}`} <When at={ab.decided_at} />.
           </p>
         ) : null}
-        <FormError error={pick.error} />
         {canWrite && editable ? (
           <div className="flex gap-2">
             <Button onClick={() => setEditing(true)}>Change the test</Button>
@@ -259,6 +268,19 @@ export function AbTestSection({
             </Button>
           </div>
         ) : null}
+        <ConfirmDialog
+          open={picking !== null}
+          onClose={() => setPicking(null)}
+          title={`Send variant ${pickedKey} to the rest?`}
+          description={`Variant ${pickedKey} goes to the other ${formatCount(rest)} of ${formatCount(total)} recipients, who have not had this mailing yet. The test group of ${formatCount(testSize)} keeps the variants it got. The pick is final.`}
+          confirmLabel={`Send ${pickedKey} to ${formatCount(rest)} recipients`}
+          tone="primary"
+          action={async () => {
+            const r = await pickAbWinner(ws, mailing.id, picking!);
+            if (r.ok) onChange(r.data);
+            return r;
+          }}
+        />
         <ConfirmDialog
           open={removing}
           onClose={() => setRemoving(false)}
@@ -331,9 +353,10 @@ function AbTestForm({
 }) {
   const { run, pending, error, fields } = useAction();
   const ab = mailing.ab_test;
-  // Changing a test starts from its subjects; its contents are re-chosen, since the variant keeps only a copy.
+  // Changing a test starts from what it is: each variant keeps its subject and,
+  // unless another is chosen, its own content.
   const [variants, setVariants] = useState<VariantDraft[]>(() =>
-    ab ? ab.variants.map((v) => ({ key: v.key, subject: v.subject ?? '', templateId: '' })) : [
+    ab ? ab.variants.map((v) => ({ key: v.key, subject: v.subject ?? '', templateId: v.has_document ? KEEP_CONTENT : '' })) : [
       { key: 'a', subject: mailing.subject, templateId: '' },
       { key: 'b', subject: '', templateId: '' },
     ],
@@ -341,7 +364,7 @@ function AbTestForm({
   const [testPercent, setTestPercent] = useState(ab ? Math.round(ab.test_fraction * 100) : 20);
   const [metric, setMetric] = useState<'opens' | 'clicks' | 'manual'>(ab?.winner_metric ?? (trackingOn ? 'opens' : 'manual'));
   const [hours, setHours] = useState(ab?.decide_after_minutes ? ab.decide_after_minutes / 60 : 4);
-  const hadDocuments = ab?.variants.some((v) => v.has_document) ?? false;
+  const hadDocument = (key: string) => ab?.variants.find((v) => v.key === key)?.has_document ?? false;
 
   return (
     <form
@@ -360,7 +383,6 @@ function AbTestForm({
         );
       }}
     >
-      {hadDocuments ? <Notice tone="warn">Variants with their own content need their template chosen again; otherwise they keep the mailing&apos;s content.</Notice> : null}
       <ul className="flex flex-col gap-3">
         {variants.map((v, i) => (
           <li key={v.key} className="grid gap-2 sm:grid-cols-[40px_1fr_240px_auto] sm:items-start">
@@ -380,6 +402,7 @@ function AbTestForm({
               value={v.templateId}
               onChange={(e) => setVariants((xs) => xs.map((x, j) => (j === i ? { ...x, templateId: e.target.value } : x)))}
             >
+              {hadDocument(v.key) ? <option value={KEEP_CONTENT}>Keep its current content</option> : null}
               <option value="">The mailing&apos;s content</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -388,7 +411,7 @@ function AbTestForm({
               ))}
             </Select>
             {variants.length > 2 ? (
-              <Button variant="ghost" onClick={() => setVariants((xs) => xs.filter((_, j) => j !== i).map((x, j) => ({ ...x, key: LETTERS[j]! })))} aria-label={`Remove variant ${v.key.toUpperCase()}`}>
+              <Button variant="ghost" onClick={() => setVariants((xs) => xs.filter((_, j) => j !== i))} aria-label={`Remove variant ${v.key.toUpperCase()}`}>
                 Remove
               </Button>
             ) : (
@@ -400,7 +423,7 @@ function AbTestForm({
       {fields.variants ? <p className="text-[12px] text-danger">{fields.variants}</p> : null}
       {variants.length < 5 ? (
         <div>
-          <Button variant="ghost" onClick={() => setVariants((xs) => [...xs, { key: LETTERS[xs.length]!, subject: '', templateId: '' }])}>
+          <Button variant="ghost" onClick={() => setVariants((xs) => [...xs, { key: LETTERS.find((l) => !xs.some((x) => x.key === l))!, subject: '', templateId: '' }])}>
             Add a variant
           </Button>
         </div>
@@ -463,7 +486,20 @@ export function AnalyticsSection({ ws, mailing }: { ws: string; mailing: Mailing
     // Re-read when the counts move; the analytics follow the same sends.
   }, [ws, mailing.id, mailing.counts.sent]);
 
-  if (!data) return load.error ? <FormError error={load.error} /> : <p className="text-[13px] text-muted">Loading the numbers.</p>;
+  if (!data) {
+    return load.error ? (
+      <div className="flex flex-col items-start gap-2">
+        <FormError error={load.error} />
+        <Button onClick={() => void load.run(() => mailingAnalytics(ws, mailing.id), setData)} busy={load.pending}>
+          Try again
+        </Button>
+      </div>
+    ) : (
+      <p role="status" className="flex items-center gap-2 text-[13px] text-muted">
+        <Spinner /> Loading the numbers.
+      </p>
+    );
+  }
   const sent = data.counts.sent;
   const tracked = data.tracking;
   return (
@@ -505,17 +541,15 @@ export function AnalyticsSection({ ws, mailing }: { ws: string; mailing: Mailing
         {data.apple_mpp_opens !== null ? (
           <div>
             <dt className="text-faint">Apple Mail privacy opens</dt>
-            <dd className="tabular text-ink" title="Apple Mail Privacy Protection loads every image on delivery: counted apart, never as a person opening the mail.">
-              {formatCount(data.apple_mpp_opens)}
-            </dd>
+            <dd className="tabular text-ink">{formatCount(data.apple_mpp_opens)}</dd>
+            <dd className="text-[12px] text-faint">Apple Mail loads every image on delivery; counted apart, never as a person opening the mail.</dd>
           </div>
         ) : null}
         {data.machine_events !== null ? (
           <div>
             <dt className="text-faint">Filtered machine events</dt>
-            <dd className="tabular text-ink" title="Security scanners and link prefetchers, left out of the unique counts.">
-              {formatCount(data.machine_events)}
-            </dd>
+            <dd className="tabular text-ink">{formatCount(data.machine_events)}</dd>
+            <dd className="text-[12px] text-faint">Security scanners and link prefetchers, left out of the unique counts.</dd>
           </div>
         ) : null}
       </dl>
@@ -556,9 +590,7 @@ export function AnalyticsSection({ ws, mailing }: { ws: string; mailing: Mailing
           <tbody>
             {data.links.map((l) => (
               <tr key={l.url}>
-                <Td className="max-w-[56ch] truncate font-mono text-[12px]">
-                  <span title={l.url}>{l.url}</span>
-                </Td>
+                <Td className="max-w-[56ch] font-mono text-[12px] break-all">{l.url}</Td>
                 <Td className="tabular text-right">{formatCount(l.unique_clicks)}</Td>
               </tr>
             ))}

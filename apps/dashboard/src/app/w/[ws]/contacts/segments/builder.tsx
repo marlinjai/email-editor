@@ -61,10 +61,11 @@ function ConditionRow({
   const ops = operatorsFor(node.field);
   const setField = (field: string) => {
     const nextOps = operatorsFor(field);
-    onChange({ ...node, field, op: nextOps.includes(node.op) ? node.op : nextOps[0]!, value: '' });
+    // A new field starts empty: the saved value belonged to the old one.
+    onChange({ ...node, field, op: nextOps.includes(node.op) ? node.op : nextOps[0]!, value: '', original: undefined });
   };
   const list = takesList(node.op);
-  const listHint = list ? 'Separate values with commas' : undefined;
+
 
   let valueInput: React.ReactNode = null;
   if (takesValue(node.op)) {
@@ -105,7 +106,6 @@ function ConditionRow({
           min={node.field.startsWith('engagement:') ? 1 : undefined}
           step={node.field.startsWith('engagement:') ? 1 : 'any'}
           placeholder={list ? (node.field === 'tag' || node.field === 'topic' ? 'slug-one, slug-two' : 'one, two') : ''}
-          title={listHint}
           className="min-w-[160px] flex-1"
         />
       );
@@ -187,6 +187,8 @@ function ConditionRow({
         <p id={`${id}-problem`} className="text-[12px] text-danger">
           {problem}
         </p>
+      ) : list && takesValue(node.op) ? (
+        <p className="text-[12px] text-faint">Separate the values with commas; write \, for a comma inside a value.</p>
       ) : null}
     </li>
   );

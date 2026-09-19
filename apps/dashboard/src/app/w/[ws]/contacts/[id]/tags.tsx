@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Tag } from '@marlinjai/mail-contract';
 import { FormError } from '@/components/form-error';
 import { Badge, Button, Select } from '@/components/ui';
@@ -13,6 +13,9 @@ export function ContactTags({ ws, contactId, tags, all, canWrite }: { ws: string
   const router = useRouter();
   const { run, pending, error } = useAction();
   const [adding, setAdding] = useState('');
+  // After a removal the focused button is gone: focus goes to the list, which
+  // says what is left, rather than to the top of the page.
+  const listRef = useRef<HTMLUListElement>(null);
   const available = all.filter((t) => !tags.includes(t.slug));
   const nameOf = (slug: string) => all.find((t) => t.slug === slug)?.name ?? slug;
   const change = (slug: string, on: boolean) =>
@@ -21,12 +24,13 @@ export function ContactTags({ ws, contactId, tags, all, canWrite }: { ws: string
       () => {
         setAdding('');
         router.refresh();
+        if (!on) listRef.current?.focus();
       },
     );
 
   return (
     <div className="flex flex-col gap-2">
-      <ul className="flex flex-wrap items-center gap-1.5" aria-label="Tags">
+      <ul ref={listRef} tabIndex={-1} className="flex flex-wrap items-center gap-1.5 focus:outline-none focus-visible:outline-2 focus-visible:outline-gold" aria-label="Tags">
         {tags.length === 0 ? <li className="text-faint">no tags</li> : null}
         {tags.map((slug) => (
           <li key={slug}>

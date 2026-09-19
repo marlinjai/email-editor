@@ -1,4 +1,4 @@
-import { USAGE_WARNING_RATIO, type Plan, type PlanId, type UsageMetric } from '@marlinjai/mail-sdk';
+import { USAGE_WARNING_RATIO, type Plan, type PlanId, type UsageMetric } from '@marlinjai/mail-contract';
 import { formatCount } from './format';
 
 /**
