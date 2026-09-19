@@ -1,0 +1,43 @@
+<mjml>
+  <mj-head>
+    <mj-title>Meet the Field Kit</mj-title>
+    <mj-html-attributes>
+      <mj-selector path=".launch-cta a">
+        <mj-html-attribute name="data-track">launch-cta</mj-html-attribute>
+      </mj-selector>
+    </mj-html-attributes>
+    <mj-attributes>
+      <mj-all padding="0px" />
+      <mj-text padding="8px 24px" font-family="Arial, sans-serif" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#101418">
+    <mj-section full-width="full-width" background-url="https://images.example.org/stripes.png" background-repeat="repeat" background-size="auto" padding="40px 0">
+      <mj-column>
+        <mj-text color="#ffffff" font-size="36px" align="center">The Field Kit</mj-text>
+        <mj-carousel thumbnails="visible" border-radius="6px">
+          <mj-carousel-image src="https://images.example.org/kit-1.jpg" alt="The kit, closed" />
+          <mj-carousel-image src="https://images.example.org/kit-2.jpg" alt="The kit, open" href="https://example.org/kit" />
+        </mj-carousel>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#ffffff">
+      <mj-column width="200px" padding="16px">
+        <mj-image src="https://images.example.org/detail.jpg" alt="Brass buckle detail" border-radius="4px" />
+      </mj-column>
+      <mj-column width="400px" padding="16px">
+        <mj-accordion border="1px solid #dddddd" font-family="Arial, sans-serif" icon-position="right">
+          <mj-accordion-element>
+            <mj-accordion-title>What is inside?</mj-accordion-title>
+            <mj-accordion-text>A notebook, two pencils, a waxed canvas roll and a brass ruler.</mj-accordion-text>
+          </mj-accordion-element>
+          <mj-accordion-element>
+            <mj-accordion-title>When does it ship?</mj-accordion-title>
+            <mj-accordion-text>From 1 October 2026.</mj-accordion-text>
+          </mj-accordion-element>
+        </mj-accordion>
+        <mj-button css-class="launch-cta" href="https://example.org/kit" background-color="#d4a017" color="#101418" inner-padding="14px 28px">Pre-order</mj-button>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

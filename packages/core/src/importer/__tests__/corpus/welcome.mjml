@@ -1,0 +1,32 @@
+<mjml>
+  <mj-head>
+    <mj-preview>Welcome aboard, {{first_name}}</mj-preview>
+    <mj-breakpoint width="520px" />
+  </mj-head>
+  <mj-body>
+    <mj-raw>
+      <!-- welcome series, mail 1 of 3 -->
+    </mj-raw>
+    <mj-hero mode="fixed-height" height="360px" background-width="600px" background-height="360px" background-url="https://images.example.org/hero.jpg" background-color="#2a3b4c" padding="100px 0px">
+      <mj-text padding="20px" color="#ffffff" font-family="Georgia, serif" align="center" font-size="42px" line-height="48px">Welcome, {{first_name}}</mj-text>
+      <mj-button href="https://example.org/start" background-color="#f45e43" color="#ffffff" align="center">Get started</mj-button>
+    </mj-hero>
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="18px">Three things to try first:</mj-text>
+        <mj-text>1. Set up your profile.<br />2. Import your contacts.<br />3. Send yourself a test.</mj-text>
+        <!--[if mso]><p style="margin:0">Outlook readers: the buttons below work too.</p><![endif]-->
+        <mj-button href="https://example.org/profile" padding="10px 25px" font-size="16px" font-weight="bold" text-transform="uppercase">Set up my profile</mj-button>
+        <mj-button href="https://example.org/help" background-color="transparent" color="#414141" border="1px solid #414141">Read the guide</mj-button>
+      </mj-column>
+    </mj-section>
+    <mj-section padding-top="0">
+      <mj-column>
+        <mj-social mode="horizontal" icon-size="24px">
+          <mj-social-element name="facebook" href="https://facebook.com/example" />
+          <mj-social-element name="x" href="https://x.com/example" />
+        </mj-social>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

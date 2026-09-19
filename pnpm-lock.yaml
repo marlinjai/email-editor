@@ -430,6 +430,12 @@ importers:
       mjml:
         specifier: ^4.14.1
         version: 4.18.0
+      mjml-parser-xml:
+        specifier: ^4.18.0
+        version: 4.18.0
+      mjml-preset-core:
+        specifier: ^4.18.0
+        version: 4.18.0
       mobx:
         specifier: ^6.12.0
         version: 6.15.0
@@ -446,6 +452,9 @@ importers:
       '@types/mjml':
         specifier: ^4.7.4
         version: 4.7.4
+      htmlparser2:
+        specifier: ^9.1.0
+        version: 9.1.0
       tsup:
         specifier: ^8.0.1
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.13)(typescript@5.9.3)(yaml@2.8.2)
