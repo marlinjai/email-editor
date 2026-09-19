@@ -58,6 +58,11 @@ Decisions and operator steps that remain after the mail service plan was built
 
 ## Recently shipped
 
+- MJML import (paste or upload, preview, warnings, remote images copied on
+  request) and export of templates and mailings as MJML or HTML, in the core,
+  the service, the SDK and the dashboard (2026-09-19)
+  [plan](docs/plans/2026-09-18-mail-service.md)
+
 - Lumitra Mail, the multi-tenant mail service with ŌPUNTIA's Studio as its first
   client, built S0 to S5 and deployed at `https://mail.lumitra.co` (API, hosted
   unsubscribe and signup pages, landing page) and `https://app.mail.lumitra.co`

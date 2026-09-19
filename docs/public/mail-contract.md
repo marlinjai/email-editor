@@ -87,6 +87,7 @@ Every non-2xx response is `{ "error": { "code", "message", "details"? } }`. Swit
 | `conflict` | 409 | a template save based on an outdated `base_version` |
 | `missing_unsubscribe_url` | 422 | a broadcast whose document lacks `{{unsubscribe_url}}` |
 | `compile_failed` | 422 | sending a document whose compile reported errors |
+| `invalid_mjml` | 422 | MJML that cannot be imported; `details.reason`, `line`, `column` |
 | `daily_budget_exhausted` | 429 | the provider's rolling 24 hour budget is spent |
 
 ## Idempotency
@@ -185,6 +186,52 @@ if it bounces again, it is blocked again.
 `{ mjml, html, warnings, errors }` with status 200 whenever compilation ran. A
 non-empty `errors` means the HTML must not be sent; `warnings` are shown and do not
 block. Only an unreadable document is a 4xx.
+
+## MJML import and export
+
+| Operation | Route | Access | Answer |
+| --- | --- | --- | --- |
+| `templates.importPreview` | `POST /v1/templates/import/preview` `{ mjml }` | read | 200 `{ document, warnings, compiled, remote_images, asset_policy }`, nothing saved |
+| `templates.import` | `POST /v1/templates/import` `{ name, description?, mjml, import_remote_assets? }` | write | 201 `{ template, warnings, imported_assets }`, the template at version 1 |
+| `templates.export` | `GET /v1/templates/:id/export?format=mjml\|html&version=n` | read | 200, the file |
+| `mailings.export` | `GET /v1/mailings/:id/export?format=mjml\|html` | read | 200, the mailing's content snapshot as a file |
+
+**Import.** The service reads the MJML (at most `MAX_MJML_IMPORT_BYTES`, 512 KB,
+else `payload_too_large`) in its compile workers under the compile deadline.
+Attributes a block has become its fields; the rest are kept and emitted again, and
+the document keeps its `mj-attributes`, so the mail compiles as the source did.
+What the editor cannot hold as a block becomes a Raw HTML block with the compiled
+output of exactly that part. Nothing is dropped silently: each change is an
+`ImportWarning` (`severity` `info` or `warning`, a stable `code` such as
+`kept_as_html` or `unknown_component`, a `path` like
+`mj-body > mj-section[2] > mj-column[1] > mj-social[1]`, the `line`, and for a
+fallback the MJML `fragment`). MJML that cannot be read at all is `invalid_mjml`
+(422) with `details.reason` (`MJML_IMPORT_REFUSALS`: `invalid_xml`, `not_mjml`,
+`include_not_supported`, `too_deep`, `too_many_elements`, `too_complex`,
+`invalid_document`) and, when it is one place, `details.line` and
+`details.column`. `mj-include` is always refused: an import has no files.
+
+The preview lists `remote_images`, the images the document loads from outside the
+service. Under the `service_only` asset policy each is also a compile error. With
+`import_remote_assets: true`, `templates.import` copies each (https only, no
+private addresses, no redirects, images only, at most `MAX_IMPORTED_REMOTE_IMAGES`,
+50) into the workspace's assets exactly as `assets.import` does and points the
+document at the copies (`imported_assets`); one that cannot be copied stays remote
+and is a `remote_image_not_imported` warning, never a failed import.
+`templates.import` takes an `Idempotency-Key` like every mutating call: a retry
+with the same key and body answers with the first template.
+
+**Export.** The answer is the file itself, not JSON (`responseType: 'text'` in the
+route table): `text/plain; charset=utf-8` for MJML (it has no registered media
+type), `text/html; charset=utf-8` for HTML, `Content-Disposition: attachment` with
+a file name from the template's name (`exportFilename`), `nosniff` and a sandboxing
+content security policy. The service's own asset addresses are absolute. An export
+is never refused for its content: MJML errors and addresses the workspace's asset
+policy does not allow are in `x-mail-export-warnings` (URL-encoded JSON of
+`CompileMessage[]`, shortened to fit; read it with `parseExportWarningsHeader`)
+and counted in `x-mail-export-warning-count`. Errors are the JSON envelope as
+everywhere. The SDK's `templates.export` and `mailings.export` return
+`{ content, contentType, filename, warnings, warningCount }`.
 
 ## Merge fields
 

@@ -115,7 +115,7 @@ function Composer({ initial }: { initial?: TemplateSnapshotOut }) {
 }
 ```
 
-In Next.js, load the component with `next/dynamic` and `ssr: false` from a `'use client'` file, and set `serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator']` in `next.config.ts`; `transpilePackages` is not needed. See the [Integration](./integration) guide.
+In Next.js, load the component with `next/dynamic` and `ssr: false` from a `'use client'` file, and set `serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-preset-core', 'mjml-validator']` in `next.config.ts`; `transpilePackages` is not needed. See the [Integration](./integration) guide.
 
 ### onRequestImage
 

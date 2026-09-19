@@ -92,7 +92,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // MJML is Node-only and loads files at runtime: keep it out of the server bundle.
-  serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
+  serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-preset-core', 'mjml-validator'],
 };
 
 export default nextConfig;

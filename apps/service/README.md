@@ -122,6 +122,30 @@ Brain unreachable is 503 with `Retry-After`, never cached. With an
 `Idempotency-Key`, a retried upload replays the first answer; the fingerprint is
 the parsed parts (a new multipart boundary on the retry still matches).
 
+**MJML import and export** (`src/routes/mjml-io.ts`, `src/compile/mjml-io.ts`).
+`templates.importPreview` and `templates.import` run the editor core's
+`importMjml` in the compile pool's workers (the worker protocol has an `import`
+job next to `compile`), under the same deadline and queue: MJML is never read on
+the request thread, and a source past the deadline is `invalid_mjml` with
+`details.reason: too_complex`. Before the parser sees anything, the core's scan
+refuses malformed MJML with a line and column, and refuses `mj-include`, so the
+parser never reads the server's disk. Sources over `MAX_MJML_IMPORT_BYTES` are
+`payload_too_large`. The import writes version 1 in one transaction and an
+audit entry `template.created` with `details.source: "mjml_import"`; with an
+`Idempotency-Key` a retry replays the first template. With
+`import_remote_assets`, the remote images found in the compiled document are
+copied through `assets.import`'s own fetch (`fetchRemoteImage` under the webhook
+SSRF policy, then `storeImageWith`, four at a time, at most 50), before the
+transaction, and every spelling of each address in the document (as written and
+XML-escaped) is replaced by the copy's `/a/<id>` address. An image that cannot be
+copied stays remote and becomes a `remote_image_not_imported` warning. Copies
+made before a failed create stay as ordinary workspace assets. `templates.export`
+and `mailings.export` compile under the workspace's asset policy (like a send),
+make relative `/a/<id>` addresses absolute on `PUBLIC_BASE_URL`, and answer with
+the file; they never refuse for the content, which goes into
+`x-mail-export-warnings` instead. Only a compile that produced nothing (the
+deadline, a crashed worker) is `service_unavailable`.
+
 ## Invitations (S3)
 
 A person who is not a member yet joins through an invitation (`src/routes/invites.ts`,

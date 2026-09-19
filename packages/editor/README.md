@@ -88,7 +88,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // MJML is Node-only and loads files at runtime: keep it out of the server bundle.
-  serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator'],
+  serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-preset-core', 'mjml-validator'],
 };
 
 export default nextConfig;
@@ -124,6 +124,60 @@ export async function POST(request: Request) {
 ```
 
 Never import `@marlinjai/email-editor-core/server` from client code.
+
+## Export as MJML or HTML, import existing MJML
+
+Both directions run on your server, next to the compiler, and never in the browser bundle.
+
+**Export.** The same `compile` call gives both files: `mjml` is the MJML source of the document, `html` the finished mail. Serve whichever the person asked for as a download:
+
+```ts
+// app/api/export/route.ts
+import { migrateTemplate } from '@marlinjai/email-editor-core';
+import { createMJMLCompiler } from '@marlinjai/email-editor-core/server';
+
+export async function POST(request: Request) {
+  const format = new URL(request.url).searchParams.get('format') === 'mjml' ? 'mjml' : 'html';
+  const { html, mjml, errors } = createMJMLCompiler().compile(migrateTemplate(await request.json()));
+  return new Response(format === 'mjml' ? mjml : html, {
+    headers: {
+      'content-type': format === 'mjml' ? 'text/plain; charset=utf-8' : 'text/html; charset=utf-8',
+      'content-disposition': `attachment; filename="email.${format}"`,
+      // errors: MJML's validation messages, worth showing next to the download
+    },
+  });
+}
+```
+
+The editor's `getHTML()` and `getMJML()` cannot compile in the browser; call your route with `getValue()` instead. The editor has no export button of its own on purpose: a download belongs in your app's chrome (where the Lumitra Mail dashboard puts its Export menu), and only your server can compile.
+
+**Import.** `importMjml(source)` reads an MJML document into the editor's document model:
+
+```ts
+import { importMjml, isMjmlImportError } from '@marlinjai/email-editor-core/server';
+
+try {
+  const { document, warnings } = importMjml(mjmlSource);
+  // `document` passed migrateTemplate: open it in the editor, or store it.
+  // `warnings`: what could not become an editable block, with where and why.
+} catch (error) {
+  if (isMjmlImportError(error)) {
+    // error.code: invalid_xml | not_mjml | include_not_supported | too_large | too_deep | too_many_elements | invalid_document
+    // error.line, error.column: where, when it is one place
+  }
+  throw error;
+}
+```
+
+What maps, and what does not:
+
+- Every standard component with the attributes its block has becomes that block: text, image, button, divider, spacer, navbar, carousel, accordion, raw HTML, sections, wrappers around one section, columns and groups of columns. Attributes the block has no field for (a `css-class` your `mj-style` rules target, `font-weight`, `mj-class`, ...) are kept on the block and emitted again, and the document keeps its `mj-attributes`, so the mail compiles as the source did.
+- The editor's own export imports back exactly, ids included.
+- What the editor cannot hold as a block is compiled in place and kept as a Raw HTML block that renders exactly as before, with a `kept_as_html` warning carrying the MJML: an `mj-hero` with content, `mj-social` (the editor's Social block draws its own icons), a hand-written `mj-table`, a wrapper around several sections, a section with conditional comments between its columns.
+- A component MJML does not know renders nothing in MJML either; its source is kept in a comment in a Raw block, with an `unknown_component` warning.
+- `mj-include` is refused (`include_not_supported`): an import has no files next to it, and the importer never reads the disk.
+
+Importing is synchronous and CPU-bound. Limits (`MAX_MJML_BYTES`, `MAX_MJML_DEPTH`, `MAX_MJML_ELEMENTS`) bound one call; for untrusted input run it off your request thread with a deadline, as the Lumitra Mail service does in its compile worker pool.
 
 ## Stored documents and `migrateTemplate`
 

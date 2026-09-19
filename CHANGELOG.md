@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `importMjml` in `@marlinjai/email-editor-core/server`: reads an MJML document
+  into the editor's document model. Nothing is dropped silently: what cannot
+  become an editable block is kept as compiled HTML, with a warning carrying its
+  path and source; unreadable MJML is an `MjmlImportError` with a line and
+  column; `mj-include` is refused. The editor's own export imports back exactly.
+- Documents keep MJML attributes the editor has no control for
+  (`extraAttributes` on blocks, columns and sections) and an imported document's
+  head settings (`metadata.mjmlHead`); the compiler emits them.
+- Mail service: `templates.importPreview`, `templates.import` (idempotent, with
+  an optional copy of remote images into the workspace's assets),
+  `templates.export` and `mailings.export` (MJML or HTML files, never refused;
+  send-blocking problems in `x-mail-export-warnings`), and the `invalid_mjml`
+  error. The contract and the SDK carry all four.
+- Dashboard: "Import MJML" (paste or upload, preview, warnings, remote images,
+  create) and an Export menu (MJML or HTML) for templates and mailings.
+- Landing page: the editor line names MJML import and export, in all five
+  languages.
+
+### Fixed
+
+- The editor dropped every `padding` object when it opened a document, and its
+  own padding edits never reached the compiled mail.
+- The compiler wrote only the padding sides that were set, so `{ top, bottom }`
+  was read by MJML as vertical and horizontal padding; it now writes all four.
+
 ## [0.1.0] - 2026-09-19
 
 The editor becomes Lumitra Mail: a multi-tenant mail service and marketing

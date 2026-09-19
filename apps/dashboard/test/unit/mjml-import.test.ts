@@ -162,7 +162,9 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 const { previewImport, importTemplate } = await import('@/app/w/[ws]/templates/actions');
 
 describe('server actions', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('previews, and refuses empty or oversized MJML without calling the service', async () => {
     api.templates.importPreview.mockResolvedValue({ document: {}, warnings: [] });
