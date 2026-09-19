@@ -118,6 +118,9 @@ export class MJMLCompiler {
       this.needsSubColumnStyles = false;
       const mjml = this.templateToMJML(template);
       const result = mjml2html(mjml, {
+        // Never resolve <mj-include>: its path is read from the server's disk,
+        // and a stored document (a Raw block's html) must not reach local files.
+        ignoreIncludes: true,
         validationLevel: 'soft',
         minify: false,
         ...(options.webFonts === false ? { fonts: {} } : {}),

@@ -21,6 +21,14 @@ export function validateDocument(document: unknown, at: (string | number)[] = ['
       limit_bytes: MAX_DOCUMENT_BYTES,
     });
   }
+  // Defense in depth behind the compiler's `ignoreIncludes`: a document never
+  // carries an <mj-include> (its path would be read from the server's disk).
+  if (/<\s*mj-include\b/i.test(JSON.stringify(document) ?? '')) {
+    throw new ApiError('validation_failed', 'A document may not contain <mj-include>.', {
+      reason: 'INVALID_DOCUMENT',
+      issues: [{ path: at, message: 'A document may not contain <mj-include>.' }],
+    });
+  }
   try {
     return migrateTemplate(document);
   } catch (err) {
