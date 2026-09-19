@@ -234,6 +234,51 @@ describe('export', () => {
   });
 });
 
+describe('wrappers', () => {
+  const WRAPPED = `<mjml><mj-body>
+    <mj-wrapper background-color="#f4f4f4" border-top="4px solid #0b6e4f" border-radius="8px" padding="24px 0" gap="12px">
+      <mj-section><mj-column><mj-text>First card</mj-text></mj-column></mj-section>
+      <mj-section><mj-column><mj-text>Second card</mj-text></mj-column></mj-section>
+    </mj-wrapper>
+  </mj-body></mjml>`;
+
+  it('an imported mj-wrapper is stored as a wrapper, edited as one, and exported as mj-wrapper again', async () => {
+    const res = await h.call({ method: 'POST', path: '/v1/templates/import', key: A.key, body: { name: 'Cards', mjml: WRAPPED } });
+    expect(res.status).toBe(201);
+    const doc = res.body.template.document;
+    expect(doc.version).toBe('1.1');
+    expect(doc.sections).toHaveLength(1);
+    expect(doc.sections[0]).toMatchObject({ type: 'wrapper', backgroundColor: '#f4f4f4', borderTop: '4px solid #0b6e4f', borderRadius: '8px', gap: '12px' });
+    expect(doc.sections[0].sections).toHaveLength(2);
+    expect(res.body.warnings.filter((w: { code: string }) => w.code === 'kept_as_html')).toEqual([]);
+
+    // Edited as a wrapper (what the editor saves), then exported.
+    const edited = structuredClone(doc);
+    edited.sections[0].backgroundColor = '#ffffff';
+    const saved = await h.call({ method: 'PUT', path: `/v1/templates/${res.body.template.id}`, key: A.key, body: { base_version: 1, document: edited } });
+    expect(saved.status).toBe(200);
+    const mjml = await h.call({ path: `/v1/templates/${res.body.template.id}/export?format=mjml`, key: A.key });
+    expect(mjml.text).toMatch(/<mj-wrapper background-color="#ffffff"[^>]*border-top="4px solid #0b6e4f"[^>]*gap="12px"/);
+    expect(mjml.text.match(/<mj-section/g)).toHaveLength(2);
+  });
+
+  it('a stored 1.0 document with the old wrapper flag is kept as sent, and compiles and exports as a wrapper', async () => {
+    const legacy = {
+      version: '1.0',
+      metadata: { title: 'Old' },
+      sections: [{ id: 'old-w', type: 'section', isWrapper: true, backgroundColor: '#eeeeee', columns: [{ id: 'c', blocks: [{ id: 't', type: 'text', content: '<p>Legacy</p>' }] }] }],
+    };
+    const created = await h.call({ method: 'POST', path: '/v1/templates', key: A.key, body: { name: 'Legacy', document: legacy } });
+    expect(created.status).toBe(201);
+    expect(created.body.document).toEqual(legacy);
+    const compiled = await h.call({ method: 'POST', path: `/v1/templates/${created.body.id}/compile`, key: A.key });
+    expect(compiled.status).toBe(200);
+    expect(compiled.body.html).toContain('Legacy');
+    const mjml = await h.call({ path: `/v1/templates/${created.body.id}/export?format=mjml`, key: A.key });
+    expect(mjml.text).toContain('<mj-wrapper background-color="#eeeeee" css-class="el-wrapper el-old-w">');
+  });
+});
+
 describe('tenancy and revoked keys', () => {
   it("workspace B cannot export A's template or mailing", async () => {
     const t = await h.call({ method: 'POST', path: '/v1/templates/import', key: A.key, body: { name: 'Private', mjml: MJML } });

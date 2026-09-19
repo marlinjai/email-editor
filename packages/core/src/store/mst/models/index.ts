@@ -39,7 +39,21 @@ export {
 } from './SectionModel';
 
 export {
+  WrapperModel,
+  createWrapper,
+  MJML_WRAPPER_DEFAULT_PADDING,
+  type WrapperInstance,
+  type WrapperSnapshotIn,
+  type WrapperSnapshotOut,
+  type WrapperProperties,
+} from './WrapperModel';
+
+export {
   TemplateModel,
+  TopLevelItemModel,
+  isWrapperInstance,
+  cloneSectionSnapshot,
+  type TopLevelItemInstance,
   TemplateMetadataModel,
   FontDefinitionModel,
   ThemeColorModel,

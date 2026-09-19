@@ -37,7 +37,7 @@ import '@marlinjai/email-editor/styles.css';
 
 const initialTemplate: TemplateSnapshotIn = {
   id: 'welcome-email',
-  version: '1.0',
+  version: '1.1',
   metadata: { subject: 'My Email' },
   sections: [],
 };
@@ -109,7 +109,7 @@ import '@marlinjai/email-editor/styles.css';
 const editor = createEditor({
   container: document.getElementById('editor'),
   initialValue: {
-    version: '1.0',
+    version: '1.1',
     metadata: { subject: 'My Email' },
     sections: [],
   },
@@ -130,12 +130,13 @@ editor.destroy();
 
 ```typescript
 interface EmailTemplate {
-  version: '1.0';
+  version: '1.0' | '1.1';
   metadata: {
     subject?: string;
     previewText?: string;
   };
-  sections: Section[];
+  // The top level, in order: sections, and wrappers (a container around sections, from 1.1)
+  sections: Array<Section | Wrapper>;
 }
 ```
 

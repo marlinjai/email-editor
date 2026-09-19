@@ -74,9 +74,13 @@ export const COLUMN_DEFAULTS: Record<string, () => unknown> = {
 export const SECTION_DEFAULTS: Record<string, () => unknown> = {
   type: () => 'section',
   fullWidth: no,
-  isWrapper: no,
   noStack: no,
   hidden: no,
+};
+
+export const WRAPPER_DEFAULTS: Record<string, () => unknown> = {
+  hidden: no,
+  fullWidth: no,
 };
 
 /**

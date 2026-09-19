@@ -9,7 +9,7 @@ import { ApiError } from '../api-error.js';
 import { assertFeature } from '../billing/usage.js';
 import { actorOf, type AppEnv, type WorkspaceAccess } from '../context.js';
 import type { Db, Sql } from '../db.js';
-import { validateDocument } from '../documents.js';
+import { acceptDocument } from '../documents.js';
 import { emitEvent } from '../events.js';
 import { mount, type MountDeps } from '../mount.js';
 import { decideWinner, variantResults } from '../platform/ab-decide.js';
@@ -147,7 +147,7 @@ export function mailingPlatformRoutes(sql: Sql, deps: MailingPlatformDeps) {
       let document: Record<string, unknown> | null = null;
       if (v.document !== undefined) {
         try {
-          document = validateDocument(v.document) as unknown as Record<string, unknown>;
+          document = acceptDocument(v.document) as unknown as Record<string, unknown>;
         } catch (err) {
           if (err instanceof ApiError) {
             throw new ApiError(err.code, `Variant ${v.key}: ${err.message}`, { ...(err.details ?? {}), variant: v.key, index: i });

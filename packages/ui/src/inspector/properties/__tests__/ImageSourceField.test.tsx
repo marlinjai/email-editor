@@ -10,7 +10,7 @@ afterEach(cleanup);
 
 function setup(onRequestImage?: OnRequestImage, block: Record<string, unknown> = {}) {
   const store = createRootStore();
-  const columnId = store.template.sections[0].columns[0].id;
+  const columnId = store.template.allSections[0]!.columns[0]!.id;
   store.template.insertBlock(columnId, {
     id: 'img',
     type: 'image',
@@ -193,7 +193,7 @@ describe('ImageSourceField with onRequestImage', () => {
   it('keeps a late rejection for one block off the inspector of the block now shown', async () => {
     const pending = deferred();
     const store = createRootStore();
-    const columnId = store.template.sections[0].columns[0].id;
+    const columnId = store.template.allSections[0]!.columns[0]!.id;
     store.template.insertBlock(columnId, { id: 'a', type: 'image', src: 'https://cdn.example.com/a.png' } as never);
     store.template.insertBlock(columnId, { id: 'b', type: 'image', src: 'https://cdn.example.com/b.png' } as never);
     const view = (id: string) => (

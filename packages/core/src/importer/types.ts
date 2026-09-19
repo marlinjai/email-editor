@@ -58,7 +58,7 @@ export type MjmlImportWarningCode =
   | 'column_width_px';
 
 export interface MjmlImportResult {
-  /** A valid `1.0` document (it passed `migrateTemplate`). */
+  /** A valid document at the current schema version (it passed `migrateTemplate`). */
   document: EmailTemplate;
   warnings: MjmlImportWarning[];
 }

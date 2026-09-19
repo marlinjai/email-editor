@@ -8,6 +8,7 @@ import { BlockProperties } from './properties/BlockProperties';
 import { SectionProperties } from './properties/SectionProperties';
 import { ColumnProperties } from './properties/ColumnProperties';
 import { SubColumnProperties } from './properties/SubColumnProperties';
+import { WrapperProperties } from './properties/WrapperProperties';
 
 interface PropertyInspectorProps {
   onDeleteBlock?: (blockId: string) => void;
@@ -28,9 +29,10 @@ export const PropertyInspector = observer(function PropertyInspector({
   const selectedSection = store.selectedSection;
   const selectedColumn = store.selectedColumn;
   const selectedSubColumn = store.selectedSubColumn;
+  const selectedWrapper = store.selectedWrapper;
 
   // No selection - show empty state
-  if (!selectedBlock && !selectedSection && !selectedColumn && !selectedSubColumn) {
+  if (!selectedBlock && !selectedSection && !selectedColumn && !selectedSubColumn && !selectedWrapper) {
     return (
       <div className="w-72 border-l border-brand-border bg-canvas-2 p-6 flex items-center justify-center text-text-dark-muted text-sm">
         Select an element to edit its properties
@@ -41,7 +43,7 @@ export const PropertyInspector = observer(function PropertyInspector({
   // Find the parent column for the sub-column inspector.
   let subColumnParent: any = undefined;
   if (selectedSubColumn) {
-    for (const section of store.template.sections) {
+    for (const section of store.template.allSections) {
       const parent = section.columns.find((c: any) =>
         (c.subColumns ?? []).some((s: any) => s.id === selectedSubColumn.id),
       );
@@ -69,6 +71,8 @@ export const PropertyInspector = observer(function PropertyInspector({
       {selectedColumn && !selectedBlock && !selectedSection && !selectedSubColumn && (
         <ColumnProperties column={selectedColumn} />
       )}
+
+      {selectedWrapper && <WrapperProperties wrapper={selectedWrapper} />}
     </div>
   );
 });

@@ -6,7 +6,8 @@ import { ApiError } from './api-error.js';
  * Every document the service stores or compiles passes through here: the
  * editor core's `migrateTemplate` validates it against the full block schema
  * (the contract only checks the envelope) and brings it to the schema version
- * this build understands.
+ * this build understands. The result is what the compiler takes; to store a
+ * document, use {@link acceptDocument}, which keeps it as sent.
  *
  * A rejected document is `validation_failed` with the core's reason in
  * `details.reason` (`INVALID_DOCUMENT`, `NEWER_VERSION`, `UNSUPPORTED_VERSION`,
@@ -39,6 +40,17 @@ export function validateDocument(document: unknown, at: (string | number)[] = ['
       issues: err.issues.length > 0 ? err.issues.map((i) => ({ path: [...at, ...i.path], message: i.message })) : [{ path: at, message: err.message }],
     });
   }
+}
+
+/**
+ * A document to store: validated exactly as {@link validateDocument} does, and
+ * then kept as sent, in the schema version it was written in. A client on an
+ * older editor (schema 1.0) reads back what it saved, which it can open; the
+ * migration to the current version happens every time the service compiles.
+ */
+export function acceptDocument(document: unknown, at: (string | number)[] = ['document']): EmailTemplate {
+  validateDocument(document, at);
+  return document as EmailTemplate;
 }
 
 /**

@@ -6,15 +6,20 @@ import { Id, PageQuery, Timestamp } from './common';
  * and uploaded assets.
  */
 
-export const DOCUMENT_SCHEMA_VERSIONS = ['1.0'] as const;
+/** Oldest first. 1.1 (2026-09-19) added wrappers (a container around sections) at the top level. */
+export const DOCUMENT_SCHEMA_VERSIONS = ['1.0', '1.1'] as const;
 export const DocumentSchemaVersion = z.enum(DOCUMENT_SCHEMA_VERSIONS);
 export type DocumentSchemaVersion = z.infer<typeof DocumentSchemaVersion>;
 
 /**
  * The editor's template document (`EmailTemplate` in
  * `@marlinjai/email-editor-core`). The contract checks only the envelope, the
- * schema version, and that `sections` is a list; the editor core owns the full
- * block schema and the service validates a document with it before compiling.
+ * schema version, and that `sections` is a list (of sections, and from 1.1 of
+ * wrappers around sections); the editor core owns the full block schema and
+ * the service validates a document with it before storing or compiling. The
+ * service stores a document as sent, in the version it was written in (a
+ * client on a 1.0 editor reads back a 1.0 document), and compiles it at the
+ * current version.
  * Importing the core here would pull the MJML compiler into an edge-safe package.
  *
  * `id` is optional and passes through unchanged: the service stores a document

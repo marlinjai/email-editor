@@ -168,8 +168,39 @@ const SectionToolbar = observer(({ section }: { section: SectionInstance }) => {
     editorUI.clearSelection();
   };
 
+  const wrapper = template.findWrapperBySectionId(section.id);
+
+  const handleWrap = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const created = template.wrapSection(section.id);
+    if (created) editorUI.selectWrapper(created.id);
+  };
+
+  const handleMoveOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!wrapper) return;
+    template.moveSectionTo(section.id, { wrapperId: null, index: template.getSectionIndex(wrapper.id) + 1 });
+  };
+
   return (
     <div className="absolute top-0 right-0 flex gap-1 z-30">
+      {wrapper ? (
+        <button
+          className="px-1.5 py-1 bg-violet-600 text-white text-xs rounded-bl hover:bg-violet-700"
+          onClick={handleMoveOut}
+          title="Move this section out of its container"
+        >
+          Move out
+        </button>
+      ) : (
+        <button
+          className="px-1.5 py-1 bg-violet-600 text-white text-xs rounded-bl hover:bg-violet-700"
+          onClick={handleWrap}
+          title="Put this section in a container (MJML mj-wrapper)"
+        >
+          Wrap in container
+        </button>
+      )}
       <button
         className="p-1 bg-amber-500 text-white text-xs rounded-bl hover:bg-amber-600"
         onClick={handleDuplicate}

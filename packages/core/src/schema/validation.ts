@@ -345,10 +345,8 @@ export const ColumnSchema = z.object({
   blocks: z.array(BlockSchema),
 });
 
-/**
- * Section schema
- */
-export const SectionSchema = z.object({
+/** The fields a section has in every schema version. */
+const sectionFields = {
   id: z.string(),
   type: z.literal('section'),
   backgroundColor: z.string().optional(),
@@ -360,27 +358,82 @@ export const SectionSchema = z.object({
   padding: SpacingSchema.optional(),
   noStack: z.boolean().optional(),
   fullWidth: z.boolean().optional(),
-  isWrapper: z.boolean().optional(),
   hidden: z.boolean().optional(),
   extraAttributes: ExtraAttributesSchema.optional(),
   bodyRaw: z.boolean().optional(),
   columns: z.array(ColumnSchema).min(1),
-});
+};
 
 /**
- * Complete email template schema
+ * Section schema (version 1.1). `isWrapper`, the 1.0 flag for a wrapper around
+ * exactly one section, is refused: `migrateTemplate` turns such a section into
+ * a {@link WrapperSchema wrapper}.
  */
-export const EmailTemplateSchema = z.object({
-  id: z.string().optional(),
-  version: z.literal('1.0'),
-  metadata: TemplateMetadataSchema,
+export const SectionSchema = z.object({
+  ...sectionFields,
+  isWrapper: z.undefined({ invalid_type_error: 'isWrapper is a schema 1.0 field; a 1.1 document holds a wrapper instead' }).optional(),
+});
+
+/** A section in a schema 1.0 document, which may carry `isWrapper`. */
+export const SectionSchemaV1_0 = z.object({
+  ...sectionFields,
+  isWrapper: z.boolean().optional(),
+});
+
+/** A container around sections (`mj-wrapper`); see `Wrapper`. */
+export const WrapperSchema = z.object({
+  id: z.string(),
+  type: z.literal('wrapper'),
+  hidden: z.boolean().optional(),
+  backgroundColor: z.string().optional(),
+  backgroundImage: z.string().optional(),
+  backgroundGradient: BackgroundGradientSchema.optional(),
+  backgroundPosition: z.string().optional(),
+  backgroundRepeat: z.enum(['repeat', 'no-repeat']).optional(),
+  backgroundSize: z.string().optional(),
+  border: z.string().optional(),
+  borderTop: z.string().optional(),
+  borderRight: z.string().optional(),
+  borderBottom: z.string().optional(),
+  borderLeft: z.string().optional(),
+  borderRadius: z.string().optional(),
+  padding: SpacingSchema.optional(),
+  fullWidth: z.boolean().optional(),
+  cssClass: z.string().optional(),
+  gap: z.string().regex(/^[0-9]+(\.[0-9]+)?px$/, 'gap is a length in px, e.g. 16px').optional(),
+  textAlign: z.enum(['left', 'center', 'right']).optional(),
+  extraAttributes: ExtraAttributesSchema.optional(),
   sections: z.array(SectionSchema),
 });
 
+/** One entry of a document's top level: a section or a wrapper. */
+export const TopLevelItemSchema = z.discriminatedUnion('type', [SectionSchema, WrapperSchema]);
+
+/** A schema 1.0 document: sections only. */
+export const EmailTemplateSchemaV1_0 = z.object({
+  id: z.string().optional(),
+  version: z.literal('1.0'),
+  metadata: TemplateMetadataSchema,
+  sections: z.array(SectionSchemaV1_0),
+});
+
+/** A schema 1.1 document (the current version): sections and wrappers. */
+export const EmailTemplateSchemaV1_1 = z.object({
+  id: z.string().optional(),
+  version: z.literal('1.1'),
+  metadata: TemplateMetadataSchema,
+  sections: z.array(TopLevelItemSchema),
+});
+
 /**
- * Validate an email template
+ * Complete email template schema, in any version this build reads. Use
+ * `migrateTemplate` to bring a document to the current version.
+ */
+export const EmailTemplateSchema = z.discriminatedUnion('version', [EmailTemplateSchemaV1_0, EmailTemplateSchemaV1_1]);
+
+/**
+ * Validate an email template (either schema version)
  */
 export function validateTemplate(template: unknown) {
   return EmailTemplateSchema.safeParse(template);
 }
-

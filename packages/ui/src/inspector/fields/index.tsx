@@ -1,7 +1,7 @@
 // packages/ui/src/inspector/fields/index.tsx
 // Reusable form fields for property inspector
 
-import React from 'react';
+import React, { useId } from 'react';
 import clsx from 'clsx';
 import { Bold, Italic, Link, Strikethrough, Underline } from 'lucide-react';
 import type { BackgroundGradient, GradientStop } from '@marlinjai/email-editor-core';
@@ -136,22 +136,40 @@ export function TextField({
   value,
   onChange,
   placeholder,
+  hint,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** A line under the field saying what it does. */
+  hint?: string;
+  /** Shown instead of the hint, and marks the field invalid. */
+  error?: string;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       <input
+        id={id}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error || hint ? `${id}-note` : undefined}
+        className={clsx(
+          'w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500',
+          error ? 'border-red-400' : 'border-gray-300'
+        )}
       />
+      {error ? (
+        <p id={`${id}-note`} role="alert" className="mt-1 text-xs text-red-600">{error}</p>
+      ) : hint ? (
+        <p id={`${id}-note`} className="mt-1 text-xs text-gray-500">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -180,9 +198,10 @@ export function ColorField({
   allowEmpty?: boolean;
   themeColors?: ThemeColorSwatch[];
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       {/* Theme color swatches */}
       {themeColors.length > 0 && (
         <div className="flex gap-1 mb-2">
@@ -204,11 +223,13 @@ export function ColorField({
       <div className="flex gap-2">
         <input
           type="color"
+          aria-label={`${label}, colour picker`}
           value={value || '#000000'}
           onChange={(e) => onChange(e.target.value)}
           className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
         />
         <input
+          id={id}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -217,6 +238,8 @@ export function ColorField({
         />
         {allowEmpty && value && (
           <button
+            type="button"
+            aria-label={`Clear ${label}`}
             onClick={() => onChange('')}
             className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
           >
@@ -242,10 +265,12 @@ export function SelectField({
   options: string[];
   onChange: (value: string) => void;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -302,21 +327,34 @@ export function CheckboxField({
   label,
   checked,
   onChange,
+  disabled = false,
+  hint,
 }: {
   label: string;
   checked: boolean;
   onChange: () => void;
+  disabled?: boolean;
+  /** A line under the checkbox, e.g. why it is disabled. */
+  hint?: string;
 }) {
+  const id = useId();
   return (
-    <label className="flex items-center gap-2 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onChange}
-        className="rounded border-gray-300"
-      />
-      <span className="text-sm text-gray-700">{label}</span>
-    </label>
+    <div>
+      <label className={clsx('flex items-center gap-2', disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer')}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onChange}
+          disabled={disabled}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+          className="rounded border-gray-300"
+        />
+        <span className="text-sm text-gray-700">{label}</span>
+      </label>
+      {hint ? (
+        <p id={`${id}-hint`} className="mt-1 ml-6 text-xs text-gray-500">{hint}</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -333,6 +371,8 @@ export function SpacingField({
   bottom,
   left,
   onChange,
+  placeholders,
+  hint,
 }: {
   label: string;
   top?: string;
@@ -340,24 +380,28 @@ export function SpacingField({
   bottom?: string;
   left?: string;
   onChange: (side: 'top' | 'right' | 'bottom' | 'left', value: string | undefined) => void;
+  /** Placeholders per side, e.g. what the mail uses when a side is not set. */
+  placeholders?: Partial<Record<'top' | 'right' | 'bottom' | 'left', string>>;
+  hint?: string;
 }) {
   const sides = ['top', 'right', 'bottom', 'left'] as const;
   const values = { top, right, bottom, left };
 
   return (
-    <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+    <div role="group" aria-label={label}>
+      <span className="block text-xs font-medium text-gray-600 mb-1">{label}</span>
       <div className="grid grid-cols-4 gap-1">
         {sides.map((side) => (
           <div key={side}>
             <input
               type="text"
+              aria-label={`${label} ${side}`}
               value={values[side] || ''}
               onChange={(e) => {
                 const normalized = normalizeSpacingValue(e.target.value);
                 onChange(side, normalized);
               }}
-              placeholder="0px"
+              placeholder={placeholders?.[side] ?? '0px'}
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded text-center"
             />
             <div className="text-[10px] text-gray-400 text-center mt-0.5">
@@ -366,6 +410,7 @@ export function SpacingField({
           </div>
         ))}
       </div>
+      {hint ? <p className="mt-1 text-xs text-gray-500">{hint}</p> : null}
     </div>
   );
 }
@@ -421,12 +466,14 @@ export function ButtonGroupField({
   onChange: (value: string | number) => void;
 }) {
   return (
-    <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+    <div role="group" aria-label={label}>
+      <span className="block text-xs font-medium text-gray-600 mb-1">{label}</span>
       <div className="flex gap-1">
         {options.map((opt) => (
           <button
             key={opt}
+            type="button"
+            aria-pressed={value === opt}
             onClick={() => onChange(opt)}
             className={clsx(
               'flex-1 py-1.5 text-sm rounded border',

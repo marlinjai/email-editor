@@ -1,0 +1,43 @@
+<mjml>
+  <mj-head>
+    <mj-title>Event digest</mj-title>
+    <mj-style>
+      .card-shadow { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#eef1f4">
+    <mj-wrapper full-width="full-width" background-color="#12263a" padding="32px 0" text-align="left">
+      <mj-section>
+        <mj-column>
+          <mj-text color="#ffffff" font-size="26px">This week at the studio</mj-text>
+        </mj-column>
+      </mj-section>
+    </mj-wrapper>
+    <mj-wrapper background-color="#ffffff" border="1px solid #d9dee3" border-top="4px solid #0b6e4f" border-radius="10px" padding="12px 16px" gap="12px" css-class="card-shadow">
+      <mj-section background-color="#f7f9fa">
+        <mj-column width="40%">
+          <mj-image src="https://images.example.org/pottery.jpg" alt="A bowl on the wheel" />
+        </mj-column>
+        <mj-column width="60%">
+          <mj-text font-size="18px">Pottery evening</mj-text>
+          <mj-text>Thursday, 7 pm. Clay and tea included.</mj-text>
+          <mj-button href="https://example.org/pottery" background-color="#0b6e4f">Book a place</mj-button>
+        </mj-column>
+      </mj-section>
+      <mj-hero background-url="https://images.example.org/print.jpg" background-height="200px" background-width="600px" mode="fixed-height" height="200px">
+        <mj-text color="#ffffff" align="center">Screen printing, all weekend</mj-text>
+      </mj-hero>
+      <mj-raw><p style="margin:0;font-size:12px;text-align:center;">Prices include materials.</p></mj-raw>
+      <mj-section>
+        <mj-column>
+          <mj-text>More at <a href="https://example.org/events">example.org/events</a>.</mj-text>
+        </mj-column>
+      </mj-section>
+    </mj-wrapper>
+    <mj-section>
+      <mj-column>
+        <mj-text align="center" font-size="12px"><a href="{{unsubscribe_url}}">Unsubscribe</a></mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

@@ -7,9 +7,9 @@ import React, { createContext, useContext, useMemo } from 'react';
  * What the editor tells the host when it asks for an image.
  */
 export interface ImageRequest {
-  /** The id of the block the image is for */
+  /** The id of the block the image is for (or the section or wrapper, for a background image) */
   blockId: string;
-  /** The block type asking (today always `image`) */
+  /** What is asking: a block type (`image`), or `section` or `wrapper` for a background image */
   blockType: string;
   /** The image URL the block currently shows, if any */
   currentUrl?: string;

@@ -520,20 +520,14 @@ describe('MJMLCompiler', () => {
       expect(result.mjml).toContain('full-width="full-width"');
     });
 
-    it('supports wrapper sections', () => {
+    it('supports wrappers around sections', () => {
       const result = compiler.compile({
-        version: '1.0',
+        version: '1.1',
         metadata: {},
-        sections: [
-          {
-            id: 'wrap-sec',
-            type: 'section' as const,
-            isWrapper: true,
-            columns: [{ id: 'c', blocks: [] }],
-          },
-        ],
+        sections: [{ id: 'wrap', type: 'wrapper' as const, sections: [{ id: 'wrap-sec', type: 'section' as const, columns: [{ id: 'c', blocks: [] }] }] }],
       });
-      expect(result.mjml).toContain('<mj-wrapper');
+      expect(result.mjml).toContain('<mj-wrapper css-class="el-wrapper el-wrap">');
+      expect(result.mjml).toContain('<mj-section css-class="el-section el-wrap-sec">');
     });
 
     it('supports noStack with mj-group', () => {

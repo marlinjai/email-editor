@@ -62,7 +62,7 @@ const EmailEditorReact = dynamic(
 
 const initialTemplate: TemplateSnapshotIn = {
   id: 'default-template',
-  version: '1.0',
+  version: '1.1',
   metadata: { title: 'Untitled Template', subject: 'Your Email Subject' },
   sections: [],
 };

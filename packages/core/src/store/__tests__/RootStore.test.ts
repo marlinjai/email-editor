@@ -348,6 +348,28 @@ describe('RootStore history', () => {
     expect(store.canUndo).toBe(false);
     expect(store.canRedo).toBe(false);
   });
+
+  it('redo re-applies what undo took back, over several steps, and a new edit after undo drops the redo future', () => {
+    const store = createRootStore({ template: createTemplate({ sections: [createSection({ id: 's' })] }) });
+    const section = () => store.template.getSectionById('s')!;
+    section().updateProperties({ backgroundColor: '#111111' });
+    section().updateProperties({ backgroundColor: '#222222' });
+    expect(store.undo()).toBe(true);
+    expect(section().backgroundColor).toBe('#111111');
+    expect(store.canRedo).toBe(true);
+    expect(store.undo()).toBe(true);
+    expect(section().backgroundColor).toBeUndefined();
+    expect(store.redo()).toBe(true);
+    expect(store.redo()).toBe(true);
+    expect(section().backgroundColor).toBe('#222222');
+    expect(store.canRedo).toBe(false);
+
+    store.undo();
+    section().updateProperties({ backgroundColor: '#333333' });
+    expect(store.canRedo).toBe(false);
+    expect(store.undo()).toBe(true);
+    expect(section().backgroundColor).toBe('#111111');
+  });
 });
 
 describe('RootStore selected views', () => {

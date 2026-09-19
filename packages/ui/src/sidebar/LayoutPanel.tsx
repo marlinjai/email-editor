@@ -11,11 +11,13 @@ interface LayoutPanelProps {
   templates: PrebuiltTemplate[];
   onAddSection: (columns: 1 | 2 | 3) => void;
   onAddPrebuilt: (template: PrebuiltTemplate) => void;
+  /** Adds a container (MJML mj-wrapper) around one empty section. */
+  onAddWrapper: () => void;
 }
 
 type LayoutTab = 'sections' | 'prebuilt';
 
-export function LayoutPanel({ templates, onAddSection, onAddPrebuilt }: LayoutPanelProps) {
+export function LayoutPanel({ templates, onAddSection, onAddPrebuilt, onAddWrapper }: LayoutPanelProps) {
   const [activeTab, setActiveTab] = useState<LayoutTab>('sections');
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -49,7 +51,7 @@ export function LayoutPanel({ templates, onAddSection, onAddPrebuilt }: LayoutPa
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto p-3">
-        {activeTab === 'sections' && <SectionStructures onAddSection={onAddSection} />}
+        {activeTab === 'sections' && <SectionStructures onAddSection={onAddSection} onAddWrapper={onAddWrapper} />}
         {activeTab === 'prebuilt' && (
           <PrebuiltLauncher
             templateCount={templates.length}
@@ -70,7 +72,7 @@ export function LayoutPanel({ templates, onAddSection, onAddPrebuilt }: LayoutPa
 
 // === Section Structures ===
 
-function SectionStructures({ onAddSection }: { onAddSection: (cols: 1 | 2 | 3) => void }) {
+function SectionStructures({ onAddSection, onAddWrapper }: { onAddSection: (cols: 1 | 2 | 3) => void; onAddWrapper: () => void }) {
   return (
     <div className="space-y-4">
       <div>
@@ -87,6 +89,28 @@ function SectionStructures({ onAddSection }: { onAddSection: (cols: 1 | 2 | 3) =
       <p className="text-xs text-text-dark-muted text-center">
         Click to add a section with the specified column layout.
       </p>
+
+      <div>
+        <h4 className="text-xs font-semibold text-text-dark-muted uppercase mb-2">
+          Add Container
+        </h4>
+        <button
+          type="button"
+          onClick={onAddWrapper}
+          className="w-full flex items-center gap-3 p-3 rounded-lg border border-border-light hover:border-violet-400 hover:bg-violet-50 transition-colors text-left"
+        >
+          <div className="p-1 rounded border-2 border-violet-300 flex flex-col gap-1">
+            <div className="w-10 h-2 bg-canvas-3 rounded-sm" />
+            <div className="w-10 h-2 bg-canvas-3 rounded-sm" />
+          </div>
+          <span>
+            <span className="block text-xs font-medium text-text-dark">Container</span>
+            <span className="block text-[11px] text-text-dark-muted">
+              Sections that share one background, border and padding.
+            </span>
+          </span>
+        </button>
+      </div>
     </div>
   );
 }

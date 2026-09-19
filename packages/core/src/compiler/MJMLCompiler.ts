@@ -4,9 +4,12 @@
 
 import mjml2html from 'mjml';
 import { blockToRawHtml } from './blockToRawHtml';
+import { allSections, isWrapper } from '../schema/types';
 import type {
   EmailTemplate,
   Section,
+  TopLevelItem,
+  Wrapper,
   Column,
   Block,
   Spacing,
@@ -72,6 +75,11 @@ function finishAttributes(attrs: string[], classes: string[], extra?: ExtraAttri
   }
   if (allClasses.length > 0) out.push(`css-class="${allClasses.join(' ')}"`);
   return out.join(' ');
+}
+
+/** A value for a double-quoted attribute: a literal quote must not end it. */
+function quoted(value: string): string {
+  return value.replace(/"/g, '&quot;');
 }
 
 /**
@@ -143,6 +151,14 @@ export class MJMLCompiler {
   }
 
   /**
+   * The MJML markup for a document, without compiling it to HTML.
+   */
+  toMJML(template: EmailTemplate): string {
+    this.needsSubColumnStyles = false;
+    return this.templateToMJML(template);
+  }
+
+  /**
    * Convert template to MJML markup
    */
   private templateToMJML(template: EmailTemplate): string {
@@ -150,7 +166,9 @@ export class MJMLCompiler {
 
     // Render body first so columnToMJML can flip the needsSubColumnStyles
     // flag before we generate the head.
-    const body = sections.map((section) => this.sectionToMJML(section)).join('\n');
+    const body = sections
+      .map((item) => (isWrapper(item) ? this.wrapperToMJML(item) : this.sectionToMJML(item)))
+      .join('\n');
     const gradientCSS = this.collectGradientStyles(sections);
     const head = this.generateHead(metadata, gradientCSS);
     const bodyAttributes = finishAttributes([], [], metadata.mjmlHead?.bodyAttributes);
@@ -250,12 +268,18 @@ export class MJMLCompiler {
   }
 
   /**
-   * Collect background-image CSS rules for all sections and columns that have gradients.
+   * Collect background-image CSS rules for all wrappers, sections and columns that have gradients.
    * Returns a string of CSS rules to inject as a single mj-style block.
    */
-  private collectGradientStyles(sections: Section[]): string {
+  private collectGradientStyles(items: TopLevelItem[]): string {
     const rules: string[] = [];
-    for (const section of sections) {
+    for (const item of items) {
+      if (isWrapper(item) && item.backgroundGradient) {
+        const css = buildGradientCSS(item.backgroundGradient);
+        if (css) rules.push(`.el-grad-${item.id} { background-image: ${css}; }`);
+      }
+    }
+    for (const section of allSections(items)) {
       if (section.backgroundGradient) {
         const css = buildGradientCSS(section.backgroundGradient);
         if (css) {
@@ -275,17 +299,66 @@ export class MJMLCompiler {
   }
 
   /**
+   * Convert a wrapper to an `<mj-wrapper>` around its sections. The wrapper's
+   * attributes are MJML's own for `mj-wrapper`; the sections inside follow
+   * MJML's rules there (a full-width section inside a full-width wrapper
+   * renders at standard width, which the inspector explains).
+   */
+  private wrapperToMJML(wrapper: Wrapper): string {
+    if (wrapper.hidden) return '';
+
+    const attrs: string[] = [];
+    const cssClasses: string[] = ['el-wrapper', `el-${wrapper.id}`];
+    this.pushBackground(attrs, cssClasses, wrapper);
+    if (wrapper.border) attrs.push(`border="${quoted(wrapper.border)}"`);
+    if (wrapper.borderTop) attrs.push(`border-top="${quoted(wrapper.borderTop)}"`);
+    if (wrapper.borderRight) attrs.push(`border-right="${quoted(wrapper.borderRight)}"`);
+    if (wrapper.borderBottom) attrs.push(`border-bottom="${quoted(wrapper.borderBottom)}"`);
+    if (wrapper.borderLeft) attrs.push(`border-left="${quoted(wrapper.borderLeft)}"`);
+    if (wrapper.borderRadius) attrs.push(`border-radius="${quoted(wrapper.borderRadius)}"`);
+    if (wrapper.fullWidth) attrs.push('full-width="full-width"');
+    const padding = spacingToString(wrapper.padding);
+    if (padding) attrs.push(`padding="${quoted(padding)}"`);
+    if (wrapper.gap) attrs.push(`gap="${quoted(wrapper.gap)}"`);
+    if (wrapper.textAlign) attrs.push(`text-align="${quoted(wrapper.textAlign)}"`);
+    for (const c of (wrapper.cssClass ?? '').split(/\s+/)) if (c && !cssClasses.includes(quoted(c))) cssClasses.push(quoted(c));
+
+    const sections = wrapper.sections.map((section) => this.sectionToMJML(section)).filter(Boolean).join('\n');
+    return `
+<mj-wrapper ${finishAttributes(attrs, cssClasses, wrapper.extraAttributes)}>
+  ${sections}
+</mj-wrapper>
+    `.trim();
+  }
+
+  /** Background attributes shared by sections and wrappers: a gradient (with its Outlook fallback colour), or colour and image. */
+  private pushBackground(attrs: string[], cssClasses: string[], node: Section | Wrapper): void {
+    if (node.backgroundGradient) {
+      // Outlook fallback: first stop color as solid background-color
+      const fallbackColor = node.backgroundGradient.stops[0]?.color;
+      if (fallbackColor) attrs.push(`background-color="${quoted(fallbackColor)}"`);
+      cssClasses.push(`el-grad-${node.id}`);
+      return;
+    }
+    if (node.backgroundColor) attrs.push(`background-color="${quoted(node.backgroundColor)}"`);
+    if (node.backgroundImage) attrs.push(`background-url="${quoted(node.backgroundImage)}"`);
+    if (node.backgroundPosition) attrs.push(`background-position="${quoted(node.backgroundPosition)}"`);
+    if (node.backgroundRepeat) attrs.push(`background-repeat="${quoted(node.backgroundRepeat)}"`);
+    if (node.backgroundSize) attrs.push(`background-size="${quoted(node.backgroundSize)}"`);
+  }
+
+  /**
    * Convert section to MJML
-   * Supports mj-section or mj-wrapper (with isWrapper flag)
    * Supports background images, full-width, and mj-group for non-stacking columns
    */
   private sectionToMJML(section: Section): string {
     // Skip hidden sections
     if (section.hidden) return '';
 
-    // Markup that sat directly in mj-body of an imported document: its raw
-    // blocks go back there, unwrapped, as long as the section holds nothing else.
-    // Emitted verbatim like every Raw block: see the SECURITY note in generateHead.
+    // Markup that sat directly in mj-body (or in an mj-wrapper) of an imported
+    // document: its raw blocks go back there, unwrapped, as long as the section
+    // holds nothing else. Emitted verbatim like every Raw block: see the
+    // SECURITY note in generateHead.
     if (section.bodyRaw) {
       const blocks = section.columns.flatMap((c) => c.blocks).filter((b) => !b.hidden);
       if (blocks.every((b) => b.type === 'raw') && section.columns.every((c) => !c.subColumns?.length)) {
@@ -294,30 +367,8 @@ export class MJMLCompiler {
     }
 
     const attrs: string[] = [];
-    const cssClasses: string[] = [section.isWrapper ? 'el-wrapper' : 'el-section', `el-${section.id}`];
-
-    if (section.backgroundGradient) {
-      // Outlook fallback: first stop color as solid background-color
-      const fallbackColor = section.backgroundGradient.stops[0]?.color;
-      if (fallbackColor) attrs.push(`background-color="${fallbackColor}"`);
-      cssClasses.push(`el-grad-${section.id}`);
-    } else {
-      if (section.backgroundColor) {
-        attrs.push(`background-color="${section.backgroundColor}"`);
-      }
-      if (section.backgroundImage) {
-        attrs.push(`background-url="${section.backgroundImage}"`);
-      }
-      if (section.backgroundPosition) {
-        attrs.push(`background-position="${section.backgroundPosition}"`);
-      }
-      if (section.backgroundRepeat) {
-        attrs.push(`background-repeat="${section.backgroundRepeat}"`);
-      }
-      if (section.backgroundSize) {
-        attrs.push(`background-size="${section.backgroundSize}"`);
-      }
-    }
+    const cssClasses: string[] = ['el-section', `el-${section.id}`];
+    this.pushBackground(attrs, cssClasses, section);
 
     if (section.fullWidth) {
       attrs.push('full-width="full-width"');
@@ -329,17 +380,6 @@ export class MJMLCompiler {
 
     const columns = section.columns.map((col) => this.columnToMJML(col)).join('\n');
     const sectionAttrs = finishAttributes(attrs, cssClasses, section.extraAttributes);
-
-    // Use mj-wrapper for wrapper sections
-    if (section.isWrapper) {
-      return `
-<mj-wrapper ${sectionAttrs}>
-  <mj-section>
-    ${columns}
-  </mj-section>
-</mj-wrapper>
-      `.trim();
-    }
 
     // Use mj-group for non-stacking columns (prevents mobile stacking)
     if (section.noStack && section.columns.length > 1) {

@@ -4,7 +4,7 @@ import { ApiError } from '../api-error.js';
 import type { WorkspaceCompile } from '../compile/workspace-compile.js';
 import { actorLabel, actorOf, type AppEnv } from '../context.js';
 import type { Sql } from '../db.js';
-import { schemaVersionOf, validateDocument } from '../documents.js';
+import { acceptDocument, schemaVersionOf, validateDocument } from '../documents.js';
 import { mount, type MountDeps } from '../mount.js';
 import { repos } from '../repo/index.js';
 import { checkBody, pageArgs, params, query, rawJson, rowId, toPage } from '../validate.js';
@@ -43,7 +43,7 @@ export function templateRoutes(sql: Sql, deps: MountDeps & { compiler: Workspace
     const raw = await rawJson(c);
     documentFirst(raw);
     const input = checkBody('templates.create', raw);
-    const document = validateDocument(input.document);
+    const document = acceptDocument(input.document);
     const template = await sql.begin(async (tx) => {
       const r = repos(tx);
       const created = await r.templates.create(access.workspaceId, {
@@ -83,7 +83,7 @@ export function templateRoutes(sql: Sql, deps: MountDeps & { compiler: Workspace
     const raw = await rawJson(c);
     documentFirst(raw);
     const input = checkBody('templates.update', raw);
-    const document = input.document === undefined ? undefined : validateDocument(input.document);
+    const document = input.document === undefined ? undefined : acceptDocument(input.document);
 
     const outcome = await sql.begin(async (tx) => {
       const r = repos(tx);

@@ -33,8 +33,14 @@ describe('template document', () => {
     expect(parsed).toMatchObject({ extra: 1 });
   });
 
+  it('accepts schema 1.1 with a wrapper at the top level', () => {
+    const wrapped = { version: '1.1', metadata: {}, sections: [{ id: 'w', type: 'wrapper', sections: [{ id: 's', type: 'section', columns: [] }] }] };
+    expect(TemplateDocument.safeParse(wrapped).success).toBe(true);
+  });
+
   it('rejects an unknown schema version, missing sections, or a non-object', () => {
     expect(TemplateDocument.safeParse({ ...doc, version: '2.0' }).success).toBe(false);
+    expect(TemplateDocument.safeParse({ ...doc, version: '1.2' }).success).toBe(false);
     expect(TemplateDocument.safeParse({ version: '1.0', metadata: {} }).success).toBe(false);
     expect(TemplateDocument.safeParse('<mjml/>').success).toBe(false);
   });

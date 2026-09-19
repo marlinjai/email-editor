@@ -36,8 +36,21 @@ export {
   type SectionSnapshotIn,
   type SectionSnapshotOut,
 
+  // Wrapper
+  WrapperModel,
+  createWrapper,
+  MJML_WRAPPER_DEFAULT_PADDING,
+  type WrapperInstance,
+  type WrapperSnapshotIn,
+  type WrapperSnapshotOut,
+  type WrapperProperties,
+
   // Template
   TemplateModel,
+  TopLevelItemModel,
+  isWrapperInstance,
+  cloneSectionSnapshot,
+  type TopLevelItemInstance,
   TemplateMetadataModel,
   FontDefinitionModel,
   ThemeColorModel,

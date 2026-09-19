@@ -4,6 +4,7 @@ A visual, drag-and-drop email editor you embed in your own app. It produces a JS
 
 - React component (`EmailEditorReact`) and a framework-agnostic factory (`createEditor`)
 - 14 block types (text, image, button, hero, social, navbar, table and more) and 35 pre-built sections
+- Containers around several sections (MJML's `mj-wrapper`): one background, border, radius and padding for a group of sections, edited visually
 - Your own image picker through the `onRequestImage` hook
 - A prebuilt stylesheet scoped to the editor, safe beside Tailwind CSS 4 or any other host styles
 - Server-side compilation through `@marlinjai/email-editor-core/server`
@@ -171,17 +172,28 @@ try {
 
 What maps, and what does not:
 
-- Every standard component with the attributes its block has becomes that block: text, image, button, divider, spacer, navbar, carousel, accordion, raw HTML, sections, wrappers around one section, columns and groups of columns. Attributes the block has no field for (a `css-class` your `mj-style` rules target, `font-weight`, `mj-class`, ...) are kept on the block and emitted again, and the document keeps its `mj-attributes`, so the mail compiles as the source did.
+- Every standard component with the attributes its block has becomes that block: text, image, button, divider, spacer, navbar, carousel, accordion, raw HTML, sections, columns and groups of columns.
+- An `mj-wrapper` becomes a container holding its sections, with every wrapper attribute as a field (background, border and each side's border, radius, padding, full width, `css-class`, `gap`, `text-align`). A child the editor cannot read as a section (an `mj-hero`, an `mj-raw`, a section with conditional comments) stays inside the container, in place, as raw HTML, so nothing in a wrapper is dropped. Attributes the block has no field for (a `css-class` your `mj-style` rules target, `font-weight`, `mj-class`, ...) are kept on the block and emitted again, and the document keeps its `mj-attributes`, so the mail compiles as the source did.
 - The editor's own export imports back exactly, ids included.
-- What the editor cannot hold as a block is compiled in place and kept as a Raw HTML block that renders exactly as before, with a `kept_as_html` warning carrying the MJML: an `mj-hero` with content, `mj-social` (the editor's Social block draws its own icons), a hand-written `mj-table`, a wrapper around several sections, a section with conditional comments between its columns.
+- What the editor cannot hold as a block is compiled in place and kept as a Raw HTML block that renders exactly as before, with a `kept_as_html` warning carrying the MJML: an `mj-hero` with content, `mj-social` (the editor's Social block draws its own icons), a hand-written `mj-table`, a section with conditional comments between its columns.
 - A component MJML does not know renders nothing in MJML either; its source is kept in a comment in a Raw block, with an `unknown_component` warning.
 - `mj-include` is refused (`include_not_supported`): an import has no files next to it, and the importer never reads the disk.
 
 Importing is synchronous and CPU-bound. Limits (`MAX_MJML_BYTES`, `MAX_MJML_DEPTH`, `MAX_MJML_ELEMENTS`) bound one call; for untrusted input run it off your request thread with a deadline, as the Lumitra Mail service does in its compile worker pool.
 
+## Containers (wrappers)
+
+A container is MJML's `mj-wrapper`: several sections sharing one background (colour, gradient or image), border (all sides or each side), corner radius and padding, with an optional `gap` between the sections inside. In the document it sits at the top level next to sections, `{ type: 'wrapper', sections: [...] }`; containers never nest and never sit inside a section.
+
+- Add one from the Layout tab (Add Container), or select a section and choose Wrap in container (canvas toolbar, inspector, or the Layers panel). A section next to a container can join it from the inspector; Move out takes it back to the top level.
+- In the Layers panel a container's sections are nested one level in. Drag sections into, out of and between containers (pointer or keyboard: Space, arrow keys, Space), and drag containers to reorder them.
+- The inspector edits every container attribute; the background image goes through your `onRequestImage` hook (`blockType: 'wrapper'`). The canvas draws background, border, radius, MJML's default padding (`20px 0`) and the gap as the mail will.
+- Inside a container a section's Full Width has no visible effect (and a full-width container draws its sections at standard width), so the section inspector explains that instead of offering it. Outlook on Windows cannot show a section's background image inside a container that has one; the inspector warns.
+- Delete (the key, the toolbar or the Layers panel) asks in the editor's own dialog whether to keep the sections or delete everything. Every container action is one undo step.
+
 ## Stored documents and `migrateTemplate`
 
-Every document carries a schema `version` (today `"1.0"`, exported as `CURRENT_TEMPLATE_VERSION`). Run stored documents through `migrateTemplate(doc)` when you load them: it returns the document at the current version, and it is the identity for `1.0` (the same object comes back, validated). It throws a `TemplateMigrationError` whose `code` is one of:
+Every document carries a schema `version` (today `"1.1"`, exported as `CURRENT_TEMPLATE_VERSION`; 1.1 added containers). Run stored documents through `migrateTemplate(doc)` when you load them: it returns the document at the current version. For a `1.1` document it is the identity (the same object comes back, validated); a `1.0` document comes back as a new object whose only change is the version, except that a 1.0 section flagged `isWrapper` (a wrapper around one section, written by the first MJML import) becomes a container around that section. The input is never changed, and a 1.0 document without that flag compiles to exactly the same mail. The editor opens 1.0 documents the same way and emits 1.1. A build that only knows 1.0 refuses a 1.1 document with `NEWER_VERSION`. It throws a `TemplateMigrationError` whose `code` is one of:
 
 | `code` | Meaning |
 |--------|---------|
@@ -195,7 +207,7 @@ Store the version next to the document (for example a `schema_version` column), 
 
 ## Your own image picker: `onRequestImage`
 
-Without the hook, the image block's inspector shows a plain URL field. With it, the inspector shows a Choose image (or Replace image) button that calls your function:
+Without the hook, the image block's inspector (and the background image of a section or container) shows a plain URL field. With it, the inspector shows a Choose image (or Replace image) button that calls your function; for a background, `blockId` is the section's or container's id and `blockType` is `section` or `wrapper`:
 
 ```tsx
 <EmailEditorReact

@@ -13,6 +13,7 @@ import type { BlockInstance } from './models/BlockModel';
 import type { ColumnInstance } from './models/ColumnModel';
 import type { SectionInstance } from './models/SectionModel';
 import type { SubColumnInstance } from './models/SubColumnModel';
+import type { WrapperInstance } from './models/WrapperModel';
 
 /**
  * RootStore - The main store for the email editor
@@ -36,6 +37,13 @@ export const RootStore = types
     historyIndex: -1,
     maxHistory: 50,
     isUndoRedo: false,
+    /**
+     * The snapshot undo or redo just applied. The snapshot listener runs after
+     * the outermost action (undo itself) has finished, so it must recognise
+     * this one and not record it as a new step: that would cut off the redo
+     * future.
+     */
+    appliedFromHistory: undefined as unknown,
   }))
   .actions(self => ({
     /**
@@ -54,6 +62,12 @@ export const RootStore = types
       if (self.isUndoRedo) return;
 
       const snapshot = getSnapshot(self.template);
+
+      if (self.appliedFromHistory !== undefined) {
+        const applied = self.appliedFromHistory;
+        self.appliedFromHistory = undefined;
+        if (JSON.stringify(applied) === JSON.stringify(snapshot)) return;
+      }
 
       // Remove any future history if we're not at the end
       if (self.historyIndex < self.history.length - 1) {
@@ -80,6 +94,7 @@ export const RootStore = types
       self.isUndoRedo = true;
       self.historyIndex--;
       applySnapshot(self.template, self.history[self.historyIndex]);
+      self.appliedFromHistory = getSnapshot(self.template);
       self.isUndoRedo = false;
 
       // Clear selection if the selected item no longer exists
@@ -96,6 +111,7 @@ export const RootStore = types
       self.isUndoRedo = true;
       self.historyIndex++;
       applySnapshot(self.template, self.history[self.historyIndex]);
+      self.appliedFromHistory = getSnapshot(self.template);
       self.isUndoRedo = false;
 
       // Clear selection if the selected item no longer exists
@@ -125,6 +141,25 @@ export const RootStore = types
       if (self.editorUI.selectedColumnId && !self.template.findColumnById(self.editorUI.selectedColumnId)) {
         self.editorUI.clearSelection();
       }
+      if (self.editorUI.selectedWrapperId && !self.template.getWrapperById(self.editorUI.selectedWrapperId)) {
+        self.editorUI.clearSelection();
+      }
+      if (self.editorUI.selectedSubColumnId && !this.findSubColumn(self.editorUI.selectedSubColumnId)) {
+        self.editorUI.clearSelection();
+      }
+      if (self.editorUI.pendingWrapperDeleteId && !self.template.getWrapperById(self.editorUI.pendingWrapperDeleteId)) {
+        self.editorUI.cancelWrapperDelete();
+      }
+    },
+
+    findSubColumn(id: string): SubColumnInstance | undefined {
+      for (const section of self.template.allSections) {
+        for (const column of section.columns) {
+          const sc = (column.subColumns ?? []).find((s: SubColumnInstance) => s.id === id);
+          if (sc) return sc;
+        }
+      }
+      return undefined;
     },
 
     /**
@@ -193,13 +228,21 @@ export const RootStore = types
     get selectedSubColumn(): SubColumnInstance | undefined {
       const id = self.editorUI.selectedSubColumnId;
       if (!id) return undefined;
-      for (const section of self.template.sections) {
+      for (const section of self.template.allSections) {
         for (const column of section.columns) {
           const sc = (column.subColumns ?? []).find((s: SubColumnInstance) => s.id === id);
           if (sc) return sc;
         }
       }
       return undefined;
+    },
+
+    /**
+     * Get the currently selected wrapper
+     */
+    get selectedWrapper(): WrapperInstance | undefined {
+      if (!self.editorUI.selectedWrapperId) return undefined;
+      return self.template.getWrapperById(self.editorUI.selectedWrapperId);
     },
 
     /**

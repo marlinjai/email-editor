@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { allPrebuiltTemplates } from '../../../../blocks/src/prebuilt';
 import { MJMLCompiler } from '../../compiler/MJMLCompiler';
 import { validateTemplate } from '../../schema/validation';
-import type { EmailTemplate } from '../../schema/types';
+import { isWrapper, type EmailTemplate } from '../../schema/types';
 import { importMjml } from '../importMjml';
 import { signature } from './signature';
 
@@ -86,4 +86,38 @@ describe('round trip: real-world MJML', () => {
       }
     });
   }
+});
+
+describe('round trip: the samples that use a wrapper import it as a wrapper', () => {
+  const wrapperCount = (source: string) => (source.match(/<mj-wrapper\b/g) ?? []).length;
+
+  for (const file of samples) {
+    const source = readFileSync(join(corpusDir, file), 'utf8');
+    if (wrapperCount(source) === 0) continue;
+    it(`${file}: every mj-wrapper is a wrapper, holding its sections`, () => {
+      const { document, warnings } = importMjml(source);
+      const wrappers = document.sections.filter(isWrapper);
+      expect(wrappers).toHaveLength(wrapperCount(source));
+      for (const w of wrappers) expect(w.sections.length).toBeGreaterThan(0);
+      // No warning says a wrapper as a whole was kept as HTML any more.
+      expect(warnings.filter((w) => w.code === 'kept_as_html' && /mj-wrapper\[\d+\]$/.test(w.path))).toEqual([]);
+      // And it goes back out as mj-wrapper.
+      expect(wrapperCount(compile(document).mjml)).toBe(wrapperCount(source));
+    });
+  }
+
+  it('newsletter.mjml: the wrapper keeps its background, padding and radius, with both sections inside', () => {
+    const { document } = importMjml(readFileSync(join(corpusDir, 'newsletter.mjml'), 'utf8'));
+    const wrapper = document.sections.find(isWrapper)!;
+    expect(wrapper).toMatchObject({ backgroundColor: '#ffffff', borderRadius: '8px', padding: { bottom: '24px' } });
+    expect(wrapper.sections.map((s) => s.columns.length)).toEqual([1, 2]);
+  });
+
+  it('wrapper-cards.mjml: border per side, gap and class map to fields; the hero and raw markup stay inside, in order', () => {
+    const { document } = importMjml(readFileSync(join(corpusDir, 'wrapper-cards.mjml'), 'utf8'));
+    const [banner, cards] = document.sections.filter(isWrapper);
+    expect(banner).toMatchObject({ fullWidth: true, textAlign: 'left' });
+    expect(cards).toMatchObject({ border: '1px solid #d9dee3', borderTop: '4px solid #0b6e4f', borderRadius: '10px', gap: '12px', cssClass: 'card-shadow' });
+    expect(cards!.sections.map((s) => (s.bodyRaw ? 'raw' : 'section'))).toEqual(['section', 'raw', 'section']);
+  });
 });

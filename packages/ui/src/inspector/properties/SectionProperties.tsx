@@ -1,12 +1,13 @@
 // packages/ui/src/inspector/properties/SectionProperties.tsx
 // Section property panel
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import clsx from 'clsx';
 import type { SectionInstance, BackgroundGradient } from '@marlinjai/email-editor-core';
+import { useStore } from '../../store';
+import { BackgroundImageField } from './BackgroundImageField';
 import {
-  TextField,
   ColorField,
   CheckboxField,
   SpacingField,
@@ -32,9 +33,16 @@ function getBackgroundMode(section: SectionInstance): BackgroundMode {
 export const SectionProperties = observer(function SectionProperties({
   section,
 }: SectionPropertiesProps) {
-  const mode = getBackgroundMode(section);
+  const { template, editorUI } = useStore();
+  // "image" chosen before an image exists: the data alone cannot tell.
+  const [chosenMode, setChosenMode] = useState<BackgroundMode | null>(null);
+  useEffect(() => setChosenMode(null), [section.id]);
+  const fromData = getBackgroundMode(section);
+  const mode: BackgroundMode = fromData !== 'color' ? fromData : chosenMode === 'image' ? 'image' : 'color';
+  const wrapper = template.findWrapperBySectionId(section.id);
 
   const setMode = (next: BackgroundMode) => {
+    setChosenMode(next);
     if (next === 'gradient') {
       section.updateProperties({
         backgroundGradient: {
@@ -57,6 +65,41 @@ export const SectionProperties = observer(function SectionProperties({
   return (
     <div className="p-4 space-y-4">
       <h3 className="font-semibold text-sm">{section.displayName}</h3>
+
+      {wrapper ? (
+        <div className="flex items-center justify-between gap-2 rounded border border-violet-200 bg-violet-50 px-2 py-1.5 text-xs text-violet-900">
+          <span>Inside a container</span>
+          <span className="flex gap-2">
+            <button type="button" className="underline" onClick={() => editorUI.selectWrapper(wrapper.id)}>
+              Select container
+            </button>
+            <button
+              type="button"
+              className="underline"
+              onClick={() => {
+                const at = template.getSectionIndex(wrapper.id);
+                template.moveSectionTo(section.id, { wrapperId: null, index: at + 1 });
+              }}
+            >
+              Move out
+            </button>
+          </span>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <button
+            type="button"
+            className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+            onClick={() => {
+              const w = template.wrapSection(section.id);
+              if (w) editorUI.selectWrapper(w.id);
+            }}
+          >
+            Wrap in container
+          </button>
+          <NeighbourContainers sectionId={section.id} />
+        </div>
+      )}
 
       {section.columnsOverflow ? (
         <p
@@ -105,19 +148,33 @@ export const SectionProperties = observer(function SectionProperties({
         )}
 
         {mode === 'image' && (
-          <TextField
-            label="Image URL"
-            value={section.backgroundImage || ''}
-            onChange={(url) => section.updateProperties({ backgroundImage: url || undefined })}
-            placeholder="https://..."
+          <BackgroundImageField
+            targetId={section.id}
+            targetType="section"
+            value={section.backgroundImage}
+            onChange={(url, id) => template.getSectionById(id)?.updateProperties({ backgroundImage: url })}
           />
         )}
+        {mode === 'image' && wrapper?.backgroundImage ? (
+          <p role="status" className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+            The container has a background image too. Outlook on Windows cannot show both: give only one of them an image.
+          </p>
+        ) : null}
       </div>
 
       <CheckboxField
         label="Full Width"
         checked={section.fullWidth}
         onChange={() => section.toggleFullWidth()}
+        // Inside a container MJML draws the section at the container's width either way, so it can only be switched off.
+        disabled={Boolean(wrapper) && !section.fullWidth}
+        hint={
+          wrapper
+            ? wrapper.fullWidth
+              ? 'Inside a full-width container, MJML draws sections at standard width: set full width on the container.'
+              : "Inside a container, a section is as wide as the container's content: set full width on the container."
+            : undefined
+        }
       />
 
       <CheckboxField
@@ -145,5 +202,39 @@ export const SectionProperties = observer(function SectionProperties({
         }}
       />
     </div>
+  );
+});
+
+/**
+ * A top-level section right next to a container can join it without a drag:
+ * at the end of the container above, or at the start of the one below.
+ */
+const NeighbourContainers = observer(function NeighbourContainers({ sectionId }: { sectionId: string }) {
+  const { template } = useStore();
+  const index = template.getSectionIndex(sectionId);
+  if (index === -1) return null;
+  const above = template.sections[index - 1];
+  const below = template.sections[index + 1];
+  return (
+    <>
+      {above && above.type === 'wrapper' ? (
+        <button
+          type="button"
+          className="w-full rounded border border-violet-200 px-2 py-1.5 text-xs text-violet-800 hover:bg-violet-50"
+          onClick={() => template.moveSectionTo(sectionId, { wrapperId: above.id, index: template.getWrapperById(above.id)!.sections.length })}
+        >
+          Add to the container above
+        </button>
+      ) : null}
+      {below && below.type === 'wrapper' ? (
+        <button
+          type="button"
+          className="w-full rounded border border-violet-200 px-2 py-1.5 text-xs text-violet-800 hover:bg-violet-50"
+          onClick={() => template.moveSectionTo(sectionId, { wrapperId: below.id, index: 0 })}
+        >
+          Add to the container below
+        </button>
+      ) : null}
+    </>
   );
 });

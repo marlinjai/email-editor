@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MJMLCompiler } from '../../compiler/MJMLCompiler';
-import type { ButtonBlock, ImageBlock, SocialBlock, TextBlock } from '../../schema/types';
+import type { ButtonBlock, EmailTemplate, ImageBlock, RawBlock, SocialBlock, TextBlock, Wrapper } from '../../schema/types';
 import { importMjml } from '../importMjml';
 import { MAX_MJML_BYTES, MAX_MJML_DEPTH, MAX_MJML_ELEMENTS, MjmlImportError } from '../types';
 
@@ -157,10 +157,123 @@ describe('mapping', () => {
     expect(document.sections[0]!.columns).toHaveLength(2);
   });
 
-  it('a wrapper around one plain section is a wrapper section', () => {
-    const { document, warnings } = importMjml(wrap('<mj-wrapper background-color="#eee" padding="10px"><mj-section><mj-column><mj-text>a</mj-text></mj-column></mj-section></mj-wrapper>'));
-    expect(document.sections[0]).toMatchObject({ isWrapper: true, backgroundColor: '#eee' });
+  it('a wrapper becomes a wrapper holding its sections, every mj-wrapper attribute mapped', () => {
+    const { document, warnings } = importMjml(
+      wrap(
+        '<mj-wrapper background-color="#eeeeee" background-url="https://i.example/bg.png" background-position="top left" background-size="cover" background-repeat="no-repeat"' +
+          ' border="1px solid #dddddd" border-top="4px solid #0b6e4f" border-right="1px dashed #aaa" border-bottom="2px solid #000" border-left="1px solid #111" border-radius="8px"' +
+          ' padding="24px 12px" full-width="full-width" css-class="card promo" gap="16px" text-align="left" direction="rtl">' +
+          '<mj-section background-color="#ffffff"><mj-column><mj-text>a</mj-text></mj-column></mj-section>' +
+          '<mj-section><mj-group><mj-column><mj-text>b</mj-text></mj-column><mj-column><mj-text>c</mj-text></mj-column></mj-group></mj-section>' +
+          '</mj-wrapper>',
+      ),
+    );
+    expect(document.version).toBe('1.1');
+    expect(document.sections).toHaveLength(1);
+    const wrapper = document.sections[0] as Wrapper;
+    expect(wrapper).toMatchObject({
+      type: 'wrapper',
+      backgroundColor: '#eeeeee',
+      backgroundImage: 'https://i.example/bg.png',
+      backgroundPosition: 'top left',
+      backgroundSize: 'cover',
+      backgroundRepeat: 'no-repeat',
+      border: '1px solid #dddddd',
+      borderTop: '4px solid #0b6e4f',
+      borderRight: '1px dashed #aaa',
+      borderBottom: '2px solid #000',
+      borderLeft: '1px solid #111',
+      borderRadius: '8px',
+      padding: { top: '24px', right: '12px', bottom: '24px', left: '12px' },
+      fullWidth: true,
+      cssClass: 'card promo',
+      gap: '16px',
+      textAlign: 'left',
+      // An attribute the inspector has no control for is kept, as on sections.
+      extraAttributes: { direction: 'rtl' },
+    });
+    expect(wrapper.sections).toHaveLength(2);
+    expect(wrapper.sections[0]).toMatchObject({ type: 'section', backgroundColor: '#ffffff' });
+    // mj-group inside a wrapped section is fine now that the wrapper is its own node.
+    expect(wrapper.sections[1]).toMatchObject({ noStack: true });
     expect(warnings.filter((w) => w.severity === 'warning')).toEqual([]);
+  });
+
+  it("a wrapper's children the editor cannot hold as sections stay in the wrapper, in place, as raw", () => {
+    const source = wrap(
+      '<mj-wrapper padding="10px">' +
+        '<mj-section><mj-column><mj-text>first</mj-text></mj-column></mj-section>' +
+        '<mj-hero background-url="https://i.example/h.png"><mj-text>hero text</mj-text></mj-hero>' +
+        '<mj-raw><p>raw markup</p></mj-raw>' +
+        '<mj-section><mj-column><mj-text>last</mj-text></mj-column></mj-section>' +
+        '<mj-section><!--[if mso]><p>mso</p><![endif]--><mj-column><mj-text>conditional</mj-text></mj-column></mj-section>' +
+        '</mj-wrapper>',
+    );
+    const { document, warnings } = importMjml(source);
+    const wrapper = document.sections[0] as Wrapper;
+    expect(wrapper.type).toBe('wrapper');
+    expect(wrapper.sections.map((s) => (s.bodyRaw ? 'raw' : 'section'))).toEqual(['section', 'raw', 'section', 'raw']);
+    // The hero and the mj-raw after it share one raw-only section, in order.
+    expect(wrapper.sections[1]!.columns[0]!.blocks.map((b) => b.type)).toEqual(['raw', 'raw']);
+    expect((wrapper.sections[1]!.columns[0]!.blocks[0] as RawBlock).html).toContain('hero text');
+    expect((wrapper.sections[1]!.columns[0]!.blocks[1] as RawBlock).html).toBe('<p>raw markup</p>');
+    expect((wrapper.sections[3]!.columns[0]!.blocks[0] as RawBlock).html).toContain('conditional');
+    expect(warnings.filter((w) => w.code === 'kept_as_html').map((w) => w.path)).toEqual([
+      'mj-body > mj-wrapper[1] > mj-hero[1]',
+      'mj-body > mj-wrapper[1] > mj-section[3]',
+    ]);
+    // Nothing is dropped: every text of the source is still in the compiled mail.
+    const html = new MJMLCompiler().compile(document).html;
+    for (const text of ['first', 'hero text', 'raw markup', 'last', 'conditional']) expect(html).toContain(text);
+  });
+
+  it('a wrapper inside a wrapper is kept as raw inside the outer one', () => {
+    const { document, warnings } = importMjml(
+      wrap('<mj-wrapper><mj-wrapper><mj-section><mj-column><mj-text>deep</mj-text></mj-column></mj-section></mj-wrapper></mj-wrapper>'),
+    );
+    const outer = document.sections[0] as Wrapper;
+    expect(outer.sections).toHaveLength(1);
+    expect(outer.sections[0]!.bodyRaw).toBe(true);
+    expect(warnings.some((w) => w.path === 'mj-body > mj-wrapper[1] > mj-wrapper[1]' && w.code === 'kept_as_html')).toBe(true);
+  });
+
+  it('an empty wrapper imports as an empty wrapper', () => {
+    const { document } = importMjml(wrap('<mj-wrapper background-color="#eee"></mj-wrapper>'));
+    expect(document.sections).toEqual([{ id: expect.any(String), type: 'wrapper', backgroundColor: '#eee', sections: [] }]);
+  });
+
+  it('a gap that is not a px length is kept as an attribute, not refused', () => {
+    const { document } = importMjml(wrap('<mj-wrapper gap="1em"><mj-section><mj-column></mj-column></mj-section></mj-wrapper>'));
+    expect(document.sections[0]).toMatchObject({ extraAttributes: { gap: '1em' } });
+    expect((document.sections[0] as Wrapper).gap).toBeUndefined();
+  });
+
+  it("the editor's own wrapper export comes back with the same ids", () => {
+    const doc: EmailTemplate = {
+      version: '1.1',
+      metadata: {},
+      sections: [
+        {
+          id: 'wrap-a',
+          type: 'wrapper',
+          backgroundGradient: { type: 'linear', angle: 90, stops: [{ color: '#111111', position: 0 }, { color: '#222222', position: 100 }] },
+          cssClass: 'mine',
+          padding: { top: '8px' },
+          sections: [{ id: 'sec-a', type: 'section', columns: [{ id: 'col-a', blocks: [{ id: 'txt-a', type: 'text', content: '<p>x</p>' }] }] }],
+        },
+      ],
+    };
+    const first = new MJMLCompiler().compile(doc);
+    const { document } = importMjml(first.mjml);
+    expect(document.sections).toEqual(doc.sections);
+    expect(new MJMLCompiler().compile(document).html).toBe(first.html);
+  });
+
+  it("a legacy (schema 1.0) editor export of a wrapper section imports as a wrapper with that id", () => {
+    const legacy = wrap('<mj-wrapper background-color="#eee" css-class="el-wrapper el-old-1"><mj-section><mj-column css-class="el-column el-c1"><mj-text css-class="el-text el-t1">a</mj-text></mj-column></mj-section></mj-wrapper>');
+    const wrapper = importMjml(legacy).document.sections[0] as Wrapper;
+    expect(wrapper).toMatchObject({ id: 'old-1', type: 'wrapper', backgroundColor: '#eee' });
+    expect(wrapper.sections[0]!.columns[0]!.id).toBe('c1');
   });
 
   it('navbar, carousel and accordion map with their items', () => {
