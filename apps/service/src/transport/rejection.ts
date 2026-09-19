@@ -55,12 +55,25 @@ const RECIPIENT_TEXT = new RegExp(
 );
 
 /**
- * Wording inside a 5.1.x reply that points at the sender's address or the
- * setup, not the recipient's mailbox: such a reply is the sender's problem even
- * though its status code is an address code.
+ * Wording inside a 5.1.x reply that names the sender's address or the setup:
+ * such a reply is the sender's problem even though its status code is an
+ * address code, whatever else it says.
  */
 const SETUP_TEXT =
-  /sender|from address|from: address|mail from|not one of your addresses|relay|authenticat|not authori[sz]ed|not permitted to send|spf|dkim|dmarc/i;
+  /sender|from address|from: address|mail from|not one of your addresses|authenticat|not authori[sz]ed|not permitted to send|spf|dkim|dmarc/i;
+
+/**
+ * Wording that names the recipient's mailbox specifically. Inside 5.1.x it wins
+ * over the generic word "relay", which Postfix also uses for its "relay
+ * recipient table" of known mailboxes.
+ */
+const MAILBOX_TEXT = new RegExp(
+  [RECIPIENT_TEXT.source, String.raw`recipient address rejected`, String.raw`mailbox unavailable`, String.raw`user unknown`].join('|'),
+  'i',
+);
+
+/** "Relay access denied" and the like: the server will not relay for this sender. */
+const RELAY_TEXT = /relay/i;
 
 /** Wording that points at the sender, the content or a policy instead. */
 const SENDER_TEXT =
@@ -84,9 +97,12 @@ export function classifyRejection(code: number | null, text: string): RejectionC
   if (e && e.cls === 5) {
     if (e.subject === 1) {
       if (e.detail === 7 || e.detail === 8 || SETUP_TEXT.test(text)) return 'sender';
+      // A phrase naming the mailbox wins over the generic "relay".
+      if (MAILBOX_TEXT.test(text)) return 'recipient';
+      if (RELAY_TEXT.test(text)) return 'sender';
       // 5.1.0 (other address status) and 5.1.2 (bad destination system) do not
       // say the mailbox is gone: only the text can.
-      if (e.detail === 0 || e.detail === 2) return RECIPIENT_TEXT.test(text) ? 'recipient' : 'unknown';
+      if (e.detail === 0 || e.detail === 2) return 'unknown';
       return 'recipient';
     }
     if (e.subject === 2 && e.detail === 1) return SETUP_TEXT.test(text) ? 'sender' : 'recipient';

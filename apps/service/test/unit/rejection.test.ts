@@ -38,6 +38,11 @@ const TABLE: Array<[number | null, string, RejectionClass]> = [
   [553, '553 5.1.0 Sender rejected: from address not verified', 'sender'],
   [550, '550 5.1.1 The from address is not one of your addresses', 'sender'],
   [553, '553 5.1.1 <x@example.com>: Relay access denied', 'sender'],
+  [554, '554 5.1.1 <x@example.com>: Relay access denied', 'sender'],
+  // Postfix's "relay recipient table" lists known mailboxes: a mailbox phrase wins over "relay".
+  [550, '550 5.1.1 <gone@example.com>: Recipient address rejected: User unknown in relay recipient table', 'recipient'],
+  [550, '550 5.1.1 <gone@example.com>: no such user here (relay host mx2)', 'recipient'],
+  [550, '550 5.1.1 Mailbox unavailable', 'recipient'],
   [550, '550 5.1.1 Authentication required for this sender', 'sender'],
   [550, '550 5.2.1 Sender mailbox disabled', 'sender'],
   [550, '550 Message rejected as spam by Content Filtering', 'sender'],
