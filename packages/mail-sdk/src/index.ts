@@ -18,7 +18,8 @@ export {
   type BaseClientOptions,
 } from './client';
 export { MailApiError, MailNetworkError, MailTimeoutError, MailResponseValidationError } from './errors';
-export type { RequestOpts, ResponseMeta, ExecuteArgs } from './core';
+export type { RequestOpts, ResponseMeta, ExecuteArgs, ExportedFile } from './core';
+export { dispositionFilename } from './core';
 export type { PaginatableOperationId, PaginateArgs, PageItem } from './pagination';
 export { generateIdempotencyKey } from './runtime';
 

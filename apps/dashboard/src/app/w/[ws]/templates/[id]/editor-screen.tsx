@@ -9,6 +9,7 @@ import { missingRequiredMergeFields, type CompileResult, type Template } from '@
 import '@marlinjai/email-editor/styles.css';
 import { ConfirmDialog, Dialog } from '@/components/dialog';
 import { CompileMessages, DeviceToggle, EmailFrame } from '@/components/email-preview';
+import { ExportMenu } from '@/components/export-menu';
 import { FormError } from '@/components/form-error';
 import { IconClose } from '@/components/icons';
 import { Badge, Button, Spinner } from '@/components/ui';
@@ -235,6 +236,10 @@ export function EditorScreen({ ws, template: initial }: { ws: string; template: 
         >
           Preview
         </Button>
+        <ExportMenu
+          href={`/w/${ws}/templates/${template.id}/export`}
+          note={dirty ? `Exports the saved v${template.version}. Save first to include your changes.` : `Exports v${template.version}.`}
+        />
         <Button variant="primary" busy={save.pending} onClick={() => doSave(template.version)} title="Save (Cmd or Ctrl + S)" data-testid="save-template">
           Save
         </Button>

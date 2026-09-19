@@ -27,7 +27,7 @@ previewing it can never take the domain back.
 - **Server compilation** (`app/api/compile/route.ts`): validates the document with `migrateTemplate` (answering 400, or 422 for a document from a newer editor), then compiles it with `createMJMLCompiler()` from `@marlinjai/email-editor-core/server` to MJML (Mailjet Markup Language) and HTML.
 - **Save** (`app/api/save/route.ts`): validates with `migrateTemplate`, compiles, and in development writes the JSON and HTML to `saved-templates/`.
 - **Tailwind CSS 4 beside the editor**: the editor's stylesheet is scoped under `.ee-root`, so the app's Tailwind styles and the editor do not restyle each other, and the Tailwind setup needs no editor-specific configuration.
-- **`next.config.ts`**: `serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-validator']`, and no `transpilePackages` (the packages ship compiled).
+- **`next.config.ts`**: `serverExternalPackages: ['mjml', 'mjml-core', 'mjml-parser-xml', 'mjml-preset-core', 'mjml-validator']`, and no `transpilePackages` (the packages ship compiled).
 - A dashboard (`app/dashboard`) that exercises the platform packages (templates, contacts, campaigns, analytics, teams, automation).
 
 ## Getting Started

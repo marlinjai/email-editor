@@ -3,6 +3,8 @@ import { types, Instance, SnapshotIn, SnapshotOut, destroy, detach } from 'mobx-
 import { nanoid } from 'nanoid';
 import { ColumnModel, ColumnInstance, ColumnSnapshotIn, createColumn } from './ColumnModel';
 import { BlockInstance } from './BlockModel';
+import { paddingIn, paddingOut } from './spacingSnapshot';
+import { SECTION_DEFAULTS, dropFilled, fillColumnWidths, fillDefaults, type Filled } from './filledDefaults';
 import type { CSSProperties } from '../types';
 import type { BackgroundGradient } from '../../..';
 import { buildGradientCSS } from '../../..';
@@ -13,7 +15,7 @@ import { buildGradientCSS } from '../../..';
  * Sections are the top-level structural elements that contain columns.
  * Each section maps to an <mj-section> in MJML.
  */
-export const SectionModel = types
+const SectionModelBase = types
   .model('Section', {
     id: types.identifier,
     type: types.optional(types.literal('section'), 'section'),
@@ -53,6 +55,19 @@ export const SectionModel = types
 
     // Columns
     columns: types.array(ColumnModel),
+
+    /**
+     * Emit the section's raw blocks straight into mj-body instead of wrapping
+     * them in an mj-section (set by the MJML import for markup that sat
+     * directly in mj-body). Ignored once the section holds any other block.
+     */
+    bodyRaw: types.maybe(types.boolean),
+
+    /** MJML attributes the inspector has no control for (kept from an import). */
+    extraAttributes: types.maybe(types.frozen<Record<string, string>>()),
+
+    /** Defaults the store filled when it opened the node; they go back out only if changed (see `filledDefaults.ts`). */
+    filled: types.maybe(types.frozen<Filled>()),
   })
   .actions(self => ({
     /**
@@ -358,6 +373,22 @@ export const SectionModel = types
     },
 
     /**
+     * How wide the section's visible columns are together, in percent, as MJML
+     * lays them out: each column's width, where a column opened without one
+     * holds MJML's share (100 / columns, whatever its siblings say). Over 100,
+     * the last column wraps below the others on desktop.
+     */
+    get columnWidthTotal(): number {
+      const total = self.columns.filter((c) => !c.hidden).reduce((sum, c) => sum + c.width, 0);
+      return Math.round(total * 100) / 100;
+    },
+
+    /** Whether the columns overflow the section ({@link columnWidthTotal} over 100). */
+    get columnsOverflow(): boolean {
+      return this.columnWidthTotal > 100;
+    },
+
+    /**
      * Display name for layers panel
      */
     get displayName(): string {
@@ -368,6 +399,16 @@ export const SectionModel = types
       return `${count}-Column Section`;
     },
   }));
+
+/**
+ * SectionModel: the section model with its filled defaults dropped again on the
+ * way out, columns without a width sharing it evenly as in MJML
+ * (`filledDefaults.ts`), and its padding mapped between the
+ * schema's `padding` object and the store's flat fields (see `spacingSnapshot.ts`).
+ */
+export const SectionModel: typeof SectionModelBase = SectionModelBase.preProcessSnapshot((snapshot) =>
+  fillDefaults(fillColumnWidths(paddingIn(snapshot)), SECTION_DEFAULTS)
+).postProcessSnapshot((snapshot) => paddingOut(dropFilled(snapshot))) as unknown as typeof SectionModelBase;
 
 export type SectionInstance = Instance<typeof SectionModel>;
 export type SectionSnapshotIn = SnapshotIn<typeof SectionModel>;

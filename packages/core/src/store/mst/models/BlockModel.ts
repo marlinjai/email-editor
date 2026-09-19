@@ -1,5 +1,7 @@
 // packages/core/src/store/mst/models/BlockModel.ts
 import { types, Instance, SnapshotIn, SnapshotOut, IAnyType } from 'mobx-state-tree';
+import { paddingIn, paddingOut } from './spacingSnapshot';
+import { BLOCK_DEFAULTS, dropFilled, fillDefaults, type Filled } from './filledDefaults';
 import type { CSSProperties } from '../types';
 
 /**
@@ -155,6 +157,12 @@ const BlockModelBase = types
 
     // === Locked Blocks (Header/Footer) ===
     locked: types.optional(types.boolean, false),
+
+    // === MJML attributes the inspector has no control for (kept from an import) ===
+    extraAttributes: types.maybe(types.frozen<Record<string, string>>()),
+
+    /** Defaults the store filled when it opened the node; they go back out only if changed (see `filledDefaults.ts`). */
+    filled: types.maybe(types.frozen<Filled>()),
   })
   .actions(self => ({
     /**
@@ -440,19 +448,31 @@ const BlockModelBase = types
  * boundary, so the store reads a stored navbar and every snapshot it emits
  * (onChange, undo history, persistence) is a schema-valid document.
  *
+ * Defaults the store fills on the way in (every block type's fields at once,
+ * `hidden: false`) are dropped again on the way out unless changed
+ * (`filledDefaults.ts`), so a stored block comes back exactly as it went in.
+ *
+ * Padding is mapped the same way (see `spacingSnapshot.ts`): the schema's
+ * `padding` object in, the store's flat `paddingTop`... fields inside.
+ *
  * Both processors keep the base creation and snapshot types, so the result is
  * typed as the base model; the explicit annotation also keeps the declaration
  * emitter from inlining the whole model type.
  */
-export const BlockModel: typeof BlockModelBase = BlockModelBase.preProcessSnapshot((snapshot) => {
-  if (!snapshot || snapshot.type !== 'navbar') return snapshot;
-  const { links, navLinks, ...rest } = snapshot as typeof snapshot & { navLinks?: unknown[] };
-  const stored = navLinks && navLinks.length > 0 ? navLinks : ((links as unknown[] | undefined) ?? []);
-  return { ...rest, links: [], navLinks: stored } as typeof snapshot;
-}).postProcessSnapshot((snapshot) => {
+export const BlockModel: typeof BlockModelBase = BlockModelBase.preProcessSnapshot((raw) => {
+  let snapshot = paddingIn(raw);
+  if (snapshot && snapshot.type === 'navbar') {
+    const { links, navLinks, ...rest } = snapshot as typeof snapshot & { navLinks?: unknown[] };
+    const stored = navLinks && navLinks.length > 0 ? navLinks : ((links as unknown[] | undefined) ?? []);
+    // The social `links` of a navbar is the store's own filler: filled, so it never leaves.
+    snapshot = { ...rest, navLinks: stored } as typeof snapshot;
+  }
+  return fillDefaults(snapshot, BLOCK_DEFAULTS);
+}).postProcessSnapshot((raw) => {
+  const snapshot = paddingOut(dropFilled(raw));
   if (snapshot.type !== 'navbar') return snapshot;
   const { navLinks, links: _socialLinks, ...rest } = snapshot;
-  return { ...rest, links: navLinks } as unknown as typeof snapshot;
+  return { ...rest, links: navLinks ?? [] } as unknown as typeof snapshot;
 }) as unknown as typeof BlockModelBase;
 
 export type BlockInstance = Instance<typeof BlockModel>;

@@ -13,3 +13,6 @@ export {
   type ExportOptions,
 } from './store/mst/MJMLExporter';
 
+
+// MJML import (server-side only: it parses with mjml-parser-xml and compiles fallbacks with mjml)
+export * from './importer';

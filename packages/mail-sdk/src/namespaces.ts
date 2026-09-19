@@ -1,5 +1,5 @@
 import type { RouteBody, RouteParams, RouteQuery } from '@marlinjai/mail-contract';
-import { execute, executeMultipart, type CoreConfig, type RequestOpts } from './core';
+import { execute, executeFile, executeMultipart, type CoreConfig, type RequestOpts } from './core';
 
 /**
  * Namespaced, hand-written wrappers over `execute`/`executeMultipart`. Every
@@ -76,6 +76,21 @@ export function createNamespaces(config: CoreConfig) {
         execute(config, 'templates.version', { params: { id, version } as RouteParams<'templates.version'> }, opts),
       compile: (id: string, body: RouteBody<'templates.compile'> = {}, opts?: RequestOpts) =>
         execute(config, 'templates.compile', { params: { id }, body }, opts),
+      /**
+       * Creates a template (version 1) from MJML. What the editor cannot hold
+       * as a block is kept as compiled HTML and reported in `warnings`; broken
+       * MJML is `invalid_mjml` with the line and column in `details`.
+       */
+      import: (body: RouteBody<'templates.import'>, opts?: RequestOpts) => execute(config, 'templates.import', { body }, opts),
+      /** What `import` would create, compiled, without saving anything. */
+      importPreview: (body: RouteBody<'templates.importPreview'>, opts?: RequestOpts) =>
+        execute(config, 'templates.importPreview', { body }, opts),
+      /**
+       * The template (or a past `version`) as an `.mjml` or `.html` file, asset
+       * addresses absolute. Never refused for the asset policy: see `warnings`.
+       */
+      export: (id: string, query: RouteQuery<'templates.export'>, opts?: RequestOpts) =>
+        executeFile(config, 'templates.export', { params: { id }, query }, opts),
     },
 
     /** Compiles an unsaved document (the editor's live preview), not a saved template. */
@@ -136,6 +151,9 @@ export function createNamespaces(config: CoreConfig) {
       list: (query?: RouteQuery<'mailings.list'>, opts?: RequestOpts) => execute(config, 'mailings.list', { query }, opts),
       create: (body: RouteBody<'mailings.create'>, opts?: RequestOpts) => execute(config, 'mailings.create', { body }, opts),
       get: (id: string, opts?: RequestOpts) => execute(config, 'mailings.get', { params: { id } }, opts),
+      /** The mailing's content snapshot as an `.mjml` or `.html` file, like `templates.export`. */
+      export: (id: string, query: RouteQuery<'mailings.export'>, opts?: RequestOpts) =>
+        executeFile(config, 'mailings.export', { params: { id }, query }, opts),
       update: (id: string, body: RouteBody<'mailings.update'>, opts?: RequestOpts) =>
         execute(config, 'mailings.update', { params: { id }, body }, opts),
       addRecipients: (id: string, body: RouteBody<'mailings.addRecipients'>, opts?: RequestOpts) =>

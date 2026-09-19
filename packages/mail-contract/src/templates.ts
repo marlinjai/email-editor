@@ -195,3 +195,187 @@ export const AssetImport = z.object({
   filename: z.string().min(1).max(255).optional(),
 });
 export type AssetImport = z.infer<typeof AssetImport>;
+
+// MJML import and export
+
+/**
+ * The largest MJML source `templates.import` and `templates.importPreview`
+ * accept, in UTF-8 bytes (the editor core's `MAX_MJML_BYTES`). Larger is
+ * `payload_too_large`. The import also refuses nesting deeper than
+ * `MAX_MJML_DEPTH` and more than `MAX_MJML_ELEMENTS` elements (`invalid_mjml`).
+ */
+export const MAX_MJML_IMPORT_BYTES = 512 * 1024;
+export const MAX_MJML_DEPTH = 32;
+export const MAX_MJML_ELEMENTS = 5000;
+/** The most remote images one import copies into the workspace's assets. */
+export const MAX_IMPORTED_REMOTE_IMAGES = 50;
+
+/**
+ * `details.reason` of an `invalid_mjml` (422) refusal, with `details.line` and
+ * `details.column` when the problem is at one place:
+ * - `invalid_xml`: not well-formed (an unclosed or mismatched tag, a malformed attribute);
+ * - `not_mjml`: no `<mjml>` root or no `<mj-body>`;
+ * - `include_not_supported`: `mj-include` needs files, and an import has none;
+ * - `too_deep`, `too_many_elements`: over the limits above;
+ * - `too_complex`: reading it took longer than the service allows for one document;
+ * - `invalid_document`: the import produced a document the editor's schema refuses (a service bug; report it).
+ */
+export const MJML_IMPORT_REFUSALS = [
+  'invalid_xml',
+  'not_mjml',
+  'include_not_supported',
+  'too_deep',
+  'too_many_elements',
+  'too_complex',
+  'invalid_document',
+] as const;
+export type MjmlImportRefusal = (typeof MJML_IMPORT_REFUSALS)[number];
+
+/**
+ * One thing the import could not carry over exactly, or wants the author to
+ * know. Nothing is dropped silently.
+ * - `info`: the compiled mail is unchanged, the editor shows or edits it
+ *   differently (document-wide defaults the canvas does not render, a comment
+ *   between columns left out).
+ * - `warning`: kept so the mail stays the same, but not as an editable block
+ *   (compiled to a Raw HTML block, `fragment` holds the MJML it came from), or
+ *   something the source asked for could not be honoured (an unknown
+ *   component, a remote image that could not be copied).
+ */
+export const ImportWarning = z.object({
+  severity: z.enum(['info', 'warning']),
+  /** Stable kind, e.g. `kept_as_html`, `unknown_component`, `remote_image_not_imported`. */
+  code: z.string().min(1).max(64),
+  /** Where in the source, e.g. `mj-body > mj-section[2] > mj-column[1] > mj-social[1]`. */
+  path: z.string(),
+  line: z.number().int().min(1).optional(),
+  message: z.string().min(1),
+  fragment: z.string().optional(),
+});
+export type ImportWarning = z.infer<typeof ImportWarning>;
+
+/** An image the imported document loads from outside the service, and where. */
+export const RemoteImage = z.object({
+  url: z.string().min(1),
+  /** The element and attribute it is loaded from, e.g. `<img src>`. */
+  where: z.string(),
+});
+export type RemoteImage = z.infer<typeof RemoteImage>;
+
+/** A remote image the import copied into the workspace's assets, and the address it now has. */
+export const ImportedAsset = z.object({
+  source_url: z.string().min(1),
+  asset_id: Id,
+  url: z.string().url(),
+});
+export type ImportedAsset = z.infer<typeof ImportedAsset>;
+
+const mjmlSource = z.string().min(1, 'paste or upload the MJML');
+
+/** Reading MJML without saving anything: the editor document it becomes, and how it compiles. */
+export const TemplateImportPreviewRequest = z.object({ mjml: mjmlSource });
+export type TemplateImportPreviewRequest = z.infer<typeof TemplateImportPreviewRequest>;
+
+export const TemplateImportPreview = z.object({
+  document: TemplateDocument,
+  warnings: z.array(ImportWarning),
+  /** The document compiled under the workspace's asset policy, exactly as a send would. */
+  compiled: CompileResult,
+  /** Images loaded from outside the service; under `service_only` each is also a compile error. */
+  remote_images: z.array(RemoteImage),
+  asset_policy: z.enum(['any', 'service_only']),
+});
+export type TemplateImportPreview = z.infer<typeof TemplateImportPreview>;
+
+/**
+ * Creating a template (version 1) from MJML. With `import_remote_assets`, every
+ * remote `https` image is first copied into the workspace's assets (as
+ * `assets.import` does: no private addresses, no redirects, images only, at most
+ * `MAX_IMPORTED_REMOTE_IMAGES`) and the document points at the copies; an image
+ * that cannot be copied stays remote and is a `remote_image_not_imported`
+ * warning. Idempotent with an `Idempotency-Key`: a retry with the same key and
+ * body answers with the first result and creates nothing.
+ */
+export const TemplateImport = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  mjml: mjmlSource,
+  import_remote_assets: z.boolean().optional(),
+});
+export type TemplateImport = z.infer<typeof TemplateImport>;
+
+export const TemplateImportResult = z.object({
+  template: Template,
+  warnings: z.array(ImportWarning),
+  imported_assets: z.array(ImportedAsset),
+});
+export type TemplateImportResult = z.infer<typeof TemplateImportResult>;
+
+export const EXPORT_FORMATS = ['mjml', 'html'] as const;
+export const ExportFormat = z.enum(EXPORT_FORMATS);
+export type ExportFormat = z.infer<typeof ExportFormat>;
+
+/** `format` of the file; `version` a past version of the template (the current one when omitted). */
+export const TemplateExportQuery = z.object({
+  format: ExportFormat,
+  version: z.coerce.number().int().min(1).optional(),
+});
+export type TemplateExportQuery = z.infer<typeof TemplateExportQuery>;
+
+export const MailingExportQuery = z.object({ format: ExportFormat });
+export type MailingExportQuery = z.infer<typeof MailingExportQuery>;
+
+/** The content type of an exported file. MJML has no registered media type, so it is plain text. */
+export const EXPORT_CONTENT_TYPES: Record<ExportFormat, string> = {
+  mjml: 'text/plain; charset=utf-8',
+  html: 'text/html; charset=utf-8',
+};
+
+/**
+ * An export never refuses a document: what would block a send (an MJML error,
+ * an address the workspace's `service_only` asset policy does not allow) is
+ * reported in this header instead, as URL-encoded JSON of `CompileMessage[]`,
+ * shortened to fit (the full count is in `EXPORT_WARNING_COUNT_HEADER`).
+ */
+export const EXPORT_WARNINGS_HEADER = 'x-mail-export-warnings';
+export const EXPORT_WARNING_COUNT_HEADER = 'x-mail-export-warning-count';
+/** The longest `EXPORT_WARNINGS_HEADER` value the service sends. */
+export const MAX_EXPORT_WARNINGS_HEADER_LENGTH = 6000;
+
+/** Builds the EXPORT_WARNINGS_HEADER value: as many messages as fit, in order. */
+export function formatExportWarningsHeader(messages: readonly CompileMessage[]): string {
+  const kept: CompileMessage[] = [];
+  for (const m of messages) {
+    if (encodeURIComponent(JSON.stringify([...kept, m])).length > MAX_EXPORT_WARNINGS_HEADER_LENGTH) break;
+    kept.push(m);
+  }
+  return encodeURIComponent(JSON.stringify(kept));
+}
+
+/** Reads an EXPORT_WARNINGS_HEADER value back; an absent or unreadable value is no warnings. */
+export function parseExportWarningsHeader(value: string | null | undefined): CompileMessage[] {
+  if (!value) return [];
+  try {
+    const parsed = z.array(CompileMessage).safeParse(JSON.parse(decodeURIComponent(value)));
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The file name of an export: the name reduced to ASCII letters, numbers, `-`
+ * and `_` (at most 80 characters), plus the format's extension. Sent as
+ * `Content-Disposition: attachment; filename="..."`.
+ */
+export function exportFilename(name: string, format: ExportFormat): string {
+  const stem = name
+    .replace(/ß/g, 'ss')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+    .replace(/-+$/g, '');
+  return `${stem || 'export'}.${format}`;
+}

@@ -30,6 +30,8 @@ export const ERROR_STATUS = {
   payload_too_large: 413,
   // 422: well-formed, but the content cannot be used
   compile_failed: 422,
+  /** MJML that cannot be imported; `details.reason` is one of MJML_IMPORT_REFUSALS, with `line` and `column`. */
+  invalid_mjml: 422,
   missing_unsubscribe_url: 422,
   mailing_not_ready: 422,
   unknown_topic: 422,

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { EmailPreview, CompileMessages } from '@/components/email-preview';
+import { ExportMenu } from '@/components/export-menu';
 import { ErrorPanel, LinkButton, PageHeader } from '@/components/ui';
 import { act } from '@/lib/action';
 import { mail } from '@/lib/mail';
@@ -33,7 +34,12 @@ export default async function TemplatePage({ params }: { params: Promise<{ ws: s
       <PageHeader
         title={template.data.name}
         description={`Version ${template.data.version}. Your role can read templates but not change them.`}
-        actions={<LinkButton href={`/w/${ws}/templates/${id}/history`}>History</LinkButton>}
+        actions={
+          <div className="flex items-start gap-2">
+            <LinkButton href={`/w/${ws}/templates/${id}/history`}>History</LinkButton>
+            <ExportMenu href={`/w/${ws}/templates/${id}/export`} />
+          </div>
+        }
       />
       {compiled.ok ? (
         <div className="flex flex-col gap-3">

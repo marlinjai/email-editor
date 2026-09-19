@@ -32,6 +32,32 @@ export interface ThemeColor {
 }
 
 /**
+ * MJML attributes the editor has no control for, kept as found (values as they
+ * stood in the source, XML entities included) and emitted again by the
+ * compiler after the attributes the editor sets. Written by the MJML import,
+ * so an imported document compiles the way its source did: a `css-class` the
+ * author's `mj-style` rules target, an `mj-class`, a button's `font-weight`.
+ */
+export type ExtraAttributes = Record<string, string>;
+
+/**
+ * What an imported document's `<mj-head>` and `<mj-body>` carried beyond the
+ * fields the editor has (title, preview, fonts, breakpoint, styles). When
+ * present, the compiler emits `attributes` instead of its own default
+ * `<mj-attributes>` (so the source's `mj-all`, per-component defaults and
+ * `mj-class` definitions apply as they did), `bodyAttributes` on `<mj-body>`,
+ * and `headRaw` (for example `mj-html-attributes`) verbatim inside `<mj-head>`.
+ */
+export interface MjmlHead {
+  /** The inner markup of `<mj-attributes>`, verbatim. An empty string means "no defaults at all". */
+  attributes?: string;
+  /** Attributes of `<mj-body>`, e.g. `background-color`, `width`. */
+  bodyAttributes?: ExtraAttributes;
+  /** Other head elements, verbatim, in source order. */
+  headRaw?: string;
+}
+
+/**
  * Email template metadata
  */
 export interface TemplateMetadata {
@@ -47,6 +73,8 @@ export interface TemplateMetadata {
   breakpoint?: string;
   customCSS?: string;
   inlineCSS?: string;
+  /** Set by the MJML import; see {@link MjmlHead}. */
+  mjmlHead?: MjmlHead;
 }
 
 /**
@@ -56,6 +84,8 @@ export interface BaseBlock {
   id: string;
   type: string;
   hidden?: boolean;
+  /** See {@link ExtraAttributes}. */
+  extraAttributes?: ExtraAttributes;
 }
 
 /**
@@ -300,6 +330,8 @@ export interface Column {
    * See `docs/superpowers/specs/2026-04-26-nested-columns-design.md`.
    */
   subColumns?: SubColumn[];
+  /** See {@link ExtraAttributes}. */
+  extraAttributes?: ExtraAttributes;
 }
 
 /**
@@ -337,6 +369,14 @@ export interface Section {
   hidden?: boolean;
   padding?: Spacing;
   columns: Column[];
+  /**
+   * Emit the section's raw blocks straight into `<mj-body>` instead of inside
+   * an `<mj-section>`: markup that sat directly in the body of an imported
+   * document. Ignored as soon as the section holds any block that is not raw.
+   */
+  bodyRaw?: boolean;
+  /** See {@link ExtraAttributes}. On a wrapper section they go on `<mj-wrapper>`. */
+  extraAttributes?: ExtraAttributes;
 }
 
 /**

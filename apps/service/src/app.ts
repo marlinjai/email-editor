@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AssetStorage } from './assets/storage.js';
 import { authenticate } from './auth.js';
-import type { Compiler } from './compile/pool.js';
+import type { Compiler, MjmlImporter } from './compile/pool.js';
 import { workspaceCompile } from './compile/workspace-compile.js';
 import type { TemplateDocument } from '@marlinjai/mail-contract';
 import type { AppEnv } from './context.js';
@@ -20,6 +20,7 @@ import { healthRoutes } from './routes/health.js';
 import { landingRoutes } from './routes/landing.js';
 import { memberRoutes } from './routes/members.js';
 import { templateRoutes } from './routes/templates.js';
+import { mjmlIoRoutes } from './routes/mjml-io.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { unsubscribeRoutes } from './routes/unsubscribe.js';
 import { workspaceRoutes } from './routes/workspaces.js';
@@ -72,8 +73,8 @@ export type AppOptions = {
   webhookUrlPolicy?: SsrfPolicy;
   /** How long `assets.import` waits for a remote image (10 seconds by default). */
   assetImportTimeoutMs?: number;
-  /** Compiles documents off the request thread (a CompilePool in production). */
-  compiler: Compiler;
+  /** Compiles documents and reads MJML off the request thread (a CompilePool in production). */
+  compiler: Compiler & MjmlImporter;
   /** Where uploaded images are stored (Storage Brain in production). */
   assetStorage: AssetStorage;
   /** The service's public origin, without a trailing slash; asset URLs are built on it. */
@@ -221,6 +222,19 @@ export function createApp({
   app.route('/', auditRoutes(deps));
   const compileForWorkspace = workspaceCompile(pool, compiler, publicBaseUrl);
   app.route('/', templateRoutes(sql, { ...deps, compiler: compileForWorkspace }));
+  app.route(
+    '/',
+    mjmlIoRoutes(sql, {
+      ...deps,
+      compiler: compileForWorkspace,
+      importer: compiler,
+      storage: assetStorage,
+      importPolicy: webhookUrlPolicy ?? {},
+      importTimeoutMs: assetImportTimeoutMs,
+      publicBaseUrl,
+      log,
+    }),
+  );
   app.route(
     '/',
     assetRoutes(sql, {

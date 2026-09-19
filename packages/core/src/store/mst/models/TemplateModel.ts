@@ -1,5 +1,7 @@
 // packages/core/src/store/mst/models/TemplateModel.ts
 import { types, Instance, SnapshotIn, SnapshotOut, destroy, detach, getSnapshot } from 'mobx-state-tree';
+import type { MjmlHead } from '../../../schema/types';
+import { dropFilled, fillDefaults, type Filled } from './filledDefaults';
 import { nanoid } from 'nanoid';
 import { SectionModel, createSection } from './SectionModel';
 import { BlockModel, BlockType } from './BlockModel';
@@ -41,6 +43,17 @@ const DEFAULT_THEME_COLORS = [
   { name: 'Background', value: '#f5f5f5' },
 ];
 
+/** What the metadata model fills when a stored document leaves a field out. */
+const METADATA_DEFAULTS: Record<string, () => unknown> = {
+  title: () => 'Untitled Template',
+  subject: () => '',
+  previewText: () => '',
+  createdAt: () => Date.now(),
+  updatedAt: () => Date.now(),
+  fonts: () => [],
+  themeColors: () => DEFAULT_THEME_COLORS.map((c) => ({ ...c })),
+};
+
 /**
  * Template metadata
  */
@@ -56,6 +69,12 @@ export const TemplateMetadataModel = types
     breakpoint: types.maybe(types.string),
     customCSS: types.maybe(types.string),
     inlineCSS: types.maybe(types.string),
+    /** The MJML head and body settings of an imported document (see `MjmlHead` in the schema). */
+    mjmlHead: types.maybe(types.frozen<MjmlHead>()),
+    /** Defaults the store filled when it opened the node; they go back out only if changed (see `filledDefaults.ts`). */
+    filled: types.maybe(types.frozen<Filled>()),
+    /** Dates a stored document wrote as ISO strings, so they go back out as written. */
+    dateStrings: types.maybe(types.frozen<Record<string, string>>()),
   })
   .actions(self => ({
     update(updates: {
@@ -114,20 +133,36 @@ export const TemplateMetadataModel = types
   }))
   // A stored document may carry its dates as ISO strings (a host that set
   // `updatedAt: new Date()` and serialized to JSON writes one). The store keeps
-  // dates as `Date`, so parse strings on the way in and drop unparseable ones,
-  // letting the default (now) apply, instead of refusing to open the document.
+  // dates as `Date`, so parse strings on the way in, remembering how they were
+  // written, and drop unparseable ones, letting the default (now) apply,
+  // instead of refusing to open the document. Defaults filled here (a title,
+  // the dates, the theme colours) are dropped again on the way out unless
+  // changed (`filledDefaults.ts`).
   .preProcessSnapshot((snapshot) => {
     if (!snapshot) return snapshot;
-    const toDate = (value: unknown) => {
+    const dateStrings: Record<string, string> = {};
+    const toDate = (key: string, value: unknown) => {
       if (typeof value !== 'string') return value;
       const ms = Date.parse(value);
-      return Number.isNaN(ms) ? undefined : ms;
+      if (Number.isNaN(ms)) return undefined;
+      dateStrings[key] = value;
+      return ms;
     };
-    return {
+    const parsed = {
       ...snapshot,
-      createdAt: toDate(snapshot.createdAt),
-      updatedAt: toDate(snapshot.updatedAt),
+      createdAt: toDate('createdAt', snapshot.createdAt),
+      updatedAt: toDate('updatedAt', snapshot.updatedAt),
+      ...(Object.keys(dateStrings).length > 0 ? { dateStrings } : {}),
     } as typeof snapshot;
+    return fillDefaults(parsed, METADATA_DEFAULTS);
+  })
+  .postProcessSnapshot((snapshot) => {
+    const { dateStrings, ...rest } = dropFilled(snapshot) as typeof snapshot & { dateStrings?: Record<string, string> };
+    const out = rest as Record<string, unknown>;
+    for (const [key, written] of Object.entries(dateStrings ?? {})) {
+      if (out[key] === Date.parse(written)) out[key] = written;
+    }
+    return out as typeof snapshot;
   });
 
 /**

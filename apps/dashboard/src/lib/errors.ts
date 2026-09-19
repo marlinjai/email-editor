@@ -27,6 +27,7 @@ const MESSAGES: Record<ErrorCode, string> = {
     "This provider's bounce circuit breaker is open: too many recipients in a row were refused alike. Check the provider, then clear its anomaly under Settings, Providers.",
   payload_too_large: 'That is too large to upload or save.',
   compile_failed: 'The email does not compile. Fix the errors shown in the preview before sending.',
+  invalid_mjml: 'The MJML could not be read.',
   missing_unsubscribe_url:
     'The email has no unsubscribe link. Add {{unsubscribe_url}} to the template, usually in the footer, before sending.',
   mailing_not_ready: 'Add at least one recipient before sending.',
@@ -51,6 +52,8 @@ const SERVICE_MESSAGE_WINS: ReadonlySet<ErrorCode> = new Set([
   'already_exists',
   'insufficient_role',
   'provider_error',
+  // It names the line, the column and what is wrong there.
+  'invalid_mjml',
 ]);
 
 type Issue = { path?: Array<string | number>; message?: string };

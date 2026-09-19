@@ -7,13 +7,16 @@ import {
   MAX_ASSET_BYTES,
   MailApiError,
   TemplateDocument,
+  MAX_MJML_IMPORT_BYTES,
   type Asset,
   type CompileResult,
   type Template,
+  type TemplateImportPreview,
+  type TemplateImportResult,
 } from '@marlinjai/mail-sdk';
 import { act, DashboardRefusal, parseInput } from '@/lib/action';
 import { blankDocument } from '@/lib/documents';
-import { mail } from '@/lib/mail';
+import { mail, mailForUpload } from '@/lib/mail';
 import type { ActionResult } from '@/lib/result';
 
 const templatesPath = (ws: string) => `/w/${ws}/templates`;
@@ -174,4 +177,51 @@ export async function uploadImage(ws: string, form: FormData): Promise<ActionRes
  */
 export async function importAsset(ws: string, url: string): Promise<ActionResult<Asset>> {
   return act('assets.import', async () => (await mail(ws)).api.assets.import({ url }));
+}
+
+const tooLargeMjml = (mjml: string) => new TextEncoder().encode(mjml).length > MAX_MJML_IMPORT_BYTES;
+const TOO_LARGE = `The MJML is larger than ${MAX_MJML_IMPORT_BYTES / 1024} KB. Split it into smaller mails and import them one by one.`;
+
+/** What an MJML source becomes in the editor, compiled, without saving anything. */
+export async function previewImport(ws: string, mjml: string): Promise<ActionResult<TemplateImportPreview>> {
+  if (mjml.trim() === '') {
+    return {
+      ok: false,
+      error: { code: 'validation_failed', message: 'Paste MJML or choose a .mjml file first.', fields: { mjml: 'Paste MJML or choose a .mjml file' } },
+    };
+  }
+  return act('templates.importPreview', async () => {
+    if (tooLargeMjml(mjml)) throw new DashboardRefusal('payload_too_large', TOO_LARGE);
+    return (await mail(ws)).api.templates.importPreview({ mjml });
+  });
+}
+
+const ImportInput = z.object({
+  name: z.string().trim().min(1, 'Name the template').max(200),
+  mjml: z.string().min(1, 'Paste MJML or choose a .mjml file'),
+  importRemoteAssets: z.boolean(),
+  idempotencyKey: z.string().min(1).max(255),
+});
+
+/**
+ * Creates the template. The idempotency key comes from the browser's draft,
+ * so a retry of this very request (a double click, a dropped answer) returns
+ * the template the first attempt made instead of a second one.
+ */
+export async function importTemplate(ws: string, input: z.input<typeof ImportInput>): Promise<ActionResult<TemplateImportResult>> {
+  const parsed = parseInput(ImportInput, input);
+  if (!parsed.ok) return parsed;
+  return act('templates.import', async () => {
+    if (tooLargeMjml(parsed.data.mjml)) throw new DashboardRefusal('payload_too_large', TOO_LARGE);
+    // Copying images means the service fetches up to 50 of them before it
+    // answers: the long-timeout client, so a slow one is not cut off at 10
+    // seconds and retried into "still being processed".
+    const { api } = parsed.data.importRemoteAssets ? await mailForUpload(ws) : await mail(ws);
+    const result = await api.templates.import(
+      { name: parsed.data.name, mjml: parsed.data.mjml, import_remote_assets: parsed.data.importRemoteAssets },
+      { idempotencyKey: parsed.data.idempotencyKey },
+    );
+    revalidatePath(templatesPath(ws));
+    return result;
+  });
 }

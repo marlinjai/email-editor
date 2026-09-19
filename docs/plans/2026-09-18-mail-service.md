@@ -942,6 +942,97 @@ every unsubscribe link and image URL points at this host.
 - Screenshots: `docs/plans/assets/2026-09-19-landing-desktop.png` and
   `-mobile.png`.
 
+### MJML import and export (built 2026-09-19)
+
+Marlin asked (2026-09-19): "build functionality that we can import existing
+MJML, and also export as MJML or as HTML". Branch `feat/mjml-import-export`.
+
+- **Core.** `importMjml(source)` in `@marlinjai/email-editor-core/server` (never
+  the browser entry). A strict scan first: a line and column for every
+  well-formedness error, `mj-include` refused (mjml-parser-xml would otherwise
+  read files from the server's disk), size, depth and element limits. Then
+  mjml-parser-xml with the standard components. A block's own attributes become
+  its fields; every other attribute is kept in a new `extraAttributes` (block,
+  column, section) and emitted again by the compiler, and the document keeps its
+  `mj-attributes` and `mj-body` attributes (`metadata.mjmlHead`), so MJML
+  resolves `mj-all`, per-tag defaults and `mj-class` exactly as for the source.
+  The editor's own export is recognised (`el-<type> el-<id>` classes, and
+  `data-ee-*` markers the compiler now writes on its raw social and sub-column
+  markup), so an export imports back with the same blocks and ids. What the
+  editor cannot hold as a block is compiled in place, with the whole source, and
+  kept as a Raw HTML block holding exactly that output; it is a `kept_as_html`
+  warning with the MJML fragment.
+- **Found and fixed on the way: the editor's store did not give back the
+  document it was given.** Asked by the orchestrator to sweep the whole class.
+  The store dropped every `padding` object when it opened a document, and its
+  own padding edits never reached the compiler; padding now maps at the
+  snapshot boundary like navbar links. It also filled defaults on the way in
+  and never took them out: every column without a width became 100% wide (two
+  such columns compiled as two stacked full-width columns), an untitled
+  document gained the title "Untitled Template" (which reached the mail as
+  `<mj-title>`), every block carried the fields of all 14 block types, and
+  dates written as ISO strings came back as numbers. The boundary is now
+  symmetric (`filledDefaults.ts`): what the store fills is recorded and dropped
+  again on the way out unless edited, columns without a width take MJML's even
+  share inside the store, and dates keep how they were written.
+  `document-roundtrip.test.ts` opens every block type (fully populated and with
+  only its required fields), sections, columns, sub-columns, gradients and
+  metadata in the store and asserts the snapshot deep-equals the input, also
+  after an edit and an undo. The only addition is the template id the store
+  assigns to a document without one. Separately, the compiler wrote only the
+  padding sides that were set, so `{ top, bottom }` became MJML's two-value
+  shorthand; it now writes all four.
+- **Round-trip corpus** (`packages/core/src/importer/__tests__/corpus.test.ts`).
+  All 35 prebuilt sections: export, import, export gives byte-identical MJML and
+  HTML, no warning of severity `warning`, and a second pass gives the same
+  document. Six hand-written real-world samples (a newsletter with
+  `mj-attributes`, `mj-class` and a wrapper, a receipt with `mj-group` and an
+  `mj-table`, a welcome mail with a body-level `mj-hero` and conditional
+  comments, a launch mail with carousel, accordion, pixel column widths and
+  `mj-html-attributes`, a minimal one, one with unsupported constructs): the
+  imported document compiles to structurally equivalent HTML (same text, links,
+  images and background colours as MJML's own output) and a second pass is
+  stable. The official MJML templates (`mjmlio/email-templates`) were not
+  vendored: that repository declares no license, so the samples are written
+  here instead.
+- **What does not map exactly, and how it degrades** (the mail never changes;
+  editability does): a wrapper around several sections, an `mj-hero` with
+  content, `mj-social` (the Social block draws its own icons), a hand-written
+  `mj-table` (the Table block styles every cell), a section with conditional
+  comments between columns, and `mj-raw` with `position` become Raw HTML blocks.
+  A component MJML does not know renders nothing in MJML either; its source is
+  kept in a comment inside a Raw block (`unknown_component`). Pixel column widths
+  are kept as attributes (the editor's width control is in percent). Per-side
+  padding attributes (`padding-top` and friends) are kept as attributes too,
+  and MJML lets them win over the `padding` the inspector edits, so that side of
+  such an element does not respond to the inspector. The canvas does not render
+  document-wide defaults; the preview is the reference.
+- **Rendering change for existing mail.** With the padding fix, a document whose
+  padding sets only some sides (all 35 prebuilt sections, and any template
+  created through the API and not re-saved since) compiles to exactly those
+  sides with 0 elsewhere, as the canvas always showed, instead of MJML's
+  shorthand reading (`80px 80px` was 80 px on all four sides). Sent mailings keep
+  their stored HTML.
+- **Service and contract.** `templates.importPreview`, `templates.import`
+  (idempotent, optional `import_remote_assets` through `assets.import`'s
+  SSRF-guarded fetch), `templates.export` and `mailings.export` (the file, never
+  refused; send-blocking problems in `x-mail-export-warnings`), the
+  `invalid_mjml` error with `details.reason`, `line` and `column`, and
+  `responseType: 'text'` in the route table for routes that answer with a file.
+  Reading MJML runs in the compile pool's workers.
+- **Dashboard.** "Import MJML" on the templates list (paste or upload, preview in
+  the sandboxed frame, warnings by severity, remote images with "Import images
+  into assets", create), on all four paths of the stateful-flow standard, and an
+  Export menu (MJML or HTML) in the editor, on the read-only template page and on
+  the mailing page, downloaded through route handlers that call the service
+  server-side.
+- **Editor package.** No `onExport` option: exporting needs the server
+  compiler, and a download belongs in the host's chrome, so the editor README
+  documents how a host gets MJML and HTML (and imports MJML) from the server
+  entry instead.
+- **Landing page.** The editor line names MJML import and export in all five
+  languages.
+
 ## Legal shape
 
 The service is a data processor for each workspace's controller. It ships with a

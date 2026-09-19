@@ -20,9 +20,11 @@ beforeAll(async () => {
 });
 afterAll(() => h?.drop());
 
-function conforms(id: OperationId, res: { status: number; body: unknown }) {
+function conforms(id: OperationId, res: { status: number; body: unknown; text?: string }) {
   expect(res.status, `${id}: ${JSON.stringify(res.body)}`).toBe(routes[id].status);
-  const parsed = routes[id].response.safeParse(res.body);
+  // A file route's success is the file itself, not JSON.
+  const isFile = (routes[id] as { responseType?: string }).responseType === 'text';
+  const parsed = routes[id].response.safeParse(isFile ? res.text : res.body);
   expect(parsed.success, `${id}: ${parsed.success ? '' : JSON.stringify(parsed.error.issues)}`).toBe(true);
 }
 
@@ -79,12 +81,17 @@ describe('contract conformance, phase S0', () => {
 describe('contract conformance, phase S1', () => {
   it('every S1 operation answers with its declared status and response schema', async () => {
     const covered = new Set<OperationId>();
-    const run = async (id: OperationId, res: { status: number; body: unknown }) => {
+    const run = async (id: OperationId, res: { status: number; body: unknown; text?: string }) => {
       conforms(id, res);
       covered.add(id);
       return res as { status: number; body: any };
     };
 
+    const mjml = '<mjml><mj-body><mj-section><mj-column><mj-text>Conform</mj-text><mj-social><mj-social-element name="github" href="https://g.example">G</mj-social-element></mj-social></mj-column></mj-section></mj-body></mjml>';
+    const preview = await run('templates.importPreview', await h.call({ method: 'POST', path: '/v1/templates/import/preview', key: W.key, body: { mjml } }));
+    expect(preview.body.warnings.length).toBeGreaterThan(0);
+    const imported = await run('templates.import', await h.call({ method: 'POST', path: '/v1/templates/import', key: W.key, body: { name: 'Imported', mjml } }));
+    await run('templates.export', await h.call({ path: `/v1/templates/${imported.body.template.id}/export?format=html`, key: W.key }));
     const created = await run('templates.create', await h.call({ method: 'POST', path: '/v1/templates', key: W.key, body: { name: 'Conform', description: 'd', document: helloDocument() } }));
     const id = created.body.id;
     await run('templates.list', await h.call({ path: '/v1/templates', key: W.key }));
@@ -429,5 +436,20 @@ describe('contract conformance, phase S4: signup forms', () => {
 
     const ops = Object.keys(routes).filter((id) => id.startsWith('signupForms.')) as OperationId[];
     expect([...covered].sort()).toEqual(ops.sort());
+  });
+});
+
+// MJML import and export: the template routes are covered in phase S1 above;
+// mailings.export, a sending route that answers with a file, here.
+describe('contract conformance, mailings.export', () => {
+  it('answers with the file, at its declared status', async () => {
+    const { seedSending, createMailing } = await import('../support/sending.js');
+    const w = await h.seedWorkspace('conform-mailing-export');
+    const { provider } = await seedSending(h, w.id, { topic: 'news' });
+    const mailing = await createMailing(h, w, { topic: 'news', provider_id: provider.id });
+    const res = await h.call({ path: `/v1/mailings/${mailing.id}/export?format=mjml`, key: w.key });
+    conforms('mailings.export', res);
+    expect(res.text).toContain('<mjml>');
+    expect(matchRoute('GET', `/v1/mailings/${mailing.id}/export`)?.id).toBe('mailings.export');
   });
 });

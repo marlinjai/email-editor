@@ -29,6 +29,13 @@ function dom(html: string) {
 
 describe('translations', () => {
   const english = LANDING_MESSAGES.en;
+
+  it.each(PAGE_LOCALES)('%s says the editor imports MJML and exports MJML or HTML', (locale) => {
+    const text = LANDING_MESSAGES[locale].f_editor_text;
+    expect(text.match(/MJML/g)?.length, locale).toBe(2);
+    expect(text, locale).toMatch(/HTML/);
+    expect(page(locale)).toContain('MJML');
+  });
   const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 
   it.each(PAGE_LOCALES)('%s has every key, non-empty, with the same placeholders as English', (locale) => {

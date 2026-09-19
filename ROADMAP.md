@@ -29,6 +29,12 @@ Decisions and operator steps that remain after the mail service plan was built
       person's member rows, and what happens to a workspace whose last owner is
       erased); today the service acknowledges it as a no-op and is subscribed only to
       `tenant.erased` (2026-09-18)
+- [ ] Decide whether the editor's model should grow to hold what an MJML import
+      keeps as Raw HTML today (the mail is unchanged, it is only not editable as
+      blocks): a wrapper around several sections (common in real templates), an
+      `mj-hero` with content, `mj-social` with MJML's own icons, a hand-written
+      `mj-table`. Each needs a schema field, a canvas renderer and an inspector
+      (2026-09-19)
 - [ ] Decide whether hosts may add new block types (not only redefine the 14
       standard ones): it needs an open block type in the store and schema, a
       renderer hook for the canvas and a compile hook the server can trust.
@@ -57,6 +63,11 @@ Decisions and operator steps that remain after the mail service plan was built
       list of lumitra.co/impressum (2026-09-19)
 
 ## Recently shipped
+
+- MJML import (paste or upload, preview, warnings, remote images copied on
+  request) and export of templates and mailings as MJML or HTML, in the core,
+  the service, the SDK and the dashboard (2026-09-19)
+  [plan](docs/plans/2026-09-18-mail-service.md)
 
 - Lumitra Mail, the multi-tenant mail service with ŌPUNTIA's Studio as its first
   client, built S0 to S5 and deployed at `https://mail.lumitra.co` (API, hosted

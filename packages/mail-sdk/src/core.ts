@@ -9,6 +9,10 @@ import {
   parseUsageWarningHeader,
   type ErrorCode,
   type UsageWarningHeaderEntry,
+  type CompileMessage,
+  EXPORT_WARNINGS_HEADER,
+  EXPORT_WARNING_COUNT_HEADER,
+  parseExportWarningsHeader,
   type OperationId,
   type RouteBody,
   type RouteDef,
@@ -125,13 +129,15 @@ async function parseErrorBody(status: number, text: string): Promise<{ code: Err
  * `RETRYABLE_ERRORS` and on network failures, and a reused Idempotency-Key
  * across every attempt (this is what makes a retry after a partial failure safe:
  * the service treats a replay with the same key and body as the first call).
+ * Answers with the successful response, its body still unread.
  */
-export async function execute<K extends OperationId>(
+async function send<K extends OperationId>(
   config: CoreConfig,
   operationId: K,
-  args: ExecuteArgs<K> = {},
-  opts: RequestOpts = {},
-): Promise<RouteResponse<K>> {
+  args: ExecuteArgs<K>,
+  opts: RequestOpts,
+  accept: string,
+): Promise<{ response: Response; requestId: string | null }> {
   const route = routes[operationId] as RouteDef;
   const sleep = config.sleep ?? defaultSleep;
   const path = buildPath(route.path, ((args.params as unknown as Record<string, string | number>) ?? {}));
@@ -151,7 +157,7 @@ export async function execute<K extends OperationId>(
     try {
       const headers: Record<string, string> = {
         ...config.authHeaders(),
-        accept: 'application/json',
+        accept,
       };
       if (hasJsonBody) headers['content-type'] = 'application/json';
       if (idempotencyKey) headers[IDEMPOTENCY_KEY_HEADER] = idempotencyKey;
@@ -180,20 +186,7 @@ export async function execute<K extends OperationId>(
       }
 
       const requestId = response.headers.get(REQUEST_ID_HEADER);
-      if (response.status >= 200 && response.status < 300) {
-        const text = await response.text();
-        const json = text.length > 0 ? (JSON.parse(text) as unknown) : undefined;
-        let data: RouteResponse<K>;
-        if (!config.validateResponses) data = json as RouteResponse<K>;
-        else {
-          const parsed = route.response.safeParse(json);
-          if (!parsed.success) throw new MailResponseValidationError(operationId, parsed.error.issues);
-          data = parsed.data as RouteResponse<K>;
-        }
-        // After the body parsed and validated: onResponse sees only calls that succeed.
-        opts.onResponse?.(responseMeta(response, requestId));
-        return data;
-      }
+      if (response.status >= 200 && response.status < 300) return { response, requestId };
 
       const text = await response.text();
       const errorBody = await parseErrorBody(response.status, text);
@@ -221,6 +214,94 @@ export async function execute<K extends OperationId>(
   }
   // Unreachable: the loop always returns or throws before exhausting attempts.
   throw lastError instanceof Error ? lastError : new Error('mail service request failed');
+}
+
+/** One JSON operation: {@link send}, then the body parsed and (optionally) validated against the contract. */
+export async function execute<K extends OperationId>(
+  config: CoreConfig,
+  operationId: K,
+  args: ExecuteArgs<K> = {},
+  opts: RequestOpts = {},
+): Promise<RouteResponse<K>> {
+  const route = routes[operationId] as RouteDef;
+  if (route.responseType === 'text') {
+    // A file route through the generic path answers with the file's text;
+    // `executeFile` also reads its name and the export warnings.
+    const file = await executeFile(config, operationId, args, opts);
+    return file.content as RouteResponse<K>;
+  }
+  const { response, requestId } = await send(config, operationId, args, opts, 'application/json');
+  const text = await response.text();
+  const json = text.length > 0 ? (JSON.parse(text) as unknown) : undefined;
+  let data: RouteResponse<K>;
+  if (!config.validateResponses) data = json as RouteResponse<K>;
+  else {
+    const parsed = route.response.safeParse(json);
+    if (!parsed.success) throw new MailResponseValidationError(operationId, parsed.error.issues);
+    data = parsed.data as RouteResponse<K>;
+  }
+  // After the body parsed and validated: onResponse sees only calls that succeed.
+  opts.onResponse?.(responseMeta(response, requestId));
+  return data;
+}
+
+/** A file the service answered with (`templates.export`, `mailings.export`). */
+export interface ExportedFile {
+  /** The file's text: MJML or HTML. */
+  content: string;
+  /** e.g. `text/html; charset=utf-8`. */
+  contentType: string;
+  /** From `Content-Disposition`, e.g. `Herbst-Newsletter.html`. */
+  filename: string;
+  /**
+   * What would block sending this content (MJML errors, addresses the
+   * workspace's asset policy does not allow). An export is never refused for
+   * them; they come in EXPORT_WARNINGS_HEADER, shortened to fit.
+   */
+  warnings: CompileMessage[];
+  /** How many warnings there are in all; more than `warnings.length` when the header was shortened. */
+  warningCount: number;
+  requestId: string | null;
+}
+
+/** The `filename` of a `Content-Disposition` value (the `filename*` UTF-8 form first). */
+export function dispositionFilename(value: string | null): string | null {
+  if (!value) return null;
+  const extended = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(value);
+  if (extended) {
+    try {
+      return decodeURIComponent(extended[1]!.trim());
+    } catch {
+      // fall through to the plain form
+    }
+  }
+  const plain = /filename\s*=\s*"([^"]*)"|filename\s*=\s*([^;\s]+)/i.exec(value);
+  return plain ? (plain[1] ?? plain[2] ?? null) : null;
+}
+
+/** Like {@link execute}, for the operations whose success is a file rather than JSON. */
+export async function executeFile<K extends OperationId>(
+  config: CoreConfig,
+  operationId: K,
+  args: ExecuteArgs<K> = {},
+  opts: RequestOpts = {},
+): Promise<ExportedFile> {
+  const route = routes[operationId] as RouteDef;
+  if (route.responseType !== 'text') throw new Error(`"${operationId}" answers with JSON: use execute`);
+  const { response, requestId } = await send(config, operationId, args, opts, 'text/html, text/plain, */*');
+  const content = await response.text();
+  const warnings = parseExportWarningsHeader(response.headers.get(EXPORT_WARNINGS_HEADER));
+  const count = Number(response.headers.get(EXPORT_WARNING_COUNT_HEADER));
+  const file: ExportedFile = {
+    content,
+    contentType: response.headers.get('content-type') ?? 'application/octet-stream',
+    filename: dispositionFilename(response.headers.get('content-disposition')) ?? 'export',
+    warnings,
+    warningCount: Number.isInteger(count) && count >= warnings.length ? count : warnings.length,
+    requestId,
+  };
+  opts.onResponse?.(responseMeta(response, requestId));
+  return file;
 }
 
 export interface MultipartArgs<K extends OperationId> {

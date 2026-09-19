@@ -1,0 +1,56 @@
+<mjml>
+  <mj-head>
+    <mj-title>The Monthly Letter</mj-title>
+    <mj-preview>What we built in September, and what comes next</mj-preview>
+    <mj-font name="Inter" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700" />
+    <mj-attributes>
+      <mj-all font-family="Inter, Helvetica, Arial, sans-serif" />
+      <mj-text font-size="15px" line-height="1.5" color="#1f2933" />
+      <mj-class name="muted" color="#7b8794" font-size="13px" />
+      <mj-class name="cta" background-color="#0b6e4f" color="#ffffff" border-radius="6px" />
+    </mj-attributes>
+    <mj-style>
+      .headline div { letter-spacing: -0.5px; }
+      @media only screen and (max-width:480px) { .stack-pad { padding: 0 12px !important; } }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#f4f5f7" width="640px">
+    <mj-section padding="20px 0">
+      <mj-column>
+        <mj-navbar base-url="https://example.org" hamburger="hamburger" ico-color="#1f2933">
+          <mj-navbar-link href="/blog" color="#1f2933">Blog</mj-navbar-link>
+          <mj-navbar-link href="/events" color="#1f2933">Events</mj-navbar-link>
+          <mj-navbar-link href="/about">About</mj-navbar-link>
+        </mj-navbar>
+      </mj-column>
+    </mj-section>
+    <mj-wrapper background-color="#ffffff" padding="0 0 24px 0" border-radius="8px">
+      <mj-section>
+        <mj-column>
+          <mj-image src="https://images.example.org/cover.jpg" alt="Our workshop in autumn light" href="https://example.org/letter" />
+          <mj-text css-class="headline" font-size="28px" font-weight="700">September, in one page</mj-text>
+          <mj-text>We shipped the new booking flow, opened two workshops and said hello to 214 new readers. <a href="https://example.org/changelog">Read the changelog</a>.</mj-text>
+        </mj-column>
+      </mj-section>
+      <mj-section>
+        <mj-column width="50%">
+          <mj-text mj-class="muted">Coming up</mj-text>
+          <mj-text>Open studio on 3 October, from 6 pm.</mj-text>
+        </mj-column>
+        <mj-column width="50%">
+          <mj-button mj-class="cta" href="https://example.org/rsvp">Save a seat</mj-button>
+        </mj-column>
+      </mj-section>
+    </mj-wrapper>
+    <mj-section css-class="stack-pad">
+      <mj-column>
+        <mj-divider border-color="#d9dee3" border-width="1px" />
+        <mj-social font-size="13px" icon-size="22px" mode="horizontal">
+          <mj-social-element name="instagram" href="https://instagram.com/example">Instagram</mj-social-element>
+          <mj-social-element name="linkedin" href="https://linkedin.com/company/example">LinkedIn</mj-social-element>
+        </mj-social>
+        <mj-text mj-class="muted" align="center">You receive this because you subscribed. <a href="{{unsubscribe_url}}">Unsubscribe</a>.</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

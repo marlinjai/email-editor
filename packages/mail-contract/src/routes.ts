@@ -22,6 +22,12 @@ import {
   Template,
   TemplateCompileRequest,
   TemplateCreate,
+  TemplateExportQuery,
+  TemplateImport,
+  TemplateImportPreview,
+  TemplateImportPreviewRequest,
+  TemplateImportResult,
+  MailingExportQuery,
   TemplateListQuery,
   TemplateSummary,
   TemplateUpdate,
@@ -126,6 +132,12 @@ export interface RouteDef {
   /** A `multipart/form-data` upload instead of a JSON body. */
   multipart?: { fileField: string; jsonField?: string; json?: z.ZodTypeAny };
   response: z.ZodTypeAny;
+  /**
+   * `text`: the success body is a file (`response` is `z.string()`), with its
+   * own content type and a `Content-Disposition`, not JSON. Errors are JSON as
+   * everywhere. Absent means JSON.
+   */
+  responseType?: 'text';
   /** HTTP status of a success. */
   status: 200 | 201 | 202;
   access: RouteAccess;
@@ -304,6 +316,35 @@ export const templateRoutes = {
     path: '/v1/templates/:id/versions/:version',
     params: TemplateVersionParams,
     response: TemplateVersion,
+    status: 200,
+    access: 'read',
+    phase: 'S1',
+  },
+  'templates.import': {
+    method: 'POST',
+    path: '/v1/templates/import',
+    body: TemplateImport,
+    response: TemplateImportResult,
+    status: 201,
+    access: 'write',
+    phase: 'S1',
+  },
+  'templates.importPreview': {
+    method: 'POST',
+    path: '/v1/templates/import/preview',
+    body: TemplateImportPreviewRequest,
+    response: TemplateImportPreview,
+    status: 200,
+    access: 'read',
+    phase: 'S1',
+  },
+  'templates.export': {
+    method: 'GET',
+    path: '/v1/templates/:id/export',
+    params: IdParams,
+    query: TemplateExportQuery,
+    response: z.string(),
+    responseType: 'text',
     status: 200,
     access: 'read',
     phase: 'S1',
@@ -566,6 +607,17 @@ export const sendingRoutes = {
     path: '/v1/mailings/:id',
     params: IdParams,
     response: Mailing,
+    status: 200,
+    access: 'read',
+    phase: 'S2',
+  },
+  'mailings.export': {
+    method: 'GET',
+    path: '/v1/mailings/:id/export',
+    params: IdParams,
+    query: MailingExportQuery,
+    response: z.string(),
+    responseType: 'text',
     status: 200,
     access: 'read',
     phase: 'S2',
