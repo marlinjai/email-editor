@@ -474,7 +474,7 @@ Endpoints are managed with `webhooks.*` (`src/routes/webhooks.ts`), all `admin` 
   own `created_at`; Svix signs every attempt afresh) answers 503 and records
   nothing, so Resend redelivers it once the worker has recorded the send. An
   older one, or one without a readable `created_at`, is acknowledged as
-  `ignored`, counted (`events.unmatched`) and logged, never acted on: two workspaces, or another system, may share one Resend
+  `unmatched`, counted (`events.unmatched`) and logged, never acted on: two workspaces, or another system, may share one Resend
   account, and a wrong block costs a real person their mail. Create and verify register the endpoint at Resend
   (`registerResendEvents`); when that fails (a sending-only key, no public
   https address, Resend unreachable) `events.error` says why and

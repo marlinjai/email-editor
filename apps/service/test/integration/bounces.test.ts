@@ -344,13 +344,13 @@ describe('Resend events', () => {
     for (const event of events) {
       const res = await post(p.id, event);
       firstId ||= res.id;
-      expect(res, JSON.stringify(event)).toMatchObject({ status: 200, body: { ok: true, duplicate: false, outcome: 'ignored' } });
+      expect(res, JSON.stringify(event)).toMatchObject({ status: 200, body: { ok: true, duplicate: false, outcome: 'unmatched' } });
     }
     expect(await suppressionsOf(W.id)).toEqual([]);
     expect(await bouncedEvents(W.id)).toEqual([]);
     expect((await h.call({ path: `/v1/providers/${p.id}`, key: W.key })).body.events.unmatched).toBe(4);
     // A redelivery of an acknowledged event is a duplicate and not counted again.
-    expect((await post(p.id, events[0], { id: firstId })).body).toMatchObject({ duplicate: true, outcome: 'ignored' });
+    expect((await post(p.id, events[0], { id: firstId })).body).toMatchObject({ duplicate: true, outcome: 'unmatched' });
     expect((await h.call({ path: `/v1/providers/${p.id}`, key: W.key })).body.events.unmatched).toBe(4);
     expect(logSpy.mock.calls.some((c) => String(c[0]).includes('never sent; ignored'))).toBe(true);
     logSpy.mockRestore();
@@ -442,7 +442,7 @@ describe('Resend events', () => {
     // B's message id, sent to A's endpoint: A has no such message, so nothing happens anywhere.
     const oldB = { ...bounceEvent('re-b', 'shared@example.com'), created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() };
     const res = await post(pa.id, oldB);
-    expect(res.body.outcome).toBe('ignored');
+    expect(res.body.outcome).toBe('unmatched');
     expect(await suppressionsOf(W.id)).toEqual([]);
     expect(await suppressionsOf(B.id)).toEqual([]);
     expect(await bouncedEvents(B.id)).toEqual([]);

@@ -97,7 +97,7 @@ class NotYetMatched extends Error {}
  *    `created_at`) answers 503 and records nothing, so Resend redelivers it once
  *    the worker has recorded the send. An older one (another workspace or system
  *    sharing the Resend account) is counted on the provider (`events.unmatched`)
- *    and logged as `ignored`, never acted on: a wrong block costs a real person
+ *    and logged as `unmatched`, never acted on: a wrong block costs a real person
  *    their mail. `email.delivery_delayed`, transient
  *    bounces and every other type are acknowledged and ignored.
  *
@@ -159,6 +159,7 @@ export function providerEventRoutes(sql: Sql, deps: ProviderEventsDeps) {
           // Not a message this provider sent through the service: another
           // workspace or system may share the Resend account, and a wrong block
           // costs a real person their mail. Counted and logged, never acted on.
+          outcome = 'unmatched';
           await r.providers.countUnmatchedEvent(workspaceId, provider.id);
           log.log(`[provider-events] ${event.type} ${externalId} for provider ${provider.id} names email ${emailId ?? '(none)'}, which this provider never sent; ignored`);
         }
