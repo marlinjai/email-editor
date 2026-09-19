@@ -20,7 +20,7 @@ const api = {
   invites: { create: vi.fn(), revoke: vi.fn(), accept: vi.fn() },
   templates: { update: vi.fn(), get: vi.fn(), version: vi.fn() },
   mailings: { addRecipients: vi.fn(), create: vi.fn(), test: vi.fn(), retryFailed: vi.fn(), pause: vi.fn() },
-  providers: { create: vi.fn(), update: vi.fn(), setEventsSecret: vi.fn() },
+  providers: { create: vi.fn(), update: vi.fn(), setEventsSecret: vi.fn(), clearAnomaly: vi.fn() },
   assets: { upload: vi.fn() },
 };
 
@@ -34,7 +34,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 const { createWorkspace } = await import('@/app/workspaces/actions');
 const { saveTemplate, restoreVersion, uploadImage } = await import('@/app/w/[ws]/templates/actions');
 const { addRecipients, createMailing, sendTest, retryFailed, controlMailing } = await import('@/app/w/[ws]/mailings/actions');
-const { inviteMember, revokeInvite, saveProvider, setProviderEventsSecret } = await import('@/app/w/[ws]/settings/actions');
+const { inviteMember, revokeInvite, saveProvider, setProviderEventsSecret, clearProviderAnomaly } = await import('@/app/w/[ws]/settings/actions');
 const { acceptInvite } = await import('@/app/invite/[token]/actions');
 
 const conflict = (current: number) => new MailApiError({ code: 'conflict', status: 409, message: 'moved on', details: { current_version: current } });
@@ -202,6 +202,16 @@ describe('providers', () => {
     const r = await setProviderEventsSecret('ws', 'p1', `  ${secret}\n`);
     expect(r).toEqual({ ok: true, data: null });
     expect(api.providers.setEventsSecret).toHaveBeenCalledWith('p1', { signing_secret: secret });
+  });
+
+  it('clears a provider anomaly through the service, and surfaces its refusal', async () => {
+    api.providers.clearAnomaly.mockResolvedValue({ id: 'p1' });
+    expect(await clearProviderAnomaly('ws', 'p1')).toEqual({ ok: true, data: null });
+    expect(api.providers.clearAnomaly).toHaveBeenCalledWith('p1');
+    api.providers.clearAnomaly.mockRejectedValue(new MailApiError({ code: 'insufficient_role', status: 403, message: 'admins only' }));
+    const denied = await clearProviderAnomaly('ws', 'p1');
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.error.code).toBe('insufficient_role');
   });
 
   it('keeps the stored secret when an update leaves it empty', async () => {

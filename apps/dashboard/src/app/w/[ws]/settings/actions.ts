@@ -234,6 +234,16 @@ export async function verifyProvider(ws: string, providerId: string): Promise<Ac
   return act('providers.verify', async () => (await mail(ws)).api.providers.verify(providerId));
 }
 
+/** Clears a provider's bounce anomaly after an admin checked the provider: bounce blocking, test sends and starts work again. */
+export async function clearProviderAnomaly(ws: string, providerId: string): Promise<ActionResult> {
+  return act('providers.clearAnomaly', async () => {
+    const { api } = await mail(ws);
+    await api.providers.clearAnomaly(providerId);
+    revalidatePath(settingsPath(ws, '/providers'));
+    return null;
+  });
+}
+
 /** Stores the signing secret of a Resend events endpoint the member added at Resend by hand. */
 export async function setProviderEventsSecret(ws: string, providerId: string, signingSecret: string): Promise<ActionResult> {
   const parsed = parseInput(ProviderEventsSecret, { signing_secret: signingSecret.trim() });

@@ -8,7 +8,14 @@ import { FormError } from '@/components/form-error';
 import { Badge, Button, describedBy, EmptyState, Field, Input, Mono, Notice, Panel, Section, Select, When } from '@/components/ui';
 import { useAction } from '@/components/use-action';
 import { formatCount, percent } from '@/lib/format';
-import { deleteProvider, saveProvider, setProviderEventsSecret, verifyProvider, type ProviderFormInput } from '../actions';
+import {
+  clearProviderAnomaly,
+  deleteProvider,
+  saveProvider,
+  setProviderEventsSecret,
+  verifyProvider,
+  type ProviderFormInput,
+} from '../actions';
 
 type Item = { provider: Provider; usage: ProviderUsage | null };
 
@@ -394,25 +401,41 @@ function BounceHandling({ ws, provider: p, canAdmin }: { ws: string; provider: P
  * many recipients refused as dead addresses in one run, which points at the
  * provider or the sender's setup. The run's blocks were undone.
  */
-function BreakerAnomaly({ ws, provider: p }: { ws: string; provider: Provider }) {
+function BreakerAnomaly({ ws, provider: p, canAdmin }: { ws: string; provider: Provider; canAdmin: boolean }) {
+  const router = useRouter();
+  const clear = useAction();
   const a = p.rejections.anomaly;
   if (!a) return null;
   return (
     <Notice tone="danger">
       <span className="font-medium">
-        A mailing was paused <When at={a.at} />: too many recipients were refused as unknown addresses.
+        {a.scope === 'provider' ? 'Bounce blocking is halted for this provider' : 'A mailing was paused'} <When at={a.at} />: too many
+        recipients were refused as unknown addresses.
       </span>
       <span className="mt-1 block text-[12.5px]">
-        {a.reason} The addresses were not blocked. Check this provider&apos;s account and the sender&apos;s domain setup, then resume
-        the mailing{a.mailing_id ? (
+        {a.reason} The addresses were not blocked.{' '}
+        {a.blocking
+          ? "Until an admin clears this, test sends are refused and mailings through this provider don't start or resume. Check the provider's account and the sender's domain setup first."
+          : "Check this provider's account and the sender's domain setup, then resume the mailing."}
+        {a.mailing_id ? (
           <>
             {' '}
-            (<a className="underline" href={`/w/${ws}/mailings/${a.mailing_id}`}>open it</a>)
+            <a className="underline" href={`/w/${ws}/mailings/${a.mailing_id}`}>
+              Open the mailing
+            </a>
+            .
           </>
         ) : null}
-        .
       </span>
       {a.sample ? <span className="mt-1 block font-mono text-[12px] text-muted">{a.sample}</span> : null}
+      {canAdmin ? (
+        <span className="mt-2 flex flex-wrap items-center gap-2">
+          <Button busy={clear.pending} onClick={() => void clear.run(() => clearProviderAnomaly(ws, p.id), () => router.refresh())}>
+            {a.blocking ? 'Provider checked: clear and allow sending' : 'Dismiss'}
+          </Button>
+          {clear.error ? <FormError error={clear.error} /> : null}
+        </span>
+      ) : null}
     </Notice>
   );
 }
@@ -510,7 +533,7 @@ function ProviderCard({ ws, item, canAdmin }: { ws: string; item: Item; canAdmin
         {verify.error ? <FormError error={verify.error} /> : verified ? <VerifyResult result={verified} /> : null}
       </div>
       <div className="mt-3 flex flex-col gap-3">
-        <BreakerAnomaly ws={ws} provider={p} />
+        <BreakerAnomaly ws={ws} provider={p} canAdmin={canAdmin} />
         <Rejections provider={p} />
         <BounceHandling ws={ws} provider={p} canAdmin={canAdmin} />
       </div>
