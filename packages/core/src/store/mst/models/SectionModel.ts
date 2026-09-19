@@ -373,6 +373,22 @@ const SectionModelBase = types
     },
 
     /**
+     * How wide the section's visible columns are together, in percent, as MJML
+     * lays them out: each column's width, where a column opened without one
+     * holds MJML's share (100 / columns, whatever its siblings say). Over 100,
+     * the last column wraps below the others on desktop.
+     */
+    get columnWidthTotal(): number {
+      const total = self.columns.filter((c) => !c.hidden).reduce((sum, c) => sum + c.width, 0);
+      return Math.round(total * 100) / 100;
+    },
+
+    /** Whether the columns overflow the section ({@link columnWidthTotal} over 100). */
+    get columnsOverflow(): boolean {
+      return this.columnWidthTotal > 100;
+    },
+
+    /**
      * Display name for layers panel
      */
     get displayName(): string {

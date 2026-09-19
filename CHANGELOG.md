@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create) and an Export menu (MJML or HTML) for templates and mailings.
 - Landing page: the editor line names MJML import and export, in all five
   languages.
+- Editor: the section inspector warns when its columns add up to more than
+  100% ("These columns add up to 110%, so the last one wraps below on
+  desktop."), counting a column without a width as MJML does (100 divided by
+  the number of columns).
 
 ### Fixed
 

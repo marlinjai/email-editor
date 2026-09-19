@@ -58,6 +58,16 @@ export const SectionProperties = observer(function SectionProperties({
     <div className="p-4 space-y-4">
       <h3 className="font-semibold text-sm">{section.displayName}</h3>
 
+      {section.columnsOverflow ? (
+        <p
+          role="status"
+          data-testid="section-columns-overflow"
+          className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800"
+        >
+          These columns add up to {Math.round(section.columnWidthTotal)}%, so the last one wraps below on desktop.
+        </p>
+      ) : null}
+
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">Background</label>
         <div className="flex gap-1 mb-2">
